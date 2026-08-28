@@ -36,7 +36,7 @@
             padding: 20px;
             display: flex;
             flex-direction: column;
-            gap: 20px;
+            gap: 18px;
             flex-shrink: 0;
             z-index: 10;
         }
@@ -45,7 +45,7 @@
             display: flex;
             align-items: center;
             gap: 10px;
-            padding-bottom: 15px;
+            padding-bottom: 12px;
             border-bottom: 1px solid #2a2e39;
         }
 
@@ -75,11 +75,11 @@
 
         .ticker-card {
             background-color: #2a2e39;
-            padding: 15px;
+            padding: 12px 15px;
             border-radius: 8px;
             display: flex;
             flex-direction: column;
-            gap: 8px;
+            gap: 6px;
         }
 
         .ticker-price {
@@ -105,12 +105,41 @@
         }
 
         .section-title {
-            font-size: 12px;
+            font-size: 11px;
             text-transform: uppercase;
             letter-spacing: 1px;
             color: #787b86;
-            margin-bottom: 5px;
+            margin-bottom: 2px;
             font-weight: 600;
+        }
+
+        .timeframe-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 6px;
+        }
+
+        .tf-btn {
+            background-color: #2a2e39;
+            border: 1px solid #363a45;
+            color: #b2b5be;
+            padding: 8px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .tf-btn:hover {
+            background-color: #363a45;
+            color: #ffffff;
+        }
+
+        .tf-btn.active {
+            background-color: #2962ff;
+            color: #ffffff;
+            border-color: #2962ff;
         }
 
         .control-group {
@@ -169,7 +198,7 @@
             font-weight: 600;
             font-size: 14px;
             cursor: pointer;
-            margin-top: 10px;
+            margin-top: 5px;
         }
 
         button.btn-primary:hover {
@@ -208,6 +237,16 @@
                     <span id="connection-status">Cargando...</span>
                 </div>
                 <div class="ticker-price" id="live-price">---.--</div>
+            </div>
+
+            <div class="section-title">Temporalidad</div>
+            <div class="timeframe-grid">
+                <button class="tf-btn active" data-tf="1m">1m</button>
+                <button class="tf-btn" data-tf="5m">5m</button>
+                <button class="tf-btn" data-tf="15m">15m</button>
+                <button class="tf-btn" data-tf="1h">1h</button>
+                <button class="tf-btn" data-tf="4h">4h</button>
+                <button class="tf-btn" data-tf="1d">1d</button>
             </div>
 
             <div class="section-title">Parámetros de Indicadores</div>
@@ -249,7 +288,10 @@
             const chartElement = document.getElementById('chart-container');
             const wrapperElement = document.getElementById('chart-wrapper');
 
-            // 1. Crear el gráfico adaptado al contenedor padre
+            let currentInterval = '1m';
+            let socket = null;
+            let rawCandles = [];
+
             const chart = LightweightCharts.createChart(chartElement, {
                 width: wrapperElement.clientWidth,
                 height: wrapperElement.clientHeight,
@@ -274,7 +316,6 @@
                 },
             });
 
-            // Ajuste automático de tamaño al cambiar la ventana
             const resizeObserver = new ResizeObserver(entries => {
                 if (entries.length === 0 || !entries[0].contentRect) return;
                 const { width, height } = entries[0].contentRect;
@@ -293,17 +334,20 @@
             const fastMaSeries = chart.addLineSeries({ color: '#2962ff', lineWidth: 2, title: 'MA Rápida' });
             const slowMaSeries = chart.addLineSeries({ color: '#ff6d00', lineWidth: 2, title: 'MA Lenta' });
 
-            let rawCandles = [];
+            async function loadHistoricalData(interval) {
+                if (socket) {
+                    socket.close();
+                }
 
-            // 2. Cargar historial con múltiples fuentes de respaldo (por restricciones geográficas/CORS en GitHub)
-            const apiEndpoints = [
-                'https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1m&limit=200',
-                'https://api1.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1m&limit=200',
-                'https://api3.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1m&limit=200'
-            ];
+                document.getElementById('connection-status').innerText = `Cargando (${interval})...`;
+                document.getElementById('status-dot').style.backgroundColor = "#ff6d00";
 
-            async function loadHistoricalData() {
-                let loaded = false;
+                const apiEndpoints = [
+                    `https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=${interval}&limit=200`,
+                    `https://api1.binance.com/api/v3/klines?symbol=BTCUSDT&interval=${interval}&limit=200`,
+                    `https://api3.binance.com/api/v3/klines?symbol=BTCUSDT&interval=${interval}&limit=200`
+                ];
+
                 for (let url of apiEndpoints) {
                     try {
                         const res = await fetch(url);
@@ -322,23 +366,20 @@
                             updateLivePrice(rawCandles[rawCandles.length - 1].close);
                         }
                         recalculateIndicators();
-                        loaded = true;
                         break;
                     } catch (e) {
-                        console.warn("Fallo endpoint:", url, e);
+                        console.warn("Fallo REST:", url, e);
                     }
                 }
 
-                // Iniciar WebSocket independientemente de si el fetch histórico funcionó o no
-                connectWebSocket();
+                connectWebSocket(interval);
             }
 
-            // 3. Conexión WebSocket
-            function connectWebSocket() {
-                const socket = new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@kline_1m');
+            function connectWebSocket(interval) {
+                socket = new WebSocket(`wss://stream.binance.com:9443/ws/btcusdt@kline_${interval}`);
 
                 socket.onopen = () => {
-                    document.getElementById('connection-status').innerText = "Conectado (1m)";
+                    document.getElementById('connection-status').innerText = `Conectado (${interval})`;
                     document.getElementById('status-dot').style.backgroundColor = "#26a69a";
                 };
 
@@ -378,7 +419,6 @@
                 priceEl.innerText = '$' + price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
             }
 
-            // 4. Cálculos Matemáticos
             function calculateSMA(data, period) {
                 let result = [];
                 for (let i = 0; i < data.length; i++) {
@@ -431,7 +471,17 @@
                 recalculateIndicators();
             };
 
-            loadHistoricalData();
+            // Event Listeners para temporalidades
+            document.querySelectorAll('.tf-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    document.querySelectorAll('.tf-btn').forEach(b => b.classList.remove('active'));
+                    e.target.classList.add('active');
+                    currentInterval = e.target.getAttribute('data-tf');
+                    loadHistoricalData(currentInterval);
+                });
+            });
+
+            loadHistoricalData(currentInterval);
         });
     </script>
 </body>
