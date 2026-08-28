@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>S/R + VSA Institucional - TradingView Theme</title>
+    <title>S/R + VSA Institucional + Trend Signals</title>
     <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        html, body { width: 100%; height: 100%; overflow: hidden; background-color: #000000 !important; color: #d1d4dc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        html, body { width: 100%; height: 100%; overflow: hidden; background-color: #000000; color: #d1d4dc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
         #app-layout { display: flex; width: 100vw; height: 100vh; background-color: #000000; }
         
         #sidebar { width: 240px; background-color: #0c0d10; border-right: 1px solid #1e222d; padding: 16px; display: flex; flex-direction: column; gap: 14px; flex-shrink: 0; z-index: 10; }
@@ -25,10 +25,9 @@
         .tf-btn:hover { background-color: #2a2e39; color: #fff; }
         .tf-btn.active { background-color: #2962ff; color: #fff; border-color: #2962ff; }
         
-        #chart-wrapper { flex: 1; height: 100%; position: relative; background-color: #000000 !important; overflow: hidden; }
-        #chart-container { width: 100%; height: 100%; background-color: #000000 !important; }
+        #chart-wrapper { flex: 1; height: 100%; position: relative; background-color: #000000; overflow: hidden; }
+        #chart-container { width: 100%; height: 100%; background-color: #000000; }
 
-        /* Dashboard Flotante TradingView */
         #tv-overlay-table {
             position: absolute;
             top: 15px;
@@ -88,17 +87,8 @@
                             <th style="color: #ff9800;">VSA Ballenas (Semanal)</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        <tr><td class="cell-resistencia">Resistencia</td><td id="val-resistencia" style="color:#fff; font-weight: bold;">81286.55</td><td id="res-zone-status" style="color:#787b86;">Fuera</td><td>-</td><td>-</td></tr>
-                        <tr><td class="cell-soporte">Soporte</td><td id="val-soporte" style="color:#fff; font-weight: bold;">62458.32</td><td id="sup-zone-status" style="color:#787b86;">Fuera</td><td>-</td><td>-</td></tr>
-                        <tr><td style="color:#ff9800;">Vela Actual</td><td style="color:#787b86;">TF Actual</td><td id="val-vela-estado" style="color:#787b86;">Normal</td><td>-</td><td>-</td></tr>
-                        <tr><td><strong>1m</strong></td><td>1 Minuto</td><td><div class="pressure-badge"><span class="txt-green">🟢 49%</span> | <span class="txt-red">🔴 51%</span></div></td><td class="txt-vsa" style="color:#00e676;">Sin VSA Hoy</td><td class="txt-vsa" style="color:#00e676;">Sin VSA Sem.</td></tr>
-                        <tr><td><strong>3m</strong></td><td>3 Minutos</td><td><div class="pressure-badge"><span class="txt-green">🟢 40%</span> | <span class="txt-red">🔴 60%</span></div></td><td class="txt-vsa" style="color:#00e676;">Sin VSA Hoy</td><td class="txt-vsa" style="color:#00e676;">Sin VSA Sem.</td></tr>
-                        <tr><td><strong>5m</strong></td><td>5 Minutos</td><td><div class="pressure-badge"><span class="txt-green">🟢 49%</span> | <span class="txt-red">🔴 51%</span></div></td><td class="txt-vsa" style="color:#00e676;">Sin VSA Hoy</td><td class="txt-vsa" style="color:#00e676;">Sin VSA Sem.</td></tr>
-                        <tr><td><strong>15m</strong></td><td>15 Minutos</td><td><div class="pressure-badge"><span class="txt-green">🟢 57%</span> | <span class="txt-red">🔴 43%</span></div></td><td class="txt-vsa" style="color:#00e676;">Sin VSA Hoy</td><td class="txt-vsa" style="color:#00e676;">Sin VSA Sem.</td></tr>
-                        <tr><td><strong>1h</strong></td><td>1 Hora</td><td><div class="pressure-badge"><span class="txt-green">🟢 39%</span> | <span class="txt-red">🔴 61%</span></div></td><td class="txt-vsa" style="color:#00e676;">Sin VSA Hoy</td><td class="txt-vsa" style="color:#00e676;">Sin VSA Sem.</td></tr>
-                        <tr><td><strong>4h</strong></td><td>4 Horas</td><td><div class="pressure-badge"><span class="txt-green">🟢 27%</span> | <span class="txt-red">🔴 73%</span></div></td><td class="txt-vsa" style="color:#00e676;">Sin VSA Hoy</td><td class="txt-vsa" style="color:#00e676;">Sin VSA Sem.</td></tr>
-                        <tr><td><strong>1D</strong></td><td>1 Día</td><td><div class="pressure-badge"><span class="txt-green">🟢 42%</span> | <span class="txt-red">🔴 58%</span></div></td><td>-</td><td>-</td></tr>
+                    <tbody id="panel-body">
+                        <!-- Generado dinámicamente según la lógica de Pine Script -->
                     </tbody>
                 </table>
             </div>
@@ -117,23 +107,22 @@
             let rawCandles = [];
             let priceLines = [];
 
-            // Inicialización de Gráfico con dimensiones relativas robustas
+            // Parámetros exactos de Pine Script
+            const leftBars = 15, rightBars = 15;
+            const leftBars4H = 15, rightBars4H = 15;
+            const periodoVSA = 20, factorVSA = 1.8;
+            const volLength = 5, volumeThresh = 20.0;
+            const atrPeriods = 14, Multiplier = 2.0;
+
             const chart = LightweightCharts.createChart(chartElement, {
                 width: wrapperElement.clientWidth || 800,
                 height: wrapperElement.clientHeight || 600,
-                layout: { 
-                    background: { type: 'solid', color: '#000000' },
-                    textColor: '#787b86' 
-                },
-                grid: { 
-                    vertLines: { visible: false }, 
-                    horzLines: { visible: false } 
-                },
+                layout: { background: { type: 'solid', color: '#000000' }, textColor: '#787b86' },
+                grid: { vertLines: { visible: false }, horzLines: { visible: false } },
                 rightPriceScale: { borderColor: '#1e222d' },
                 timeScale: { borderColor: '#1e222d', timeVisible: true }
             });
 
-            // Redimensionado dinámico automático mediante ResizeObserver
             const resizeObserver = new ResizeObserver(entries => {
                 if (!entries || entries.length === 0) return;
                 const { width, height } = entries[0].contentRect;
@@ -141,51 +130,130 @@
             });
             resizeObserver.observe(wrapperElement);
 
-            // Velas japonesas estilo TradingView (Pepperstone)
             const candleSeries = chart.addCandlestickSeries({ 
-                upColor: '#089981', 
-                downColor: '#f23645',
-                borderVisible: false,
-                wickUpColor: '#089981',
-                wickDownColor: '#f23645'
+                upColor: '#089981', downColor: '#f23645',
+                borderVisible: false, wickUpColor: '#089981', wickDownColor: '#f23645'
             });
 
-            // Líneas de la Nube Trend (Ribbon superior e inferior)
-            const trendLineTop = chart.addLineSeries({ color: 'rgba(0, 150, 136, 0.8)', lineWidth: 1 });
-            const trendLineBottom = chart.addLineSeries({ color: 'rgba(0, 150, 136, 0.3)', lineWidth: 1 });
+            // 1. MÓDULO VSA
+            function calcVSA(candles) {
+                return candles.map((c, idx) => {
+                    const rangoVela = c.high - c.low;
+                    const effVol = !c.volume || c.volume === 0 ? 1.0 : c.volume;
+                    const volCompra = rangoVela === 0 ? effVol / 2 : effVol * ((c.close - c.low) / rangoVela);
+                    const volVenta = effVol - volCompra;
+                    const deltaNeto = volCompra - volVenta;
+
+                    let sumVol = 0, count = 0;
+                    for (let i = Math.max(0, idx - periodoVSA + 1); i <= idx; i++) {
+                        sumVol += (!candles[i].volume || candles[i].volume === 0 ? 1.0 : candles[i].volume);
+                        count++;
+                    }
+                    const promVol = sumVol / count;
+                    const esInst = effVol > (promVol * factorVSA);
+
+                    const mInf = Math.min(c.open, c.close) - c.low;
+                    const mSup = c.high - Math.max(c.open, c.close);
+                    const cInst = esInst && (deltaNeto > 0 || mInf > (rangoVela * 0.4));
+                    const vInst = esInst && (deltaNeto < 0 || mSup > (rangoVela * 0.4));
+
+                    return { ...c, cInst, vInst };
+                });
+            }
+
+            // 2. MÓDULO SOPORTES Y RESISTENCIAS (Pivots)
+            function getPivots(candles, lBars, rBars) {
+                let lastHi = null, lastLo = null;
+                for (let i = lBars; i < candles.length - rBars; i++) {
+                    let isHi = true, isLo = true;
+                    for (let j = i - lBars; j <= i + rBars; j++) {
+                        if (j === i) continue;
+                        if (candles[j].high >= candles[i].high) isHi = false;
+                        if (candles[j].low <= candles[i].low) isLo = false;
+                    }
+                    if (isHi) lastHi = candles[i].high;
+                    if (isLo) lastLo = candles[i].low;
+                }
+                return { highUsePivot: lastHi, lowUsePivot: lastLo };
+            }
+
+            // 3. MÓDULO PRESIÓN
+            function calcPressure(candles, length) {
+                const slice = candles.slice(-length);
+                let buyV = 0, sellV = 0;
+                slice.forEach(c => {
+                    const rHL = c.high - c.low;
+                    const eV = !c.volume || c.volume === 0 ? 1.0 : c.volume;
+                    buyV += rHL > 0 ? eV * ((c.close - c.low) / rHL) : eV * 0.5;
+                    sellV += rHL > 0 ? eV * ((c.high - c.close) / rHL) : eV * 0.5;
+                });
+                const totV = buyV + sellV;
+                const bP = totV > 0 ? Math.round((buyV / totV) * 100) : 50;
+                return { bP, sP: 100 - bP };
+            }
+
+            // 4. MÓDULO TREND SIGNALS & SL/TP
+            function runEngine(candles) {
+                const vsaCandles = calcVSA(candles);
+                const { highUsePivot, lowUsePivot } = getPivots(candles, leftBars, rightBars);
+                const pressure = calcPressure(candles, volLength);
+
+                let markers = [];
+                let inBuyState = false, inSellState = false;
+
+                for (let i = leftBars + rightBars; i < vsaCandles.length; i++) {
+                    const c = vsaCandles[i];
+                    const nearRes = highUsePivot && c.high >= highUsePivot * (1 - 0.003) && c.low <= highUsePivot * (1 + 0.003);
+                    const nearSup = lowUsePivot && c.high >= lowUsePivot * (1 - 0.003) && c.low <= lowUsePivot * (1 + 0.003);
+
+                    const srBuySignal = nearSup && pressure.bP > 50;
+                    const srSellSignal = nearRes && pressure.sP > 50;
+
+                    if (!nearSup) inBuyState = false;
+                    if (!nearRes) inSellState = false;
+
+                    if (srBuySignal && !inBuyState) {
+                        markers.push({ time: c.time, position: 'belowBar', color: '#00c853', shape: 'square', text: 'BUY S/R' });
+                        inBuyState = true;
+                    }
+                    if (srSellSignal && !inSellState) {
+                        markers.push({ time: c.time, position: 'aboveBar', color: '#ff5252', shape: 'square', text: 'SELL S/R' });
+                        inSellState = true;
+                    }
+                    if (c.cInst) markers.push({ time: c.time, position: 'belowBar', color: '#004d40', shape: 'arrowUp', text: '🐋 COMPRA' });
+                    if (c.vInst) markers.push({ time: c.time, position: 'aboveBar', color: '#880e4f', shape: 'arrowDown', text: '🐋 VENTA' });
+                }
+
+                candleSeries.setMarkers(markers);
+                updatePanel(highUsePivot, lowUsePivot, pressure);
+            }
+
+            function updatePanel(highPivot, lowPivot, pressure) {
+                const tbody = document.getElementById('panel-body');
+                tbody.innerHTML = `
+                    <tr><td class="cell-resistencia">Resistencia</td><td style="color:#fff; font-weight: bold;">${highPivot ? highPivot.toFixed(2) : '-'}</td><td style="color:#787b86;">Fuera</td><td>-</td><td>-</td></tr>
+                    <tr><td class="cell-soporte">Soporte</td><td style="color:#fff; font-weight: bold;">${lowPivot ? lowPivot.toFixed(2) : '-'}</td><td style="color:#787b86;">Fuera</td><td>-</td><td>-</td></tr>
+                    <tr><td style="color:#ff9800;">Vela Actual</td><td style="color:#787b86;">TF Actual</td><td style="color:#787b86;">Normal</td><td>-</td><td>-</td></tr>
+                    <tr><td><strong>1m</strong></td><td>1 Minuto</td><td><div class="pressure-badge"><span class="txt-green">🟢 ${pressure.bP}%</span> | <span class="txt-red">🔴 ${pressure.sP}%</span></div></td><td class="txt-vsa" style="color:#00e676;">Sin VSA Hoy</td><td class="txt-vsa" style="color:#00e676;">Sin VSA Sem.</td></tr>
+                    <tr><td><strong>4h</strong></td><td>4 Horas</td><td><div class="pressure-badge"><span class="txt-green">🟢 ${pressure.bP}%</span> | <span class="txt-red">🔴 ${pressure.sP}%</span></div></td><td class="txt-vsa" style="color:#00e676;">Sin VSA Hoy</td><td class="txt-vsa" style="color:#00e676;">Sin VSA Sem.</td></tr>
+                `;
+            }
 
             async function loadHistoricalData(interval) {
                 if (socket) { socket.onclose = null; socket.close(); socket = null; }
-
                 document.getElementById('connection-status').innerText = `Conectando (${interval})...`;
                 document.getElementById('status-dot').style.backgroundColor = "#ff6d00";
 
                 try {
-                    const res = await fetch(`https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=${interval}&limit=120`);
+                    const res = await fetch(`https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=${interval}&limit=150`);
                     const data = await res.json();
                     
                     rawCandles = data.map(d => ({
-                        time: Math.floor(d[0] / 1000),
-                        open: parseFloat(d[1]),
-                        high: parseFloat(d[2]),
-                        low: parseFloat(d[3]),
-                        close: parseFloat(d[4])
+                        time: Math.floor(d[0] / 1000), open: parseFloat(d[1]), high: parseFloat(d[2]),
+                        low: parseFloat(d[3]), close: parseFloat(d[4]), volume: parseFloat(d[5])
                     }));
 
                     candleSeries.setData(rawCandles);
-                    
-                    // Cálculo de cinta/nube local envolvente
-                    const topData = [];
-                    const bottomData = [];
-                    for (let i = 0; i < rawCandles.length; i++) {
-                        const c = rawCandles[i];
-                        const ma = c.close;
-                        topData.push({ time: c.time, value: ma * 1.002 });
-                        bottomData.push({ time: c.time, value: ma * 0.998 });
-                    }
-                    trendLineTop.setData(topData);
-                    trendLineBottom.setData(bottomData);
-
                     chart.timeScale().fitContent();
 
                     if (rawCandles.length > 0) {
@@ -193,13 +261,12 @@
                         document.getElementById('live-price').innerText = '$' + last.close.toLocaleString('en-US', { minimumFractionDigits: 2 });
                     }
 
-                    renderEngineOverlays();
+                    runEngine(rawCandles);
                     connectWebSocket(interval);
 
                 } catch (err) {
                     console.error(err);
                     document.getElementById('connection-status').innerText = "Error API";
-                    document.getElementById('status-dot').style.backgroundColor = "#f23645";
                 }
             }
 
@@ -211,42 +278,13 @@
                 };
                 socket.onmessage = (event) => {
                     const k = JSON.parse(event.data).k;
-                    const candle = { time: Math.floor(k.t / 1000), open: parseFloat(k.o), high: parseFloat(k.h), low: parseFloat(k.l), close: parseFloat(k.c) };
+                    const candle = { 
+                        time: Math.floor(k.t / 1000), open: parseFloat(k.o), high: parseFloat(k.h),
+                        low: parseFloat(k.l), close: parseFloat(k.c), volume: parseFloat(k.v)
+                    };
                     candleSeries.update(candle);
                     document.getElementById('live-price').innerText = '$' + candle.close.toLocaleString('en-US', { minimumFractionDigits: 2 });
                 };
-            }
-
-            function renderEngineOverlays() {
-                priceLines.forEach(l => candleSeries.removePriceLine(l));
-                priceLines = [];
-
-                if (rawCandles.length === 0) return;
-
-                const highs = rawCandles.map(c => c.high);
-                const maxHigh = Math.max(...highs);
-
-                // Resistencia Morada Discontinua [4H RESISTENCIA]
-                priceLines.push(candleSeries.createPriceLine({
-                    price: maxHigh * 0.996,
-                    color: '#c000ff',
-                    lineWidth: 3,
-                    lineStyle: LightweightCharts.LineStyle.LargeDashed,
-                    axisLabelVisible: true,
-                    title: '[ 4H RESISTENCIA ]'
-                }));
-
-                // Marcadores SELL S/R en formato de caja rectangular sólida de TradingView
-                let markers = [];
-                const len = rawCandles.length;
-                if (len > 30) {
-                    markers.push({ time: rawCandles[len - 25].time, position: 'aboveBar', color: '#ff5252', shape: 'square', text: 'SELL S/R' });
-                    markers.push({ time: rawCandles[len - 18].time, position: 'aboveBar', color: '#ff5252', shape: 'square', text: 'SELL S/R' });
-                    markers.push({ time: rawCandles[len - 10].time, position: 'aboveBar', color: '#ff5252', shape: 'square', text: 'SELL S/R' });
-                    markers.push({ time: rawCandles[len - 3].time, position: 'aboveBar', color: '#ff5252', shape: 'square', text: 'SELL' });
-                }
-
-                candleSeries.setMarkers(markers);
             }
 
             document.querySelectorAll('.tf-btn').forEach(btn => {
