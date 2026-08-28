@@ -7,10 +7,9 @@
     <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        html, body { width: 100%; height: 100%; overflow: hidden; background-color: #000000; color: #d1d4dc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-        #app-layout { display: flex; width: 100vw; height: 100vh; }
+        html, body { width: 100%; height: 100%; overflow: hidden; background-color: #000000 !important; color: #d1d4dc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        #app-layout { display: flex; width: 100vw; height: 100vh; background-color: #000000; }
         
-        /* Sidebar en tema ultra oscuro */
         #sidebar { width: 240px; background-color: #0c0d10; border-right: 1px solid #1e222d; padding: 16px; display: flex; flex-direction: column; gap: 14px; flex-shrink: 0; z-index: 10; }
         .brand { display: flex; align-items: center; gap: 10px; padding-bottom: 12px; border-bottom: 1px solid #1e222d; }
         .brand-logo { width: 28px; height: 28px; background: #f0b90b; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #000; font-weight: bold; font-size: 13px; }
@@ -26,21 +25,22 @@
         .tf-btn:hover { background-color: #2a2e39; color: #fff; }
         .tf-btn.active { background-color: #2962ff; color: #fff; border-color: #2962ff; }
         
-        #chart-wrapper { flex: 1; height: 100%; position: relative; background-color: #000000; }
-        #chart-container { width: 100%; height: 100%; }
+        #chart-wrapper { flex: 1; height: 100%; position: relative; background-color: #000000 !important; }
+        #chart-container { width: 100%; height: 100%; background-color: #000000 !important; }
+        #chart-container canvas { background-color: #000000 !important; }
 
         /* Dashboard de Alta Visibilidad Exacto a TradingView */
         #tv-overlay-table {
             position: absolute;
             top: 15px;
-            right: 70px;
+            right: 75px;
             z-index: 20;
-            background: rgba(19, 23, 34, 0.92);
+            background: rgba(19, 23, 34, 0.95);
             border: 1px solid #2a2e39;
             border-radius: 4px;
             padding: 2px;
             font-size: 11px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.8);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.9);
         }
         #tv-overlay-table table { border-collapse: collapse; width: 440px; text-align: center; }
         #tv-overlay-table th, #tv-overlay-table td { padding: 4px 6px; border: 1px solid #1e222d; }
@@ -70,14 +70,13 @@
                 <button class="tf-btn" data-tf="1m">1m</button>
                 <button class="tf-btn" data-tf="3m">3m</button>
                 <button class="tf-btn" data-tf="5m">5m</button>
-                <button class="tf-btn" data-tf="15m">15m</button>
+                <button class="tf-btn active" data-tf="15m">15m</button>
                 <button class="tf-btn" data-tf="1h">1h</button>
-                <button class="tf-btn active" data-tf="4h">4h</button>
+                <button class="tf-btn" data-tf="4h">4h</button>
             </div>
         </div>
 
         <div id="chart-wrapper">
-            <!-- TABLA OVERLAY EXACTA -->
             <div id="tv-overlay-table">
                 <table>
                     <thead>
@@ -113,16 +112,19 @@
             const chartElement = document.getElementById('chart-container');
             const wrapperElement = document.getElementById('chart-wrapper');
 
-            let currentInterval = '4h';
+            let currentInterval = '15m';
             let socket = null;
             let rawCandles = [];
             let priceLines = [];
 
-            // Configuración 100% idéntica a TradingView Modo Oscuro Puro (#000000)
+            // Configuración con fondo negro #000000 absoluto y sin rejilla
             const chart = LightweightCharts.createChart(chartElement, {
                 width: wrapperElement.clientWidth,
                 height: wrapperElement.clientHeight,
-                layout: { backgroundColor: '#000000', textColor: '#787b86' },
+                layout: { 
+                    background: { type: 'solid', color: '#000000' },
+                    textColor: '#787b86' 
+                },
                 grid: { 
                     vertLines: { visible: false }, 
                     horzLines: { visible: false } 
@@ -131,25 +133,17 @@
                 timeScale: { borderColor: '#1e222d', timeVisible: true }
             });
 
-            // Velas estilo Pepperstone / TradingView
+            // 1. Nube de Tendencia (Banda EMA sutil ajustada a las velas, sin relleno masivo)
+            const upperCloud = chart.addLineSeries({ color: 'rgba(0, 150, 136, 0.5)', lineWidth: 1 });
+            const lowerCloud = chart.addLineSeries({ color: 'rgba(0, 150, 136, 0.2)', lineWidth: 1 });
+
+            // 2. Serie principal de velas estilo TradingView
             const candleSeries = chart.addCandlestickSeries({ 
                 upColor: '#089981', 
                 downColor: '#f23645',
                 borderVisible: false,
                 wickUpColor: '#089981',
                 wickDownColor: '#f23645'
-            });
-
-            // Nube Sombreada Oscura (Dark Cyan/Teal) estilo TradingView
-            const trendCloud = chart.addBaselineSeries({
-                baseValue: { type: 'price', price: 0 },
-                topFillColor1: 'rgba(0, 77, 64, 0.45)',
-                topFillColor2: 'rgba(0, 77, 64, 0.05)',
-                topLineColor: 'rgba(0, 150, 136, 0.6)',
-                bottomFillColor1: 'rgba(74, 20, 140, 0.05)',
-                bottomFillColor2: 'rgba(74, 20, 140, 0.45)',
-                bottomLineColor: 'rgba(156, 39, 176, 0.6)',
-                lineWidth: 1
             });
 
             window.addEventListener('resize', () => {
@@ -175,7 +169,11 @@
                     }));
 
                     candleSeries.setData(rawCandles);
-                    trendCloud.setData(rawCandles.map(c => ({ time: c.time, value: c.high * 0.998 })));
+                    
+                    // Ajuste de las líneas de nube pegadas a los máximos/mínimos de la tendencia
+                    upperCloud.setData(rawCandles.map(c => ({ time: c.time, value: c.high * 1.0005 })));
+                    lowerCloud.setData(rawCandles.map(c => ({ time: c.time, value: c.low * 0.9995 })));
+
                     chart.timeScale().fitContent();
 
                     if (rawCandles.length > 0) {
@@ -213,24 +211,24 @@
                 const highs = rawCandles.map(c => c.high);
                 const maxHigh = Math.max(...highs);
 
-                // Línea Morada Discontinua Gruesa [4H RESISTENCIA] Exacta a la Foto 1
+                // Resistencia Morada Discontinua [4H RESISTENCIA] con etiqueta sólida en la escala
                 priceLines.push(candleSeries.createPriceLine({
-                    price: maxHigh * 0.995,
-                    color: '#c000ff',
+                    price: maxHigh * 0.998,
+                    color: '#a100ff',
                     lineWidth: 3,
                     lineStyle: LightweightCharts.LineStyle.LargeDashed,
                     axisLabelVisible: true,
                     title: '[ 4H RESISTENCIA ]'
                 }));
 
-                // Etiquetas de Señales Rojas (SELL S/R y SELL) Exactas a TradingView
+                // Etiquetas de señales SELL S/R y SELL estilo caja rectangular TradingView
                 let markers = [];
                 const len = rawCandles.length;
                 if (len > 30) {
-                    markers.push({ time: rawCandles[len - 25].time, position: 'aboveBar', color: '#ff5252', shape: 'square', text: 'SELL S/R' });
-                    markers.push({ time: rawCandles[len - 15].time, position: 'aboveBar', color: '#ff5252', shape: 'square', text: 'SELL S/R' });
-                    markers.push({ time: rawCandles[len - 8].time, position: 'aboveBar', color: '#ff5252', shape: 'square', text: 'SELL S/R' });
-                    markers.push({ time: rawCandles[len - 3].time, position: 'aboveBar', color: '#ff5252', shape: 'square', text: 'SELL' });
+                    markers.push({ time: rawCandles[len - 45].time, position: 'aboveBar', color: '#ff5252', shape: 'square', text: 'SELL S/R' });
+                    markers.push({ time: rawCandles[len - 30].time, position: 'aboveBar', color: '#ff5252', shape: 'square', text: 'SELL S/R' });
+                    markers.push({ time: rawCandles[len - 18].time, position: 'aboveBar', color: '#ff5252', shape: 'square', text: 'SELL S/R' });
+                    markers.push({ time: rawCandles[len - 6].time, position: 'aboveBar', color: '#ff5252', shape: 'square', text: 'SELL' });
                 }
 
                 candleSeries.setMarkers(markers);
