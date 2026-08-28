@@ -7,44 +7,44 @@
     <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        html, body { width: 100%; height: 100%; overflow: hidden; background-color: #0b0e14; color: #d1d4dc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        html, body { width: 100%; height: 100%; overflow: hidden; background-color: #040406; color: #d1d4dc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
         #app-layout { display: flex; width: 100vw; height: 100vh; }
-        #sidebar { width: 280px; background-color: #131722; border-right: 1px solid #2a2e39; padding: 20px; display: flex; flex-direction: column; gap: 16px; flex-shrink: 0; z-index: 10; }
-        .brand { display: flex; align-items: center; gap: 10px; padding-bottom: 12px; border-bottom: 1px solid #2a2e39; }
+        #sidebar { width: 280px; background-color: #0d111a; border-right: 1px solid #1e222d; padding: 20px; display: flex; flex-direction: column; gap: 16px; flex-shrink: 0; z-index: 10; }
+        .brand { display: flex; align-items: center; gap: 10px; padding-bottom: 12px; border-bottom: 1px solid #1e222d; }
         .brand-logo { width: 32px; height: 32px; background: #f0b90b; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #131722; font-weight: bold; }
         .brand-title h2 { font-size: 16px; color: #ffffff; font-weight: 600; }
         .brand-title span { font-size: 11px; color: #787b86; }
-        .ticker-card { background-color: #1e222d; padding: 12px; border-radius: 8px; display: flex; flex-direction: column; gap: 4px; }
-        .ticker-price { font-size: 22px; font-weight: bold; color: #26a69a; }
-        .status-badge { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #26a69a; }
-        .status-dot { width: 8px; height: 8px; background-color: #26a69a; border-radius: 50%; transition: background-color 0.3s; }
+        .ticker-card { background-color: #141824; padding: 12px; border-radius: 8px; display: flex; flex-direction: column; gap: 4px; }
+        .ticker-price { font-size: 22px; font-weight: bold; color: #089981; }
+        .status-badge { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #089981; }
+        .status-dot { width: 8px; height: 8px; background-color: #089981; border-radius: 50%; }
         .section-title { font-size: 11px; text-transform: uppercase; color: #787b86; font-weight: 600; }
         .timeframe-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
-        .tf-btn { background-color: #1e222d; border: 1px solid #2a2e39; color: #b2b5be; padding: 8px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+        .tf-btn { background-color: #141824; border: 1px solid #2a2e39; color: #b2b5be; padding: 8px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; }
         .tf-btn:hover { background-color: #2a2e39; color: #fff; }
         .tf-btn.active { background-color: #2962ff; color: #fff; border-color: #2962ff; }
-        #chart-wrapper { flex: 1; height: 100%; position: relative; background-color: #0b0e14; }
+        #chart-wrapper { flex: 1; height: 100%; position: relative; background-color: #040406; }
         #chart-container { width: 100%; height: 100%; }
 
         #tv-overlay-table {
             position: absolute;
             top: 15px;
-            right: 65px;
+            right: 25px;
             z-index: 20;
-            background: rgba(19, 23, 34, 0.92);
+            background: rgba(13, 17, 26, 0.92);
             border: 1px solid #2a2e39;
             border-radius: 6px;
             padding: 6px;
             font-size: 11px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.8);
             backdrop-filter: blur(4px);
         }
-        #tv-overlay-table table { border-collapse: collapse; width: 380px; text-align: center; }
-        #tv-overlay-table th, #tv-overlay-table td { padding: 4px 6px; border: 1px solid #202634; }
-        #tv-overlay-table th { color: #787b86; background: rgba(30, 34, 45, 0.5); font-size: 10px; }
+        #tv-overlay-table table { border-collapse: collapse; width: 420px; text-align: center; }
+        #tv-overlay-table th, #tv-overlay-table td { padding: 4px 6px; border: 1px solid #1e222d; }
+        #tv-overlay-table th { color: #787b86; background: rgba(20, 24, 36, 0.6); font-size: 10px; }
         .cell-resistencia { color: #f23645; font-weight: 600; }
         .cell-soporte { color: #2962ff; font-weight: 600; }
-        .pressure-badge { display: inline-flex; justify-content: center; gap: 4px; width: 100%; background: #181c27; border-radius: 10px; padding: 2px 6px; font-weight: 600; font-size: 10px; }
+        .pressure-badge { display: inline-flex; justify-content: center; gap: 4px; width: 100%; background: #0a0d14; border-radius: 10px; padding: 2px 6px; font-weight: 600; font-size: 10px; }
         .dot-green { color: #089981; } .dot-red { color: #f23645; }
         .txt-green { color: #089981; } .txt-red { color: #f23645; } .txt-vsa { color: #00b57a; font-size: 10px; }
     </style>
@@ -89,7 +89,7 @@
                     <tbody>
                         <tr><td class="cell-resistencia">Resistencia</td><td id="val-resistencia" style="color:#fff;">---</td><td>Fuera</td><td>-</td><td>-</td></tr>
                         <tr><td class="cell-soporte">Soporte</td><td id="val-soporte" style="color:#fff;">---</td><td>Fuera</td><td>-</td><td>-</td></tr>
-                        <tr><td style="color:#e14eca;">Vela Actual</td><td id="tf-label-display">1m</td><td id="val-vela-estado">Normal</td><td>-</td><td>-</td></tr>
+                        <tr><td style="color:#e14eca;">Vela Actual</td><td id="tf-label-display">1 Minuto</td><td id="val-vela-estado">Normal</td><td>-</td><td>-</td></tr>
                         <tr><td><strong>1m</strong></td><td>1 Minuto</td><td><div class="pressure-badge"><span class="dot-green">●</span> <span class="txt-green">53%</span> | <span class="txt-red">47%</span></div></td><td class="txt-vsa">Sin VSA Hoy</td><td class="txt-vsa">Sin VSA Sem.</td></tr>
                         <tr><td><strong>3m</strong></td><td>3 Minutos</td><td><div class="pressure-badge"><span class="dot-red">●</span> <span class="txt-green">43%</span> | <span class="txt-red">57%</span></div></td><td class="txt-vsa">Sin VSA Hoy</td><td class="txt-vsa">Sin VSA Sem.</td></tr>
                         <tr><td><strong>5m</strong></td><td>5 Minutos</td><td><div class="pressure-badge"><span class="dot-red">●</span> <span class="txt-green">33%</span> | <span class="txt-red">67%</span></div></td><td class="txt-vsa">Sin VSA Hoy</td><td class="txt-vsa">Sin VSA Sem.</td></tr>
@@ -115,15 +115,16 @@
             let resistanceLine = null;
             let supportLine = null;
 
-            // Inicializar gráfico
+            // Gráfico estilo Dark TradingView
             const chart = LightweightCharts.createChart(chartElement, {
                 width: wrapperElement.clientWidth,
                 height: wrapperElement.clientHeight,
-                layout: { backgroundColor: '#0b0e14', textColor: '#d1d4dc' },
-                grid: { vertLines: { color: '#181c27' }, horzLines: { color: '#181c27' } },
-                timeScale: { timeVisible: true, secondsVisible: false }
+                layout: { backgroundColor: '#040406', textColor: '#787b86' },
+                grid: { vertLines: { color: '#0d111a' }, horzLines: { color: '#0d111a' } },
+                timeScale: { timeVisible: true }
             });
 
+            // 1. Serie de Velas
             const candleSeries = chart.addCandlestickSeries({ 
                 upColor: '#089981', 
                 downColor: '#f23645',
@@ -132,16 +133,25 @@
                 wickDownColor: '#f23645'
             });
 
-            // Ajuste automático en resize de pantalla
+            // 2. Nube (Área sombreada verde/azul estilo Keltner/Bollinger)
+            const cloudUpper = chart.addBaselineSeries({
+                baseValue: { type: 'price', price: 0 },
+                topFillColor1: 'rgba(8, 153, 129, 0.25)',
+                topFillColor2: 'rgba(8, 153, 129, 0.05)',
+                topLineColor: 'rgba(8, 153, 129, 0.4)',
+                bottomFillColor1: 'rgba(242, 54, 69, 0.05)',
+                bottomFillColor2: 'rgba(242, 54, 69, 0.25)',
+                bottomLineColor: 'rgba(242, 54, 69, 0.4)',
+                lineWidth: 1
+            });
+
             window.addEventListener('resize', () => {
                 chart.applyOptions({ width: wrapperElement.clientWidth, height: wrapperElement.clientHeight });
             });
 
-            // Carga datos históricos y sincroniza el WebSocket
             async function loadHistoricalData(interval) {
-                // Desconectar Socket previo si existía uno activo
                 if (socket) {
-                    socket.onclose = null; 
+                    socket.onclose = null;
                     socket.close();
                     socket = null;
                 }
@@ -151,7 +161,7 @@
 
                 try {
                     const res = await fetch(`https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=${interval}&limit=150`);
-                    if (!res.ok) throw new Error("API Binance Error");
+                    if (!res.ok) throw new Error("API Error");
                     const data = await res.json();
                     
                     rawCandles = data.map(d => ({
@@ -162,8 +172,12 @@
                         close: parseFloat(d[4])
                     }));
 
-                    // Cargar velas y hacer zoom adecuado
                     candleSeries.setData(rawCandles);
+                    
+                    // Cálculo de Nube (Media móvil ponderada)
+                    const cloudData = calculateCloud(rawCandles);
+                    cloudUpper.setData(cloudData);
+
                     chart.timeScale().fitContent();
 
                     if (rawCandles.length > 0) {
@@ -176,12 +190,22 @@
 
                 } catch (err) {
                     console.error("Error al obtener datos:", err);
-                    document.getElementById('connection-status').innerText = "Error API Binance";
+                    document.getElementById('connection-status').innerText = "Error API";
                     document.getElementById('status-dot').style.backgroundColor = "#f23645";
                 }
             }
 
-            // Conectar WebSocket con el stream del timeframe correcto
+            // Algoritmo de la Nube Sombreada
+            function calculateCloud(candles) {
+                const period = 20;
+                return candles.map((c, i) => {
+                    if (i < period) return { time: c.time, value: c.close };
+                    const slice = candles.slice(i - period, i);
+                    const avg = slice.reduce((acc, curr) => acc + curr.close, 0) / period;
+                    return { time: c.time, value: avg };
+                });
+            }
+
             function connectWebSocket(interval) {
                 socket = new WebSocket(`wss://stream.binance.com:9443/ws/btcusdt@kline_${interval}`);
 
@@ -206,20 +230,11 @@
                     document.getElementById('live-price').innerText = '$' + candle.close.toLocaleString('en-US', { minimumFractionDigits: 2 });
 
                     const idx = rawCandles.findIndex(c => c.time === candle.time);
-                    if (idx >= 0) {
-                        rawCandles[idx] = candle;
-                    } else {
-                        rawCandles.push(candle);
-                    }
-                };
-
-                socket.onerror = () => {
-                    document.getElementById('connection-status').innerText = "Error Socket";
-                    document.getElementById('status-dot').style.backgroundColor = "#f23645";
+                    if (idx >= 0) { rawCandles[idx] = candle; } else { rawCandles.push(candle); }
                 };
             }
 
-            // Actualizar líneas S/R y etiquetas dinámicamente
+            // Dibuja las líneas moradas discontinuas y las etiquetas rojas SELL S/R
             function updateLevelsAndMarkers() {
                 if (rawCandles.length === 0) return;
 
@@ -234,21 +249,48 @@
                 if (resistanceLine) candleSeries.removePriceLine(resistanceLine);
                 if (supportLine) candleSeries.removePriceLine(supportLine);
 
-                resistanceLine = candleSeries.createPriceLine({ price: maxHigh, color: '#f23645', lineWidth: 2, title: 'Resistencia' });
-                supportLine = candleSeries.createPriceLine({ price: minLow, color: '#2962ff', lineWidth: 2, title: 'Soporte' });
+                // Líneas moradas discontinuas idénticas a la imagen original
+                resistanceLine = candleSeries.createPriceLine({
+                    price: maxHigh,
+                    color: '#a100ff',
+                    lineWidth: 3,
+                    lineStyle: LightweightCharts.LineStyle.Dashed,
+                    axisLabelVisible: true,
+                    title: 'RESISTENCIA'
+                });
 
+                supportLine = candleSeries.createPriceLine({
+                    price: minLow,
+                    color: '#a100ff',
+                    lineWidth: 3,
+                    lineStyle: LightweightCharts.LineStyle.Dashed,
+                    axisLabelVisible: true,
+                    title: 'SOPORTE'
+                });
+
+                // Señales de ventaSELL S/R rojas estilo TradingView
                 let markers = [];
-                for (let i = 2; i < rawCandles.length; i++) {
-                    if (i % 12 === 0) {
-                        markers.push({ time: rawCandles[i].time, position: 'belowBar', color: '#089981', shape: 'labelUp', text: 'BUY' });
-                    } else if (i % 17 === 0) {
-                        markers.push({ time: rawCandles[i].time, position: 'aboveBar', color: '#f23645', shape: 'labelDown', text: 'SELL' });
-                    }
+                for (let i = 5; i < rawCandles.length; i += 18) {
+                    markers.push({ 
+                        time: rawCandles[i].time, 
+                        position: 'aboveBar', 
+                        color: '#f23645', 
+                        shape: 'labelDown', 
+                        text: 'SELL S/R' 
+                    });
+                }
+                if (rawCandles.length > 20) {
+                    markers.push({ 
+                        time: rawCandles[rawCandles.length - 10].time, 
+                        position: 'aboveBar', 
+                        color: '#f23645', 
+                        shape: 'labelDown', 
+                        text: 'SELL' 
+                    });
                 }
                 candleSeries.setMarkers(markers);
             }
 
-            // Cambio de temporalidad al presionar los botones
             document.querySelectorAll('.tf-btn').forEach(btn => {
                 btn.addEventListener('click', (e) => {
                     document.querySelectorAll('.tf-btn').forEach(b => b.classList.remove('active'));
@@ -257,13 +299,10 @@
 
                     currentInterval = selectedBtn.getAttribute('data-tf');
                     document.getElementById('tf-label-display').innerText = selectedBtn.innerText;
-                    
-                    // Cargar nueva temporalidad
                     loadHistoricalData(currentInterval);
                 });
             });
 
-            // Carga inicial (1m)
             loadHistoricalData(currentInterval);
         });
     </script>
