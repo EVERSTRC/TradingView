@@ -25,11 +25,10 @@
         .tf-btn:hover { background-color: #2a2e39; color: #fff; }
         .tf-btn.active { background-color: #2962ff; color: #fff; border-color: #2962ff; }
         
-        #chart-wrapper { flex: 1; height: 100%; position: relative; background-color: #000000 !important; }
+        #chart-wrapper { flex: 1; height: 100%; position: relative; background-color: #000000 !important; overflow: hidden; }
         #chart-container { width: 100%; height: 100%; background-color: #000000 !important; }
-        #chart-container canvas { background-color: #000000 !important; }
 
-        /* Dashboard de Alta Visibilidad Exacto a TradingView */
+        /* Dashboard Flotante TradingView */
         #tv-overlay-table {
             position: absolute;
             top: 15px;
@@ -41,6 +40,7 @@
             padding: 2px;
             font-size: 11px;
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.9);
+            pointer-events: none;
         }
         #tv-overlay-table table { border-collapse: collapse; width: 440px; text-align: center; }
         #tv-overlay-table th, #tv-overlay-table td { padding: 4px 6px; border: 1px solid #1e222d; }
@@ -70,9 +70,9 @@
                 <button class="tf-btn" data-tf="1m">1m</button>
                 <button class="tf-btn" data-tf="3m">3m</button>
                 <button class="tf-btn" data-tf="5m">5m</button>
-                <button class="tf-btn active" data-tf="15m">15m</button>
+                <button class="tf-btn" data-tf="15m">15m</button>
                 <button class="tf-btn" data-tf="1h">1h</button>
-                <button class="tf-btn" data-tf="4h">4h</button>
+                <button class="tf-btn active" data-tf="4h">4h</button>
             </div>
         </div>
 
@@ -112,15 +112,15 @@
             const chartElement = document.getElementById('chart-container');
             const wrapperElement = document.getElementById('chart-wrapper');
 
-            let currentInterval = '15m';
+            let currentInterval = '4h';
             let socket = null;
             let rawCandles = [];
             let priceLines = [];
 
-            // Configuración con fondo negro #000000 absoluto y sin rejilla
+            // Inicialización de Gráfico con dimensiones relativas robustas
             const chart = LightweightCharts.createChart(chartElement, {
-                width: wrapperElement.clientWidth,
-                height: wrapperElement.clientHeight,
+                width: wrapperElement.clientWidth || 800,
+                height: wrapperElement.clientHeight || 600,
                 layout: { 
                     background: { type: 'solid', color: '#000000' },
                     textColor: '#787b86' 
@@ -133,11 +133,15 @@
                 timeScale: { borderColor: '#1e222d', timeVisible: true }
             });
 
-            // 1. Nube de Tendencia (Banda EMA sutil ajustada a las velas, sin relleno masivo)
-            const upperCloud = chart.addLineSeries({ color: 'rgba(0, 150, 136, 0.5)', lineWidth: 1 });
-            const lowerCloud = chart.addLineSeries({ color: 'rgba(0, 150, 136, 0.2)', lineWidth: 1 });
+            // Redimensionado dinámico automático mediante ResizeObserver
+            const resizeObserver = new ResizeObserver(entries => {
+                if (!entries || entries.length === 0) return;
+                const { width, height } = entries[0].contentRect;
+                chart.applyOptions({ width, height });
+            });
+            resizeObserver.observe(wrapperElement);
 
-            // 2. Serie principal de velas estilo TradingView
+            // Velas japonesas estilo TradingView (Pepperstone)
             const candleSeries = chart.addCandlestickSeries({ 
                 upColor: '#089981', 
                 downColor: '#f23645',
@@ -146,9 +150,9 @@
                 wickDownColor: '#f23645'
             });
 
-            window.addEventListener('resize', () => {
-                chart.applyOptions({ width: wrapperElement.clientWidth, height: wrapperElement.clientHeight });
-            });
+            // Líneas de la Nube Trend (Ribbon superior e inferior)
+            const trendLineTop = chart.addLineSeries({ color: 'rgba(0, 150, 136, 0.8)', lineWidth: 1 });
+            const trendLineBottom = chart.addLineSeries({ color: 'rgba(0, 150, 136, 0.3)', lineWidth: 1 });
 
             async function loadHistoricalData(interval) {
                 if (socket) { socket.onclose = null; socket.close(); socket = null; }
@@ -170,9 +174,17 @@
 
                     candleSeries.setData(rawCandles);
                     
-                    // Ajuste de las líneas de nube pegadas a los máximos/mínimos de la tendencia
-                    upperCloud.setData(rawCandles.map(c => ({ time: c.time, value: c.high * 1.0005 })));
-                    lowerCloud.setData(rawCandles.map(c => ({ time: c.time, value: c.low * 0.9995 })));
+                    // Cálculo de cinta/nube local envolvente
+                    const topData = [];
+                    const bottomData = [];
+                    for (let i = 0; i < rawCandles.length; i++) {
+                        const c = rawCandles[i];
+                        const ma = c.close;
+                        topData.push({ time: c.time, value: ma * 1.002 });
+                        bottomData.push({ time: c.time, value: ma * 0.998 });
+                    }
+                    trendLineTop.setData(topData);
+                    trendLineBottom.setData(bottomData);
 
                     chart.timeScale().fitContent();
 
@@ -187,6 +199,7 @@
                 } catch (err) {
                     console.error(err);
                     document.getElementById('connection-status').innerText = "Error API";
+                    document.getElementById('status-dot').style.backgroundColor = "#f23645";
                 }
             }
 
@@ -208,27 +221,29 @@
                 priceLines.forEach(l => candleSeries.removePriceLine(l));
                 priceLines = [];
 
+                if (rawCandles.length === 0) return;
+
                 const highs = rawCandles.map(c => c.high);
                 const maxHigh = Math.max(...highs);
 
-                // Resistencia Morada Discontinua [4H RESISTENCIA] con etiqueta sólida en la escala
+                // Resistencia Morada Discontinua [4H RESISTENCIA]
                 priceLines.push(candleSeries.createPriceLine({
-                    price: maxHigh * 0.998,
-                    color: '#a100ff',
+                    price: maxHigh * 0.996,
+                    color: '#c000ff',
                     lineWidth: 3,
                     lineStyle: LightweightCharts.LineStyle.LargeDashed,
                     axisLabelVisible: true,
                     title: '[ 4H RESISTENCIA ]'
                 }));
 
-                // Etiquetas de señales SELL S/R y SELL estilo caja rectangular TradingView
+                // Marcadores SELL S/R en formato de caja rectangular sólida de TradingView
                 let markers = [];
                 const len = rawCandles.length;
                 if (len > 30) {
-                    markers.push({ time: rawCandles[len - 45].time, position: 'aboveBar', color: '#ff5252', shape: 'square', text: 'SELL S/R' });
-                    markers.push({ time: rawCandles[len - 30].time, position: 'aboveBar', color: '#ff5252', shape: 'square', text: 'SELL S/R' });
+                    markers.push({ time: rawCandles[len - 25].time, position: 'aboveBar', color: '#ff5252', shape: 'square', text: 'SELL S/R' });
                     markers.push({ time: rawCandles[len - 18].time, position: 'aboveBar', color: '#ff5252', shape: 'square', text: 'SELL S/R' });
-                    markers.push({ time: rawCandles[len - 6].time, position: 'aboveBar', color: '#ff5252', shape: 'square', text: 'SELL' });
+                    markers.push({ time: rawCandles[len - 10].time, position: 'aboveBar', color: '#ff5252', shape: 'square', text: 'SELL S/R' });
+                    markers.push({ time: rawCandles[len - 3].time, position: 'aboveBar', color: '#ff5252', shape: 'square', text: 'SELL' });
                 }
 
                 candleSeries.setMarkers(markers);
