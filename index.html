@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plataforma BTC/USDT - Trading Engine</title>
+    <!-- TradingView Lightweight Charts Library -->
+    <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background-color: #131722;
+            color: #d1d4dc;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Sidebar Styling */
+        #sidebar {
+            width: 320px;
+            background-color: #1e222d;
+            border-right: 1px solid #2a2e39;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            flex-shrink: 0;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.3);
+            z-index: 10;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #2a2e39;
+        }
+
+        .brand-logo {
+            width: 32px;
+            height: 32px;
+            background: #f0b90b;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #131722;
+            font-weight: bold;
+            font-size: 18px;
+        }
+
+        .brand-title h2 {
+            font-size: 16px;
+            color: #ffffff;
+            font-weight: 600;
+        }
+
+        .brand-title span {
+            font-size: 11px;
+            color: #787b86;
+        }
+
+        .section-title {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #787b86;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        label {
+            font-size: 13px;
+            color: #b2b5be;
+        }
+
+        input[type="number"], select {
+            background-color: #2a2e39;
+            border: 1px solid #363a45;
+            color: #ffffff;
+            padding: 10px 12px;
+            border-radius: 6px;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.2s;
+            width: 100%;
+        }
+
+        input[type="number"]:focus, select:focus {
+            border-color: #2962ff;
+        }
+
+        .color-picker-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        input[type="color"] {
+            -webkit-appearance: none;
+            border: none;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            cursor: pointer;
+            background: none;
+        }
+
+        input[type="color"]::-webkit-color-swatch-wrapper {
+            padding: 0;
+        }
+
+        input[type="color"]::-webkit-color-swatch {
+            border: 1px solid #434651;
+            border-radius: 50%;
+        }
+
+        button.btn-primary {
+            background-color: #2962ff;
+            color: #ffffff;
+            border: none;
+            padding: 12px;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.1s;
+            margin-top: 10px;
+        }
+
+        button.btn-primary:hover {
+            background-color: #1e53e5;
+        }
+
+        button.btn-primary:active {
+            transform: scale(0.98);
+        }
+
+        /* Status & Ticker Cards */
+        .ticker-card {
+            background-color: #2a2e39;
+            padding: 15px;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .ticker-price {
+            font-size: 24px;
+            font-weight: bold;
+            color: #26a69a;
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: #26a69a;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background-color: #26a69a;
+            border-radius: 50%;
+            box-shadow: 0 0 8px #26a69a;
+        }
+
+        /* Chart Area */
+        #chart-container {
+            flex-grow: 1;
+            height: 100%;
+            position: relative;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="sidebar">
+        <div class="brand">
+            <div class="brand-logo">₿</div>
+            <div class="brand-title">
+                <h2>BTC / USDT</h2>
+                <span>Binance Live Stream</span>
+            </div>
+        </div>
+
+        <div class="ticker-card">
+            <div class="status-badge">
+                <span class="status-dot"></span>
+                <span id="connection-status">Conectado (1m)</span>
+            </div>
+            <div class="ticker-price" id="live-price">---.--</div>
+        </div>
+
+        <div class="section-title">Parámetros de Indicadores</div>
+
+        <div class="control-group">
+            <div class="color-picker-row">
+                <label for="fast-ma">Periodo MA Rápida:</label>
+                <input type="color" id="fast-color" value="#2962ff">
+            </div>
+            <input type="number" id="fast-ma" value="9" min="1" max="200">
+        </div>
+
+        <div class="control-group">
+            <div class="color-picker-row">
+                <label for="slow-ma">Periodo MA Lenta:</label>
+                <input type="color" id="slow-color" value="#ff6d00">
+            </div>
+            <input type="number" id="slow-ma" value="21" min="1" max="500">
+        </div>
+
+        <div class="control-group">
+            <label for="ma-type">Tipo de Media Móvil:</label>
+            <select id="ma-type">
+                <option value="SMA">Simple (SMA)</option>
+                <option value="EMA">Exponencial (EMA)</option>
+            </select>
+        </div>
+
+        <button class="btn-primary" onclick="applySettings()">Aplicar Cambios</button>
+    </div>
+
+    <div id="chart-container"></div>
+
+    <script>
+        // 1. Inicialización del gráfico Lightweight Charts
+        const chartElement = document.getElementById('chart-container');
+        const chart = LightweightCharts.createChart(chartElement, {
+            layout: {
+                backgroundColor: '#131722',
+                textColor: '#d1d4dc',
+            },
+            grid: {
+                vertLines: { color: '#2B2B43' },
+                horzLines: { color: '#2B2B43' },
+            },
+            crosshair: {
+                mode: LightweightCharts.CrosshairMode.Normal,
+            },
+            rightPriceScale: {
+                borderColor: '#485c7b',
+            },
+            timeScale: {
+                borderColor: '#485c7b',
+                timeVisible: true,
+                secondsVisible: false,
+            },
+        });
+
+        // Responsive resize
+        window.addEventListener('resize', () => {
+            chart.applyOptions({
+                width: chartElement.clientWidth,
+                height: chartElement.clientHeight
+            });
+        });
+
+        const candleSeries = chart.addCandlestickSeries({
+            upColor: '#26a69a',
+            downColor: '#ef5350',
+            borderVisible: false,
+            wickUpColor: '#26a69a',
+            wickDownColor: '#ef5350',
+        });
+
+        let fastMaSeries = chart.addLineSeries({ color: '#2962ff', lineWidth: 2, title: 'MA Rápida' });
+        let slowMaSeries = chart.addLineSeries({ color: '#ff6d00', lineWidth: 2, title: 'MA Lenta' });
+
+        let rawCandles = [];
+
+        // 2. Fetch de velas históricas (API REST de Binance)
+        fetch('https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1m&limit=200')
+            .then(res => res.json())
+            .then(data => {
+                rawCandles = data.map(d => ({
+                    time: d[0] / 1000,
+                    open: parseFloat(d[1]),
+                    high: parseFloat(d[2]),
+                    low: parseFloat(d[3]),
+                    close: parseFloat(d[4])
+                }));
+
+                candleSeries.setData(rawCandles);
+                if (rawCandles.length > 0) {
+                    updateLivePrice(rawCandles[rawCandles.length - 1].close);
+                }
+                recalculateIndicators();
+                connectWebSocket();
+            })
+            .catch(err => {
+                console.error("Error cargando historial de Binance:", err);
+                document.getElementById('connection-status').innerText = "Error de conexión";
+            });
+
+        // 3. Conexión WebSocket en tiempo real
+        function connectWebSocket() {
+            const socket = new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@kline_1m');
+
+            socket.onmessage = (event) => {
+                const message = JSON.parse(event.data);
+                const kline = message.k;
+
+                const candle = {
+                    time: kline.t / 1000,
+                    open: parseFloat(kline.o),
+                    high: parseFloat(kline.h),
+                    low: parseFloat(kline.l),
+                    close: parseFloat(kline.c)
+                };
+
+                candleSeries.update(candle);
+                updateLivePrice(candle.close);
+
+                const existingIndex = rawCandles.findIndex(c => c.time === candle.time);
+                if (existingIndex >= 0) {
+                    rawCandles[existingIndex] = candle;
+                } else {
+                    rawCandles.push(candle);
+                }
+
+                recalculateIndicators();
+            };
+
+            socket.onerror = () => {
+                document.getElementById('connection-status').innerText = "Desconectado";
+            };
+        }
+
+        function updateLivePrice(price) {
+            const priceEl = document.getElementById('live-price');
+            priceEl.innerText = '$' + price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        // 4. Motores de Cálculo Matemático de Indicadores
+        function calculateSMA(data, period) {
+            let result = [];
+            for (let i = 0; i < data.length; i++) {
+                if (i < period - 1) continue;
+                let sum = 0;
+                for (let j = 0; j < period; j++) {
+                    sum += data[i - j].close;
+                }
+                result.push({ time: data[i].time, value: sum / period });
+            }
+            return result;
+        }
+
+        function calculateEMA(data, period) {
+            let result = [];
+            if (data.length < period) return result;
+            
+            let k = 2 / (period + 1);
+            let sum = 0;
+            for (let i = 0; i < period; i++) {
+                sum += data[i].close;
+            }
+            let ema = sum / period;
+            result.push({ time: data[period - 1].time, value: ema });
+
+            for (let i = period; i < data.length; i++) {
+                ema = (data[i].close * k) + (ema * (1 - k));
+                result.push({ time: data[i].time, value: ema });
+            }
+            return result;
+        }
+
+        // 5. Recálculo y Renderizado
+        function recalculateIndicators() {
+            const fastPeriod = parseInt(document.getElementById('fast-ma').value);
+            const slowPeriod = parseInt(document.getElementById('slow-ma').value);
+            const maType = document.getElementById('ma-type').value;
+
+            const calcFn = maType === 'EMA' ? calculateEMA : calculateSMA;
+
+            if (rawCandles.length >= fastPeriod) {
+                fastMaSeries.setData(calcFn(rawCandles, fastPeriod));
+            }
+            if (rawCandles.length >= slowPeriod) {
+                slowMaSeries.setData(calcFn(rawCandles, slowPeriod));
+            }
+        }
+
+        function applySettings() {
+            const fastColor = document.getElementById('fast-color').value;
+            const slowColor = document.getElementById('slow-color').value;
+
+            fastMaSeries.applyOptions({ color: fastColor });
+            slowMaSeries.applyOptions({ color: slowColor });
+
+            recalculateIndicators();
+        }
+    </script>
+</body>
+</html>
