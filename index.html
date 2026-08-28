@@ -331,6 +331,18 @@
                 wickDownColor: '#ef5350',
             });
 
+            // Serie Histogram para Volumen al estilo TradingView
+            const volumeSeries = chart.addHistogramSeries({
+                priceFormat: {
+                    type: 'volume',
+                },
+                priceScaleId: '',
+                scaleMargins: {
+                    top: 0.8,
+                    bottom: 0,
+                },
+            });
+
             const fastMaSeries = chart.addLineSeries({ color: '#2962ff', lineWidth: 2, title: 'MA Rápida' });
             const slowMaSeries = chart.addLineSeries({ color: '#ff6d00', lineWidth: 2, title: 'MA Lenta' });
 
@@ -358,10 +370,17 @@
                             open: parseFloat(d[1]),
                             high: parseFloat(d[2]),
                             low: parseFloat(d[3]),
-                            close: parseFloat(d[4])
+                            close: parseFloat(d[4]),
+                            volume: parseFloat(d[5])
                         }));
 
                         candleSeries.setData(rawCandles);
+                        volumeSeries.setData(rawCandles.map(c => ({
+                            time: c.time,
+                            value: c.volume,
+                            color: c.close >= c.open ? 'rgba(38, 166, 154, 0.5)' : 'rgba(239, 83, 80, 0.5)'
+                        })));
+
                         if (rawCandles.length > 0) {
                             updateLivePrice(rawCandles[rawCandles.length - 1].close);
                         }
@@ -392,10 +411,17 @@
                         open: parseFloat(kline.o),
                         high: parseFloat(kline.h),
                         low: parseFloat(kline.l),
-                        close: parseFloat(kline.c)
+                        close: parseFloat(kline.c),
+                        volume: parseFloat(kline.v)
                     };
 
                     candleSeries.update(candle);
+                    volumeSeries.update({
+                        time: candle.time,
+                        value: candle.volume,
+                        color: candle.close >= candle.open ? 'rgba(38, 166, 154, 0.5)' : 'rgba(239, 83, 80, 0.5)'
+                    });
+
                     updateLivePrice(candle.close);
 
                     const existingIndex = rawCandles.findIndex(c => c.time === candle.time);
