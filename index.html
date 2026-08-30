@@ -3,23 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TradingView - S/R + VSA Institucional</title>
+    <title>TradingView - Gráfico Completo</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        html, body {
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-            background-color: #000000;
-        }
-        #tradingview_widget {
-            width: 100vw;
-            height: 100vh;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { width: 100%; height: 100%; overflow: hidden; background-color: #000000; }
+        #tradingview_widget { width: 100vw; height: 100vh; }
     </style>
 </head>
 <body>
@@ -44,11 +32,11 @@
             "backgroundColor": "#000000",
             "gridColor": "rgba(42, 46, 57, 0)",
             
+            // Indicador de volumen estándar integrado correctamente
             "studies": [
-                // Identificador del script cargado directamente
-                "STD;S%2FR%20%2B%20VSA%20Institucional%20Tiburon"
+                "STD;Volume"
             ],
-            
+
             "disabled_features": [
                 "header_saveload"
             ],
