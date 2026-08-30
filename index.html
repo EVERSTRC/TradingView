@@ -26,12 +26,11 @@
 
     <div id="tradingview_widget"></div>
 
-    <!-- Cargador oficial del widget de TradingView -->
     <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
     <script type="text/javascript">
         new TradingView.widget({
             "autosize": true,
-            "symbol": "BINANCE:BTCUSDT",
+            "symbol": "PEPPERSTONE:BTCUSD",
             "interval": "240",
             "timezone": "Etc/UTC",
             "theme": "dark",
@@ -39,15 +38,15 @@
             "locale": "es",
             "toolbar_bg": "#000000",
             "enable_publishing": false,
+            "hide_side_toolbar": false,
             "allow_symbol_change": true,
             "container_id": "tradingview_widget",
             "backgroundColor": "#000000",
             "gridColor": "rgba(42, 46, 57, 0)",
             
-            // Carga directa de estudios e indicadores personalizados
             "studies": [
-                // Para scripts propios publicados/guardados en tu cuenta:
-                "TU_NOMBRE_DE_INDICADOR_AQUI@tv-scripting-101"
+                // Identificador del script cargado directamente
+                "STD;S%2FR%20%2B%20VSA%20Institucional%20Tiburon"
             ],
             
             "disabled_features": [
