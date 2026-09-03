@@ -46,7 +46,11 @@
                 <label for="timeframe">Temporalidad: </label>
                 <select id="timeframe">
                     <option value="1s">1 Segundo</option>
+                    <option value="5s">5 Segundos</option>
+                    <option value="15s">15 Segundos</option>
+                    <option value="30s">30 Segundos</option>
                     <option value="1m">1 Minuto</option>
+                    <option value="3m">3 Minutos</option>
                     <option value="5m">5 Minutos</option>
                     <option value="15m">15 Minutos</option>
                     <option value="1h" selected>1 Hora</option>
@@ -82,12 +86,13 @@
                 statusEl.style.display = "block";
                 statusEl.innerText = "Cargando datos...";
 
-                // Determinar el endpoint adecuado según si son segundos o temporalidades estándar
-                let url = `https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=${interval}&limit=300`;
+                let url;
                 
-                if (interval === "1s") {
-                    // API de Binance para datos de segundos
-                    url = `https://api.binance.com/api/v3/uiKlines?symbol=BTCUSDT&interval=1s&limit=300`;
+                // Manejo especial para temporalidades de segundos en Binance
+                if (interval.endsWith("s")) {
+                    url = `https://api.binance.com/api/v3/uiKlines?symbol=BTCUSDT&interval=${interval}&limit=300`;
+                } else {
+                    url = `https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=${interval}&limit=300`;
                 }
 
                 try {
@@ -114,10 +119,10 @@
                 }
             }
 
-            // Cargar inicial en 1 Hora
+            // Carga inicial
             loadChartData(timeframeSelect.value);
 
-            // Evento al cambiar la temporalidad en el desplegable
+            // Escuchar cambio de temporalidad
             timeframeSelect.addEventListener("change", (e) => {
                 loadChartData(e.target.value);
             });
