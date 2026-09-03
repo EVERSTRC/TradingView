@@ -3,240 +3,39 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TradingView Native Clone - S/R + VSA</title>
-    <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
+    <title>TradingView Native Exact Clone</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        html, body { width: 100vw; height: 100vh; overflow: hidden; background-color: #000000; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #d1d4dc; }
-
-        #app { width: 100%; height: 100%; display: flex; flex-direction: column; }
-
-        /* Banner Superior */
-        .tv-header {
-            height: 38px;
-            background-color: #131722;
-            border-bottom: 1px solid #2a2e39;
-            display: flex;
-            align-items: center;
-            padding: 0 12px;
-            gap: 10px;
-            z-index: 100;
-        }
-
-        .symbol-title { font-size: 13px; font-weight: bold; color: #ffffff; display: flex; align-items: center; gap: 6px; }
-        .status-dot { width: 8px; height: 8px; background-color: #089981; border-radius: 50%; }
-
-        #chart-container { flex: 1; width: 100%; height: calc(100vh - 38px); position: relative; background-color: #000000; }
-        #chart { width: 100%; height: 100%; }
-
-        /* Tabla Dashboard VSA Completa */
-        .vsa-table-container {
-            position: absolute;
-            top: 10px;
-            right: 60px;
-            z-index: 50;
-            background-color: rgba(19, 23, 34, 0.95);
-            border: 1px solid #2a2e39;
-            border-radius: 4px;
-            font-size: 10px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
-        }
-
-        table.vsa-table { border-collapse: collapse; text-align: center; color: #b2b5be; }
-        table.vsa-table th, table.vsa-table td { padding: 3px 6px; border: 1px solid #2a2e39; white-space: nowrap; }
-        table.vsa-table th { background-color: #1e222d; color: #787b86; font-weight: 600; }
-        
-        /* Modificadores de Estado */
-        .txt-gold { color: #ffd700; font-weight: bold; }
-        .txt-blue { color: #2962ff; font-weight: bold; }
-        .txt-green { color: #00e676; font-weight: bold; }
-        .txt-red { color: #ff5252; font-weight: bold; }
-        
-        .bg-bull { background-color: rgba(0, 200, 83, 0.15); color: #00e676; font-weight: bold; }
-        .bg-bear { background-color: rgba(213, 0, 0, 0.15); color: #ff5252; font-weight: bold; }
-        .bg-proj-header { background-color: #0d47a1; color: #ffffff; font-weight: bold; text-align: left; padding-left: 8px; }
+        html, body, #tradingview_container { width: 100vw; height: 100vh; overflow: hidden; background-color: #000000; }
     </style>
 </head>
 <body>
 
-    <div id="app">
-        <div class="tv-header">
-            <div class="symbol-title">
-                <span class="status-dot"></span>
-                <span>Bitcoin/Dólar estadounidense · 15 · Binance</span>
-            </div>
-        </div>
+    <div id="tradingview_container"></div>
 
-        <div id="chart-container">
-            <div id="chart"></div>
-
-            <!-- TABLA VSA DASHBOARD IDÉNTICA A LA IMAGEN -->
-            <div class="vsa-table-container">
-                <table class="vsa-table">
-                    <thead>
-                        <tr>
-                            <th>TF</th>
-                            <th>Nivel / Estado</th>
-                            <th>Presión (Compra | Venta)</th>
-                            <th class="txt-gold">VSA Ballenas (Hoy)</th>
-                            <th class="txt-gold">VSA Ballenas (Semanal)</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td class="txt-gold">NOTICIAS</td>
-                            <td>Impacto / Sesgo</td>
-                            <td class="bg-bull">🟢 SESGO LIGERAMENTE ALCISTA</td>
-                            <td>-</td>
-                            <td>-</td>
-                        </tr>
-                        <tr>
-                            <td class="txt-blue">Soporte</td>
-                            <td>76229.54</td>
-                            <td>Fuera</td>
-                            <td>-</td>
-                            <td>-</td>
-                        </tr>
-                        <tr>
-                            <td style="color:#ff9800">Vela Actual</td>
-                            <td>TF Actual</td>
-                            <td>Normal</td>
-                            <td>-</td>
-                            <td>-</td>
-                        </tr>
-                        <tr>
-                            <td>1m</td>
-                            <td>1 Minuto</td>
-                            <td class="bg-bear">🔴 50% | 🔴 50%</td>
-                            <td class="txt-green">🟢 50% (2) | 🔴 50% (2)</td>
-                            <td class="txt-green">🟢 52% (90) | 🔴 38% (56)</td>
-                        </tr>
-                        <tr>
-                            <td>3m</td>
-                            <td>3 Minutos</td>
-                            <td class="bg-bear">🔴 44% | 🔴 56%</td>
-                            <td class="txt-green">🟢 71% (5) | 🔴 29% (2)</td>
-                            <td class="txt-green">🟢 52% (64) | 🔴 48% (59)</td>
-                        </tr>
-                        <tr>
-                            <td>5m</td>
-                            <td>5 Minutos</td>
-                            <td class="bg-bull">🟢 64% | 🟢 36%</td>
-                            <td class="txt-green">🟢 57% (4) | 🔴 43% (3)</td>
-                            <td class="txt-green">🟢 51% (54) | 🔴 49% (51)</td>
-                        </tr>
-                        <tr>
-                            <td>15m</td>
-                            <td>15 Minutos</td>
-                            <td class="bg-bull">🟢 63% | 🟢 37%</td>
-                            <td class="txt-green">🟢 100% (3) | 🔴 0% (0)</td>
-                            <td class="txt-green">🟢 61% (31) | 🔴 39% (20)</td>
-                        </tr>
-                        <tr>
-                            <td>1h</td>
-                            <td>1 Hora</td>
-                            <td class="bg-bull">🟢 83% | 🟢 17%</td>
-                            <td>Sin VSA Hoy</td>
-                            <td class="txt-green">🟢 62% (13) | 🔴 38% (8)</td>
-                        </tr>
-                        <tr>
-                            <td>4h</td>
-                            <td>4 Horas</td>
-                            <td class="bg-bear">🔴 49% | 🔴 51%</td>
-                            <td class="txt-green">🟢 50% (1) | 🔴 50% (1)</td>
-                            <td class="txt-green">🟢 64% (7) | 🔴 36% (4)</td>
-                        </tr>
-                        <tr>
-                            <td>1D</td>
-                            <td>1 Día</td>
-                            <td class="bg-bull">🟢 60% | 🟢 40%</td>
-                            <td>-</td>
-                            <td>-</td>
-                        </tr>
-                        <!-- PROYECCIONES -->
-                        <tr>
-                            <td colspan="2" class="bg-proj-header">PROYECCIÓN</td>
-                            <td class="bg-proj-header">Horizonte Temporal</td>
-                            <td class="bg-proj-header">Precio Estimado Objetivo</td>
-                            <td class="bg-proj-header">Fuerza y Sesgo Proyectado</td>
-                        </tr>
-                        <tr>
-                            <td>📈 15m</td>
-                            <td>Próximos 15 Min</td>
-                            <td class="txt-green">77757.35</td>
-                            <td class="txt-green" colspan="2">↗ ALCISTA (Presión TF Cortos)</td>
-                        </tr>
-                        <tr>
-                            <td>📈 1h / 4h</td>
-                            <td>1 Horas / 4 Horas</td>
-                            <td class="txt-green">1H: 77816.92 | 4H: 77893.52</td>
-                            <td class="txt-green" colspan="2">↗ ALCISTA (Ponderación Macro VSA)</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        const container = document.getElementById('chart');
-
-        const chart = LightweightCharts.createChart(container, {
-            width: container.clientWidth,
-            height: container.clientHeight,
-            layout: {
-                background: { type: 'solid', color: '#000000' },
-                textColor: '#787b86'
-            },
-            grid: {
-                vertLines: { color: 'rgba(42, 46, 57, 0.2)' },
-                horzLines: { color: 'rgba(42, 46, 57, 0.2)' }
-            },
-            priceScale: { borderColor: '#2a2e39' },
-            timeScale: { borderColor: '#2a2e39', timeVisible: true }
+    <!-- Script Oficial de TradingView -->
+    <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+    <script type="text/javascript">
+        new TradingView.widget({
+            "autosize": true,
+            "symbol": "BINANCE:BTCUSDT",
+            "interval": "15",
+            "timezone": "Etc/UTC",
+            "theme": "dark",
+            "style": "1",
+            "locale": "es",
+            "toolbar_bg": "#131722",
+            "enable_publishing": false,
+            "allow_symbol_change": true,
+            "container_id": "tradingview_container",
+            "backgroundColor": "rgba(0, 0, 0, 1)",
+            "gridColor": "rgba(42, 46, 57, 0.3)",
+            "hide_side_toolbar": false,
+            "studies": [
+                // Si el indicador VSA es público en TradingView, se invoca por su Script ID aquí:
+                // "STD;EMA" 
+            ]
         });
-
-        const candleSeries = chart.addCandlestickSeries({
-            upColor: '#089981', downColor: '#f23645',
-            borderUpColor: '#089981', borderDownColor: '#f23645',
-            wickUpColor: '#089981', wickDownColor: '#f23645'
-        });
-
-        async function loadChartData() {
-            const res = await fetch('https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=15m&limit=100');
-            const data = await res.json();
-            const formatted = data.map(d => ({
-                time: Math.floor(d[0] / 1000),
-                open: parseFloat(d[1]),
-                high: parseFloat(d[2]),
-                low: parseFloat(d[3]),
-                close: parseFloat(d[4])
-            }));
-
-            candleSeries.setData(formatted);
-
-            // Agregar Línea de Soporte Roja Horizontal idéntica
-            const lastClose = formatted[formatted.length - 1].close;
-            candleSeries.createPriceLine({
-                price: lastClose * 0.996,
-                color: '#ff5252',
-                lineWidth: 2,
-                lineStyle: LightweightCharts.LineStyle.Solid,
-                axisLabelVisible: true,
-                title: 'S/R',
-            });
-
-            // Señales de Compra/Venta tipo etiqueta en gráfico
-            candleSeries.setMarkers([
-                { time: formatted[formatted.length - 30].time, position: 'aboveBar', color: '#ff5252', shape: 'arrowDown', text: 'SELL S/R' },
-                { time: formatted[formatted.length - 20].time, position: 'aboveBar', color: '#ff5252', shape: 'arrowDown', text: 'SELL' },
-                { time: formatted[formatted.length - 12].time, position: 'belowBar', color: '#00e676', shape: 'arrowUp', text: 'COMPRA' },
-                { time: formatted[formatted.length - 5].time, position: 'belowBar', color: '#00e676', shape: 'arrowUp', text: 'BUY PRA' }
-            ]);
-        }
-
-        window.addEventListener('resize', () => chart.resize(container.clientWidth, container.clientHeight));
-        loadChartData();
     </script>
 </body>
 </html>
