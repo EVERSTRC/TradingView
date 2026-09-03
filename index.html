@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TradingView Clone - Custom VSA Engine</title>
-    <!-- Carga garantizada de Lightweight Charts v4 -->
+    <title>TradingView Clone - VSA & S/R Indicator</title>
     <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -32,7 +31,7 @@
         }
         .btn.active { background-color: #2962ff; color: #fff; }
         #chart-container { flex: 1; width: 100%; height: calc(100vh - 42px); position: relative; }
-        #error-msg { position: absolute; top: 10px; left: 10px; color: #ff5252; font-size: 12px; z-index: 20; }
+        #status-msg { position: absolute; top: 10px; left: 10px; color: #787b86; font-size: 12px; z-index: 20; }
     </style>
 </head>
 <body>
@@ -44,69 +43,126 @@
     </div>
 
     <div id="chart-container">
-        <div id="error-msg"></div>
+        <div id="status-msg">Cargando...</div>
     </div>
 
     <script>
         const container = document.getElementById('chart-container');
-        const errorDiv = document.getElementById('error-msg');
+        const statusDiv = document.getElementById('status-msg');
 
-        // Inicialización del Gráfico
+        // Configuración del Gráfico
         const chart = LightweightCharts.createChart(container, {
             layout: { backgroundColor: '#000000', textColor: '#d1d4dc' },
-            grid: { vertLines: { color: 'rgba(42, 46, 57, 0.2)' }, horzLines: { color: 'rgba(42, 46, 57, 0.2)' } },
+            grid: { vertLines: { color: 'rgba(42, 46, 57, 0.15)' }, horzLines: { color: 'rgba(42, 46, 57, 0.15)' } },
             timeScale: { timeVisible: true, secondsVisible: false }
         });
 
-        // Series
+        // 1. Serie de Velas Japonesas
         const candleSeries = chart.addCandlestickSeries({
             upColor: '#26a69a', downColor: '#ef5350', borderVisible: false, wickUpColor: '#26a69a', wickDownColor: '#ef5350'
         });
 
+        // 2. Línea de VWAP / Indicador Institucional (Verde)
+        const vwapSeries = chart.addLineSeries({
+            color: '#00e676',
+            lineWidth: 2,
+            title: 'VWAP Ballenas'
+        });
+
+        // 3. Línea de Resistencia (Roja)
+        const resistanceSeries = chart.addLineSeries({
+            color: '#ff1744',
+            lineWidth: 1,
+            lineStyle: LightweightCharts.LineStyle.Dashed,
+            title: 'Resistencia'
+        });
+
+        // 4. Línea de Soporte (Azul)
+        const supportSeries = chart.addLineSeries({
+            color: '#2962ff',
+            lineWidth: 1,
+            lineStyle: LightweightCharts.LineStyle.Dashed,
+            title: 'Soporte'
+        });
+
+        // 5. Histograma de Volumen VSA (Abajo)
         const volumeSeries = chart.addHistogramSeries({
             priceFormat: { type: 'volume' },
             priceScaleId: '',
             scaleMargins: { top: 0.8, bottom: 0 }
         });
 
-        // Motor VSA
-        function calculateVSA(data) {
+        // Motor de Cálculos de Indicadores en JS
+        function processIndicators(data) {
             const period = 20;
             const multiplier = 1.8;
+            
+            let cumVol = 0;
+            let cumPV = 0;
+            let currentSup = data[0].low;
+            let currentRes = data[0].high;
 
-            return data.map((bar, index) => {
-                if (index < period) {
-                    return { ...bar, volColor: bar.close >= bar.open ? 'rgba(38, 166, 154, 0.5)' : 'rgba(239, 83, 80, 0.5)' };
+            const processedCandles = [];
+            const processedVolumes = [];
+            const vwapData = [];
+            const supData = [];
+            const resData = [];
+
+            data.forEach((bar, index) => {
+                // Cálculo de VWAP
+                const typicalPrice = (bar.high + bar.low + bar.close) / 3;
+                cumPV += typicalPrice * bar.volume;
+                cumVol += bar.volume;
+                const vwap = cumPV / cumVol;
+
+                // Detección de Soporte y Resistencia (Pivot High/Low)
+                if (index >= 5 && index < data.length - 5) {
+                    if (bar.high > data[index-1].high && bar.high > data[index-2].high) {
+                        currentRes = bar.high;
+                    }
+                    if (bar.low < data[index-1].low && bar.low < data[index-2].low) {
+                        currentSup = bar.low;
+                    }
                 }
 
-                const slice = data.slice(index - period, index);
-                const avgVol = slice.reduce((acc, curr) => acc + curr.volume, 0) / period;
-                const isWhale = bar.volume > (avgVol * multiplier);
+                // Detección de Volumen VSA (Volumen de Ballenas)
+                let isWhale = false;
+                if (index >= period) {
+                    const slice = data.slice(index - period, index);
+                    const avgVol = slice.reduce((acc, c) => acc + c.volume, 0) / period;
+                    isWhale = bar.volume > (avgVol * multiplier);
+                }
 
-                let volColor = bar.close >= bar.open ? 'rgba(38, 166, 154, 0.5)' : 'rgba(239, 83, 80, 0.5)';
+                // Colores de Volumen
+                let volColor = bar.close >= bar.open ? 'rgba(38, 166, 154, 0.4)' : 'rgba(239, 83, 80, 0.4)';
                 if (isWhale) {
-                    volColor = bar.close >= bar.open ? '#00e676' : '#ff1744';
+                    volColor = bar.close >= bar.open ? '#00e676' : '#ff1744'; // Resaltar volumen
                 }
 
-                return { ...bar, volColor };
+                // Guardar estructuras de datos
+                processedCandles.push({ time: bar.time, open: bar.open, high: bar.high, low: bar.low, close: bar.close });
+                processedVolumes.push({ time: bar.time, value: bar.volume, color: volColor });
+                vwapData.push({ time: bar.time, value: vwap });
+                supData.push({ time: bar.time, value: currentSup });
+                resData.push({ time: bar.time, value: currentRes });
             });
+
+            return { processedCandles, processedVolumes, vwapData, supData, resData };
         }
 
-        // Carga de Datos desde Binance
+        // Cargar Datos de Mercado
         async function loadMarket(symbol, btn) {
-            errorDiv.innerText = "Cargando datos...";
+            statusDiv.innerText = "Cargando indicador...";
             if (btn) {
                 document.querySelectorAll('.btn-sym').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
             }
 
             try {
-                const response = await fetch(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=1h&limit=500`);
-                if (!response.ok) throw new Error("Error en la respuesta de red");
-                
-                const rawData = await response.json();
+                const res = await fetch(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=1h&limit=500`);
+                const rawData = await res.json();
 
-                const formattedData = rawData.map(d => ({
+                const formatted = rawData.map(d => ({
                     time: Math.floor(d[0] / 1000),
                     open: parseFloat(d[1]),
                     high: parseFloat(d[2]),
@@ -115,23 +171,24 @@
                     volume: parseFloat(d[5])
                 }));
 
-                const processedData = calculateVSA(formattedData);
+                const result = processIndicators(formatted);
 
-                candleSeries.setData(processedData.map(d => ({ time: d.time, open: d.open, high: d.high, low: d.low, close: d.close })));
-                volumeSeries.setData(processedData.map(d => ({ time: d.time, value: d.volume, color: d.volColor })));
+                // Renderizar todas las series en el gráfico
+                candleSeries.setData(result.processedCandles);
+                volumeSeries.setData(result.processedVolumes);
+                vwapSeries.setData(result.vwapData);
+                supportSeries.setData(result.supData);
+                resistanceSeries.setData(result.resData);
 
                 chart.timeScale().fitContent();
-                errorDiv.innerText = "";
+                statusDiv.innerText = "";
             } catch (err) {
-                console.error(err);
-                errorDiv.innerText = "Error cargando datos de Binance. Revisa la consola.";
+                statusDiv.innerText = "Error cargando datos de Binance.";
             }
         }
 
-        // Carga inicial
         loadMarket('BTCUSDT');
 
-        // Redimensionamiento
         window.addEventListener('resize', () => {
             chart.resize(container.clientWidth, container.clientHeight);
         });
