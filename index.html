@@ -127,16 +127,12 @@
                 return { pivotHigh: lastPivotHigh, pivotLow: lastPivotLow };
             }
 
-            // ==========================================
-            // CÁLCULO EXACTO DE BALLENAS (COMPRA / VENTA SEPARADOS)
-            // ==========================================
             function processWhaleData(candles, lineLevels) {
                 const markers = [];
                 const length = candles.length;
-                if (length < 20) return { markers, lastBuyPrice: null, lastSellPrice: null };
+                if (length < 20) return { markers, whalePrices: [] };
 
-                let buyPrices = [];
-                let sellPrices = [];
+                const whalePrices = [];
 
                 for (let i = 20; i < length; i++) {
                     const currentCandle = candles[i];
@@ -163,8 +159,9 @@
                     });
 
                     if (isHighVolume) {
+                        whalePrices.push(currentCandle.close);
+
                         if (isBullish) {
-                            buyPrices.push(currentCandle.close);
                             markers.push({
                                 time: currentCandle.time,
                                 position: 'belowBar',
@@ -173,7 +170,6 @@
                                 text: nearSupport ? 'BUY S/R' : 'BUY'
                             });
                         } else if (isBearish) {
-                            sellPrices.push(currentCandle.close);
                             markers.push({
                                 time: currentCandle.time,
                                 position: 'aboveBar',
@@ -185,10 +181,38 @@
                     }
                 }
 
-                const lastBuyPrice = buyPrices.length > 0 ? buyPrices.reduce((a, b) => a + b, 0) / buyPrices.length : null;
-                const lastSellPrice = sellPrices.length > 0 ? sellPrices.reduce((a, b) => a + b, 0) / sellPrices.length : null;
+                return { markers, whalePrices };
+            }
 
-                return { markers, lastBuyPrice, lastSellPrice };
+            // EXTRAE PRECIOS DE VSA MULTI-TEMPORALIDAD
+            async function getMultiTimeframeWhaleAvg() {
+                try {
+                    const tfList = ['1m', '1h', '4h'];
+                    let allWhalePrices = [];
+
+                    const requests = tfList.map(tf => 
+                        fetch(`https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=${tf}&limit=200`).then(r => r.json())
+                    );
+
+                    const results = await Promise.all(requests);
+
+                    results.forEach(rawData => {
+                        const candles = rawData.map(d => ({
+                            time: Math.floor(d[0] / 1000), open: parseFloat(d[1]), high: parseFloat(d[2]), low: parseFloat(d[3]), close: parseFloat(d[4]), volume: parseFloat(d[5])
+                        }));
+
+                        const { whalePrices } = processWhaleData(candles, []);
+                        allWhalePrices = allWhalePrices.concat(whalePrices);
+                    });
+
+                    if (allWhalePrices.length === 0) return null;
+                    const sum = allWhalePrices.reduce((acc, p) => acc + p, 0);
+                    return sum / allWhalePrices.length;
+
+                } catch (e) {
+                    console.error("Error obteniendo datos multi-temporalidad:", e);
+                    return null;
+                }
             }
 
             async function renderSRVisuals(currentFormattedData, currentInterval) {
@@ -235,26 +259,18 @@
                         }
                     }
 
-                    const { markers, lastBuyPrice, lastSellPrice } = processWhaleData(currentFormattedData, lineLevels);
+                    const { markers } = processWhaleData(currentFormattedData, lineLevels);
                     candlestickSeries.setMarkers(markers);
 
-                    if (lastBuyPrice) {
+                    // PROMEDIO GLOBAL MULTI-TEMPORALIDAD (Línea más gruesa: width 4)
+                    const globalWhaleAvg = await getMultiTimeframeWhaleAvg();
+                    if (globalWhaleAvg) {
                         lineLevels.push({
-                            price: lastBuyPrice,
-                            color: '#00e676',
-                            title: '[ VSA BALLENAS COMPRA ]',
-                            width: 2,
-                            style: LightweightCharts.LineStyle.Dashed
-                        });
-                    }
-
-                    if (lastSellPrice) {
-                        lineLevels.push({
-                            price: lastSellPrice,
-                            color: '#ff1744',
-                            title: '[ VSA BALLENAS VENTA ]',
-                            width: 2,
-                            style: LightweightCharts.LineStyle.Dashed
+                            price: globalWhaleAvg,
+                            color: '#ffff00',
+                            title: '[ PROMEDIO GLOBAL BALLENAS ]',
+                            width: 4,
+                            style: LightweightCharts.LineStyle.Solid
                         });
                     }
 
