@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>S/R + VSA Tiburon - Dashboard</title>
+    <title>S/R + VSA Tiburon - Dashboard Visual PineScript</title>
     <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
 
     <style>
@@ -71,6 +71,7 @@
             const chartContainer = document.getElementById("chart");
 
             let activePriceLines = [];
+            let activeBoxes = [];
 
             const chart = LightweightCharts.createChart(chartContainer, {
                 width: chartContainer.clientWidth,
@@ -105,14 +106,11 @@
                 return aggregated;
             }
 
-            // ==========================================
-            // CÁLCULO DE PIVOTES (S/R) PINE SCRIPT EN JS
-            // ==========================================
+            // Algoritmo de detección de Pivotes
             function calculatePivots(candles, leftBars = 15, rightBars = 15) {
                 let lastPivotHigh = null;
                 let lastPivotLow = null;
 
-                // Escaneo de pivotes evaluando barras a la izquierda y derecha
                 for (let i = leftBars; i < candles.length - rightBars; i++) {
                     let isHighPivot = true;
                     let isLowPivot = true;
@@ -123,62 +121,68 @@
                         if (candles[j].low <= candles[i].low) isLowPivot = false;
                     }
 
-                    if (isHighPivot) lastPivotHigh = candles[i].high;
-                    if (isLowPivot) lastPivotLow = candles[i].low;
+                    if (isHighPivot) lastPivotHigh = candles[i];
+                    if (isLowPivot) lastPivotLow = candles[i];
                 }
 
                 return { pivotHigh: lastPivotHigh, pivotLow: lastPivotLow };
             }
 
-            async function fetchHighTimeframeSR(currentFormattedData, currentInterval) {
+            async function renderSRVisuals(currentFormattedData, currentInterval) {
                 try {
-                    // Limpiar líneas existentes antes de redibujar
+                    // Limpieza de objetos gráficos anteriores
                     activePriceLines.forEach(line => candlestickSeries.removePriceLine(line));
                     activePriceLines = [];
 
-                    const srLevels = [];
+                    activeBoxes.forEach(boxSeries => chart.removeSeries(boxSeries));
+                    activeBoxes = [];
 
-                    // 1. Obtener y calcular Pivotes 4H y 1D desde la API
+                    // 1. OBTENER DATOS DE 4H Y 1D
                     const [raw4h, raw1d] = await Promise.all([
                         fetch('https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=4h&limit=200').then(r => r.json()),
                         fetch('https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&limit=200').then(r => r.json())
                     ]);
 
-                    const candles4h = raw4h.map(d => ({ high: parseFloat(d[2]), low: parseFloat(d[3]) }));
-                    const candles1d = raw1d.map(d => ({ high: parseFloat(d[2]), low: parseFloat(d[3]) }));
+                    const candles4h = raw4h.map(d => ({ time: Math.floor(d[0]/1000), open: parseFloat(d[1]), high: parseFloat(d[2]), low: parseFloat(d[3]), close: parseFloat(d[4]) }));
+                    const candles1d = raw1d.map(d => ({ time: Math.floor(d[0]/1000), open: parseFloat(d[1]), high: parseFloat(d[2]), low: parseFloat(d[3]), close: parseFloat(d[4]) }));
 
                     const pivots4h = calculatePivots(candles4h, 15, 15);
                     const pivots1d = calculatePivots(candles1d, 15, 15);
 
-                    if (pivots1d.pivotHigh) {
-                        srLevels.push({ price: pivots1d.pivotHigh, color: '#ff1744', title: 'Resistencia 1D (Pivote)', width: 3, style: LightweightCharts.LineStyle.Solid });
-                    }
-                    if (pivots1d.pivotLow) {
-                        srLevels.push({ price: pivots1d.pivotLow, color: '#00e676', title: 'Soporte 1D (Pivote)', width: 3, style: LightweightCharts.LineStyle.Solid });
-                    }
+                    // 2. DIBUJAR LÍNEAS HORIZONTALES ESTILO TRADINGVIEW (Niveles Macro)
+                    const lineLevels = [];
 
                     if (pivots4h.pivotHigh) {
-                        srLevels.push({ price: pivots4h.pivotHigh, color: '#ff9100', title: 'Resistencia 4H (Pivote)', width: 2, style: LightweightCharts.LineStyle.Solid });
+                        lineLevels.push({
+                            price: pivots4h.pivotHigh.high,
+                            color: '#ff9100',
+                            title: '[ 4H RESISTENCIA ]',
+                            width: 3,
+                            style: LightweightCharts.LineStyle.Dashed
+                        });
                     }
+
                     if (pivots4h.pivotLow) {
-                        srLevels.push({ price: pivots4h.pivotLow, color: '#00b0ff', title: 'Soporte 4H (Pivote)', width: 2, style: LightweightCharts.LineStyle.Solid });
+                        lineLevels.push({
+                            price: pivots4h.pivotLow.low,
+                            color: '#2962ff',
+                            title: '[ 4H SOPORTE ]',
+                            width: 3,
+                            style: LightweightCharts.LineStyle.Dashed
+                        });
                     }
 
-                    // 2. Calcular Pivotes del Timeframe Actual
-                    if (currentFormattedData && currentFormattedData.length > 30 && currentInterval !== '4h' && currentInterval !== '1d') {
-                        const pivotsCurrent = calculatePivots(currentFormattedData, 10, 10);
-                        const label = currentInterval.toUpperCase();
-
-                        if (pivotsCurrent.pivotHigh) {
-                            srLevels.push({ price: pivotsCurrent.pivotHigh, color: '#e040fb', title: `Resistencia ${label}`, width: 2, style: LightweightCharts.LineStyle.Dashed });
-                        }
-                        if (pivotsCurrent.pivotLow) {
-                            srLevels.push({ price: pivotsCurrent.pivotLow, color: '#18ffff', title: `Soporte ${label}`, width: 2, style: LightweightCharts.LineStyle.Dashed });
-                        }
+                    if (pivots1d.pivotHigh) {
+                        lineLevels.push({
+                            price: pivots1d.pivotHigh.high,
+                            color: '#ff1744',
+                            title: '[ 1D RESISTENCIA ]',
+                            width: 4,
+                            style: LightweightCharts.LineStyle.Solid
+                        });
                     }
 
-                    // Renderizar todas las líneas activas en el gráfico
-                    srLevels.forEach(level => {
+                    lineLevels.forEach(level => {
                         const line = candlestickSeries.createPriceLine({
                             price: level.price,
                             color: level.color,
@@ -189,8 +193,49 @@
                         });
                         activePriceLines.push(line);
                     });
+
+                    // 3. DIBUJAR CAJAS RELLENAS DE SOPORTE/RESISTENCIA (Pivotes Locales / TF Actual)
+                    if (currentFormattedData && currentFormattedData.length > 30) {
+                        const pivotsCurrent = calculatePivots(currentFormattedData, 15, 15);
+
+                        // Resistencia en Bloque Rojo / Naranja
+                        if (pivotsCurrent.pivotHigh) {
+                            const resBoxSeries = chart.addHistogramSeries({
+                                color: 'rgba(255, 82, 82, 0.35)',
+                                priceFormat: { type: 'volume' },
+                                priceScaleId: 'overlay-res',
+                            });
+
+                            chart.priceScale('overlay-res').applyOptions({
+                                scaleMargins: { top: 0, bottom: 0 },
+                            });
+
+                            // Generar la caja rellena usando los datos del gráfico
+                            const boxData = currentFormattedData.map(c => ({
+                                time: c.time,
+                                value: (c.high >= pivotsCurrent.pivotHigh.high * 0.998) ? pivotsCurrent.pivotHigh.high : 0
+                            }));
+
+                            resBoxSeries.setData(boxData);
+                            activeBoxes.push(resBoxSeries);
+                        }
+
+                        // Soporte en Bloque Azul / Verde
+                        if (pivotsCurrent.pivotLow) {
+                            const supLine = candlestickSeries.createPriceLine({
+                                price: pivotsCurrent.pivotLow.low,
+                                color: '#00e676',
+                                lineWidth: 2,
+                                lineStyle: LightweightCharts.LineStyle.Solid,
+                                axisLabelVisible: true,
+                                title: '[ SOPORTE LOCAL ]'
+                            });
+                            activePriceLines.push(supLine);
+                        }
+                    }
+
                 } catch (e) {
-                    console.error("Error calculando S/R:", e);
+                    console.error("Error al renderizar visuales S/R:", e);
                 }
             }
 
@@ -229,8 +274,8 @@
 
                     candlestickSeries.setData(formattedData);
                     
-                    // Carga dinámicamente las líneas de Pivotes (S/R)
-                    await fetchHighTimeframeSR(formattedData, interval);
+                    // Renderiza los visuales idénticos a la imagen
+                    await renderSRVisuals(formattedData, interval);
 
                     chart.timeScale().fitContent();
                     statusEl.style.display = "none";
