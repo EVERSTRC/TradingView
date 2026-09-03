@@ -80,23 +80,28 @@
                 timeScale: { borderColor: 'rgba(197, 203, 206, 0.8)', timeVisible: true, secondsVisible: true },
             });
 
+            // NUBES SUPERTREND (Sombreado/Áreas creadas ANTES de las velas para quedar al fondo)
+            const supertrendUpArea = chart.addAreaSeries({
+                topColor: 'rgba(0, 230, 118, 0.25)',
+                bottomColor: 'rgba(0, 230, 118, 0.02)',
+                lineColor: '#00e676',
+                lineWidth: 2,
+                priceLineVisible: false,
+                lastValueVisible: false,
+            });
+
+            const supertrendDownArea = chart.addAreaSeries({
+                topColor: 'rgba(255, 23, 68, 0.25)',
+                bottomColor: 'rgba(255, 23, 68, 0.02)',
+                lineColor: '#ff1744',
+                lineWidth: 2,
+                priceLineVisible: false,
+                lastValueVisible: false,
+            });
+
+            // VELAS
             const candlestickSeries = chart.addCandlestickSeries({
                 upColor: '#089981', downColor: '#f23645', borderVisible: false, wickUpColor: '#089981', wickDownColor: '#f23645'
-            });
-
-            // Líneas para el Supertrend (Alcista y Bajista)
-            const supertrendUpSeries = chart.addLineSeries({
-                color: '#00e676',
-                lineWidth: 2,
-                priceLineVisible: false,
-                lastValueVisible: false,
-            });
-
-            const supertrendDownSeries = chart.addLineSeries({
-                color: '#ff1744',
-                lineWidth: 2,
-                priceLineVisible: false,
-                lastValueVisible: false,
             });
 
             function aggregateSecondsData(data1s, stepSeconds) {
@@ -177,10 +182,8 @@
 
                     if (isBullish) {
                         upData.push({ time: candles[i].time, value: currentSupertrend });
-                        downData.push({ time: candles[i].time, value: NaN });
                     } else {
                         downData.push({ time: candles[i].time, value: currentSupertrend });
-                        upData.push({ time: candles[i].time, value: NaN });
                     }
 
                     prevUpperBand = upperBand;
@@ -494,10 +497,10 @@
 
                     candlestickSeries.setData(formattedData);
 
-                    // RENDERIZAR SUPERTREND
+                    // RENDERIZAR SUPERTREND COMO NUBE (AREA)
                     const { upData, downData } = calculateSupertrend(formattedData, 10, 3.0);
-                    supertrendUpSeries.setData(upData);
-                    supertrendDownSeries.setData(downData);
+                    supertrendUpArea.setData(upData);
+                    supertrendDownArea.setData(downData);
 
                     await renderSRVisuals(formattedData, interval);
 
