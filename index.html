@@ -3,39 +3,49 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TradingView Native Exact Clone</title>
+    <title>S/R + VSA Tiburon - Dashboard</title>
+    <!-- Librería Oficial Lightweight Charts de TradingView -->
+    <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        html, body, #tradingview_container { width: 100vw; height: 100vh; overflow: hidden; background-color: #000000; }
+        body { margin: 0; padding: 0; background-color: #131722; color: #d1d4dc; font-family: sans-serif; }
+        #chart { width: 100vw; height: 100vh; }
     </style>
 </head>
 <body>
 
-    <div id="tradingview_container"></div>
+    <div id="chart"></div>
 
-    <!-- Script Oficial de TradingView -->
-    <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
-    <script type="text/javascript">
-        new TradingView.widget({
-            "autosize": true,
-            "symbol": "BINANCE:BTCUSDT",
-            "interval": "15",
-            "timezone": "Etc/UTC",
-            "theme": "dark",
-            "style": "1",
-            "locale": "es",
-            "toolbar_bg": "#131722",
-            "enable_publishing": false,
-            "allow_symbol_change": true,
-            "container_id": "tradingview_container",
-            "backgroundColor": "rgba(0, 0, 0, 1)",
-            "gridColor": "rgba(42, 46, 57, 0.3)",
-            "hide_side_toolbar": false,
-            "studies": [
-                // Si el indicador VSA es público en TradingView, se invoca por su Script ID aquí:
-                // "STD;EMA" 
-            ]
+    <script>
+        // 1. Crear el gráfico con estilo oscuro
+        const chart = LightweightCharts.createChart(document.getElementById('chart'), {
+            layout: { backgroundColor: '#131722', textColor: '#d1d4dc' },
+            grid: { vertLines: { color: '#1f2937' }, horzLines: { color: '#1f2937' } },
+            timeScale: { timeVisible: true, secondsVisible: false }
         });
+
+        const candlestickSeries = chart.addCandlestickSeries({
+            upColor: '#089981', downColor: '#f23645',
+            borderUpColor: '#089981', borderDownColor: '#f23645',
+            wickUpColor: '#089981', wickDownColor: '#f23645',
+        });
+
+        // 2. Obtener datos en tiempo real desde la API de Binance
+        async function fetchMarketData() {
+            const res = await fetch('https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1h&limit=300');
+            const data = await res.json();
+            
+            const formattedData = data.map(d => ({
+                time: d[0] / 1000,
+                open: parseFloat(d[1]),
+                high: parseFloat(d[2]),
+                low: parseFloat(d[3]),
+                close: parseFloat(d[4])
+            }));
+
+            candlestickSeries.setData(formattedData);
+        }
+
+        fetchMarketData();
     </script>
 </body>
 </html>
