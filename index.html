@@ -41,7 +41,7 @@
 
     <div id="main-container">
         <div id="header">
-            <span class="title">🦈 S/R + VSA Institucional Tiburon (BTC/USDT)</span>
+            <span class="title">🦈 S/R + VSA + Supertrend Institucional Tiburon (BTC/USDT)</span>
             <div>
                 <label for="timeframe">Temporalidad: </label>
                 <select id="timeframe">
@@ -84,6 +84,21 @@
                 upColor: '#089981', downColor: '#f23645', borderVisible: false, wickUpColor: '#089981', wickDownColor: '#f23645'
             });
 
+            // Líneas para el Supertrend (Alcista y Bajista)
+            const supertrendUpSeries = chart.addLineSeries({
+                color: '#00e676',
+                lineWidth: 2,
+                priceLineVisible: false,
+                lastValueVisible: false,
+            });
+
+            const supertrendDownSeries = chart.addLineSeries({
+                color: '#ff1744',
+                lineWidth: 2,
+                priceLineVisible: false,
+                lastValueVisible: false,
+            });
+
             function aggregateSecondsData(data1s, stepSeconds) {
                 const aggregated = [];
                 let currentCandle = null;
@@ -104,6 +119,76 @@
 
                 if (currentCandle) aggregated.push(currentCandle);
                 return aggregated;
+            }
+
+            // FUNCIÓN PARA CALCULAR SUPERTREND
+            function calculateSupertrend(candles, period = 10, multiplier = 3.0) {
+                if (candles.length < period + 1) return { upData: [], downData: [] };
+
+                const atr = [];
+                const tr = [];
+
+                for (let i = 0; i < candles.length; i++) {
+                    if (i === 0) {
+                        tr.push(candles[i].high - candles[i].low);
+                    } else {
+                        const hL = candles[i].high - candles[i].low;
+                        const hC = Math.abs(candles[i].high - candles[i - 1].close);
+                        const lC = Math.abs(candles[i].low - candles[i - 1].close);
+                        tr.push(Math.max(hL, hC, lC));
+                    }
+                }
+
+                let sumTR = 0;
+                for (let i = 0; i < period; i++) sumTR += tr[i];
+                atr[period - 1] = sumTR / period;
+
+                for (let i = period; i < candles.length; i++) {
+                    atr[i] = (atr[i - 1] * (period - 1) + tr[i]) / period;
+                }
+
+                const upData = [];
+                const downData = [];
+
+                let prevUpperBand = 0;
+                let prevLowerBand = 0;
+                let prevSupertrend = 0;
+                let isBullish = true;
+
+                for (let i = period; i < candles.length; i++) {
+                    const hl2 = (candles[i].high + candles[i].low) / 2;
+                    const basicUpperBand = hl2 + (multiplier * atr[i]);
+                    const basicLowerBand = hl2 - (multiplier * atr[i]);
+
+                    let upperBand = (basicUpperBand < prevUpperBand || candles[i - 1].close > prevUpperBand) ? basicUpperBand : prevUpperBand;
+                    let lowerBand = (basicLowerBand > prevLowerBand || candles[i - 1].close < prevLowerBand) ? basicLowerBand : prevLowerBand;
+
+                    if (i === period) {
+                        isBullish = candles[i].close > upperBand ? true : false;
+                    } else {
+                        if (prevSupertrend === prevUpperBand) {
+                            isBullish = candles[i].close > upperBand;
+                        } else {
+                            isBullish = candles[i].close >= lowerBand;
+                        }
+                    }
+
+                    const currentSupertrend = isBullish ? lowerBand : upperBand;
+
+                    if (isBullish) {
+                        upData.push({ time: candles[i].time, value: currentSupertrend });
+                        downData.push({ time: candles[i].time, value: NaN });
+                    } else {
+                        downData.push({ time: candles[i].time, value: currentSupertrend });
+                        upData.push({ time: candles[i].time, value: NaN });
+                    }
+
+                    prevUpperBand = upperBand;
+                    prevLowerBand = lowerBand;
+                    prevSupertrend = currentSupertrend;
+                }
+
+                return { upData, downData };
             }
 
             function calculatePivots(candles, leftBars = 15, rightBars = 15) {
@@ -185,7 +270,6 @@
                 return { markers, buyPrices, sellPrices };
             }
 
-            // PROCESA PROMEDIOS MULTI-TEMPORALIDAD
             async function getMultiTimeframeWhaleAvgs() {
                 try {
                     const tfList = ['1m', '1h', '4h'];
@@ -219,7 +303,6 @@
                 }
             }
 
-            // CÁLCULO DE ACUMULADOS MACRO (DIARIO Y SEMANAL)
             async function getMacroWhaleAvgs() {
                 try {
                     const [raw1d, raw1w] = await Promise.all([
@@ -297,7 +380,6 @@
                     const { markers } = processWhaleData(currentFormattedData, lineLevels);
                     candlestickSeries.setMarkers(markers);
 
-                    // 1. LÍNEAS PROMEDIO MULTI-TEMPORALIDAD (INTRA-DAY)
                     const { avgBuy, avgSell } = await getMultiTimeframeWhaleAvgs();
                     
                     if (avgBuy) {
@@ -320,7 +402,6 @@
                         });
                     }
 
-                    // 2. LÍNEAS ACUMULADAS MACRO (1D Y 1W)
                     const { buy1d, sell1d, buy1w, sell1w } = await getMacroWhaleAvgs();
 
                     if (buy1d) {
@@ -412,6 +493,12 @@
                     }
 
                     candlestickSeries.setData(formattedData);
+
+                    // RENDERIZAR SUPERTREND
+                    const { upData, downData } = calculateSupertrend(formattedData, 10, 3.0);
+                    supertrendUpSeries.setData(upData);
+                    supertrendDownSeries.setData(downData);
+
                     await renderSRVisuals(formattedData, interval);
 
                     chart.timeScale().fitContent();
