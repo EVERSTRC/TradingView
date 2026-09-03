@@ -105,11 +105,13 @@
                 return aggregated;
             }
 
-            async function fetchHighTimeframeSR() {
+            async function fetchHighTimeframeSR(currentFormattedData, currentInterval) {
                 try {
+                    // Limpiar líneas existentes antes de redibujar
                     activePriceLines.forEach(line => candlestickSeries.removePriceLine(line));
                     activePriceLines = [];
 
+                    // Fetch niveles fijos mayores (4H y 1D)
                     const [res4h, res1d] = await Promise.all([
                         fetch('https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=4h&limit=50').then(r => r.json()),
                         fetch('https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&limit=50').then(r => r.json())
@@ -121,20 +123,33 @@
                     const high1d = Math.max(...res1d.map(d => parseFloat(d[2])));
                     const low1d = Math.min(...res1d.map(d => parseFloat(d[3])));
 
-                    // Configuración con grosor aumentado (lineWidth: 4)
+                    // Niveles base de S/R Superior
                     const srLevels = [
-                        { price: high1d, color: '#ff1744', title: 'Resistencia 1D', width: 4 },
-                        { price: low1d, color: '#00e676', title: 'Soporte 1D', width: 4 },
-                        { price: high4h, color: '#ff9100', title: 'Resistencia 4H', width: 3 },
-                        { price: low4h, color: '#00b0ff', title: 'Soporte 4H', width: 3 }
+                        { price: high1d, color: '#ff1744', title: 'Resistencia 1D', width: 4, style: LightweightCharts.LineStyle.Solid },
+                        { price: low1d, color: '#00e676', title: 'Soporte 1D', width: 4, style: LightweightCharts.LineStyle.Solid },
+                        { price: high4h, color: '#ff9100', title: 'Resistencia 4H', width: 3, style: LightweightCharts.LineStyle.Solid },
+                        { price: low4h, color: '#00b0ff', title: 'Soporte 4H', width: 3, style: LightweightCharts.LineStyle.Solid }
                     ];
 
+                    // Calcular Soporte y Resistencia del Timeframe Actual (si no es ni 4h ni 1d para evitar duplicar)
+                    if (currentFormattedData && currentFormattedData.length > 0 && currentInterval !== '4h' && currentInterval !== '1d') {
+                        const highTF = Math.max(...currentFormattedData.map(d => d.high));
+                        const lowTF = Math.min(...currentFormattedData.map(d => d.low));
+                        const label = currentInterval.toUpperCase();
+
+                        srLevels.push(
+                            { price: highTF, color: '#e040fb', title: `Resistencia ${label}`, width: 2, style: LightweightCharts.LineStyle.Dashed },
+                            { price: lowTF, color: '#18ffff', title: `Soporte ${label}`, width: 2, style: LightweightCharts.LineStyle.Dashed }
+                        );
+                    }
+
+                    // Renderizar todas las líneas activas en el gráfico
                     srLevels.forEach(level => {
                         const line = candlestickSeries.createPriceLine({
                             price: level.price,
                             color: level.color,
-                            lineWidth: level.width, // Mayor grosor aquí
-                            lineStyle: LightweightCharts.LineStyle.Solid, // Línea sólida para mayor visibilidad
+                            lineWidth: level.width,
+                            lineStyle: level.style,
                             axisLabelVisible: true,
                             title: level.title,
                         });
@@ -179,7 +194,9 @@
                     }
 
                     candlestickSeries.setData(formattedData);
-                    await fetchHighTimeframeSR();
+                    
+                    // Carga dinámicamente las líneas de 1D, 4H + la del TF seleccionado
+                    await fetchHighTimeframeSR(formattedData, interval);
 
                     chart.timeScale().fitContent();
                     statusEl.style.display = "none";
