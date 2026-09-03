@@ -3,54 +3,69 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TradingView - Full Client Platform</title>
-    <!-- Script Oficial de TradingView API -->
+    <title>TradingView - S/R + VSA Institucional</title>
     <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { width: 100vw; height: 100vh; overflow: hidden; background-color: #000000; display: flex; flex-direction: column; }
+        .top-bar {
+            height: 38px;
+            background-color: #131722;
+            display: flex;
+            align-items: center;
+            padding: 0 10px;
+            gap: 8px;
+            border-bottom: 1px solid #2a2e39;
         }
-        html, body {
-            width: 100vw;
-            height: 100vh;
-            overflow: hidden;
-            background-color: #000000;
+        .btn {
+            background-color: #2a2e39;
+            color: #d1d4dc;
+            border: none;
+            padding: 4px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: bold;
         }
-        #tradingview_widget {
-            width: 100%;
-            height: 100%;
-        }
+        .btn:hover { background-color: #363a45; color: #fff; }
+        #tv_container { flex: 1; width: 100%; }
     </style>
 </head>
 <body>
 
-    <!-- Contenedor del Gráfico Completo -->
-    <div id="tradingview_widget"></div>
+    <div class="top-bar">
+        <button class="btn" onclick="loadChart('PEPPERSTONE:BTCUSD')">BTC/USD</button>
+        <button class="btn" onclick="loadChart('BINANCE:ETHUSDT')">ETH/USDT</button>
+        <button class="btn" onclick="loadChart('BINANCE:SOLUSDT')">SOL/USDT</button>
+        <button class="btn" onclick="loadChart('CAPITALCOM:GOLD')">ORO</button>
+    </div>
+
+    <div id="tv_container"></div>
 
     <script type="text/javascript">
-        new TradingView.widget({
-            "autosize": true,
-            "symbol": "PEPPERSTONE:BTCUSD", // Mismo broker y par de tu captura
-            "interval": "60",
-            "timezone": "Etc/UTC",
-            "theme": "dark",
-            "style": "1",
-            "locale": "es",
-            "toolbar_bg": "#131722",
-            "enable_publishing": false,
-            "hide_side_toolbar": false, // Muestra la barra lateral de herramientas
-            "allow_symbol_change": true,
-            "calendar": true,           // Muestra los eventos de noticias de la parte inferior
-            "details": true,
-            "hotlist": true,
-            "calendar": true,
-            "container_id": "tradingview_widget",
-            "studies": [
-                "PUB;5ttKryBy" // Enlace a tu script Pine Script
-            ]
-        });
+        function loadChart(symbol) {
+            document.getElementById('tv_container').innerHTML = '';
+            
+            new TradingView.widget({
+                "autosize": true,
+                "symbol": symbol,
+                "interval": "60",
+                "timezone": "Etc/UTC",
+                "theme": "dark",
+                "style": "1",
+                "locale": "es",
+                "toolbar_bg": "#131722",
+                "enable_publishing": false,
+                "hide_side_toolbar": false,
+                "allow_symbol_change": true,
+                "container_id": "tv_container",
+                "studies": [
+                    "PUB;5ttKryBy" // Si publicaste tu indicador, pon aquí su ID (ej. PUB;tu_id_unico)
+                ]
+            });
+        }
+
+        loadChart('PEPPERSTONE:BTCUSD');
     </script>
 </body>
 </html>
