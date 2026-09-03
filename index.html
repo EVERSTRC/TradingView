@@ -50,10 +50,10 @@
                     <option value="15s">15 Segundos</option>
                     <option value="30s">30 Segundos</option>
                     <option value="1m">1 Minuto</option>
-                    <option value="3m" selected>3 Minutos</option>
+                    <option value="3m">3 Minutos</option>
                     <option value="5m">5 Minutos</option>
                     <option value="15m">15 Minutos</option>
-                    <option value="1h">1 Hora</option>
+                    <option value="1h" selected>1 Hora</option>
                     <option value="4h">4 Horas</option>
                     <option value="1d">1 Día</option>
                     <option value="1w">1 Semana</option>
@@ -128,7 +128,7 @@
             }
 
             // ==========================================
-            // DETECCION VSA + LÍNEA AMARILLA CONSTANTE DE BALLENAS
+            // CÁLCULO EXACTO DE BALLENAS (CIERRE DE VELA CLÍMAX)
             // ==========================================
             function processWhaleData(candles, lineLevels) {
                 const markers = [];
@@ -161,9 +161,9 @@
                         }
                     });
 
-                    // Si hay clímax de volumen (ballena), guardamos ese nivel de precio
+                    // Usamos el CIERRE de la vela VSA para igualar Pine Script
                     if (isHighVolume) {
-                        lastWhalePrice = (currentCandle.high + currentCandle.low + currentCandle.close) / 3;
+                        lastWhalePrice = currentCandle.close;
 
                         if (isBullish) {
                             markers.push({
@@ -190,7 +190,6 @@
 
             async function renderSRVisuals(currentFormattedData, currentInterval) {
                 try {
-                    // Limpieza total de líneas activas anteriores
                     activePriceLines.forEach(line => candlestickSeries.removePriceLine(line));
                     activePriceLines = [];
 
@@ -233,22 +232,19 @@
                         }
                     }
 
-                    // Procesar marcas VSA y obtener el precio constante de la última ballena
                     const { markers, lastWhalePrice } = processWhaleData(currentFormattedData, lineLevels);
                     candlestickSeries.setMarkers(markers);
 
-                    // Si se detectó una ballena, dibujamos la LÍNEA AMARILLA HORIZONTAL CONSTANTE
                     if (lastWhalePrice) {
                         lineLevels.push({
                             price: lastWhalePrice,
-                            color: '#ffeb3b',
-                            title: '[ PRECIO BALLENA ]',
+                            color: '#ff9100',
+                            title: '[ VSA BALLENAS ]',
                             width: 2,
-                            style: LightweightCharts.LineStyle.Solid
+                            style: LightweightCharts.LineStyle.Dashed
                         });
                     }
 
-                    // Renderizar todas las líneas horizontales
                     lineLevels.forEach(level => {
                         const line = candlestickSeries.createPriceLine({
                             price: level.price,
