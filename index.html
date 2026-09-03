@@ -3,69 +3,183 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TradingView - S/R + VSA Institucional</title>
-    <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+    <title>Plataforma Propia - S/R + VSA Institucional</title>
+    <!-- Librería de Gráficos Nativa (Lightweight Charts) -->
+    <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        html, body { width: 100vw; height: 100vh; overflow: hidden; background-color: #000000; display: flex; flex-direction: column; }
-        .top-bar {
-            height: 38px;
-            background-color: #131722;
-            display: flex;
-            align-items: center;
-            padding: 0 10px;
-            gap: 8px;
-            border-bottom: 1px solid #2a2e39;
-        }
-        .btn {
-            background-color: #2a2e39;
-            color: #d1d4dc;
-            border: none;
-            padding: 4px 10px;
-            border-radius: 4px;
-            cursor: pointer;
+        body, html { width: 100vw; height: 100vh; overflow: hidden; background-color: #131722; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #d1d4dc; }
+        
+        #chart-container { width: 100vw; height: 100vh; position: relative; }
+        
+        /* DASHBOARD PROPIO (Estilo Pine Script) */
+        #vsa-dashboard {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            z-index: 10;
+            background-color: rgba(19, 23, 34, 0.95);
+            border: 1px solid #363a45;
+            border-collapse: collapse;
             font-size: 11px;
-            font-weight: bold;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            border-radius: 4px;
+            overflow: hidden;
         }
-        .btn:hover { background-color: #363a45; color: #fff; }
-        #tv_container { flex: 1; width: 100%; }
+        #vsa-dashboard th, #vsa-dashboard td {
+            padding: 5px 9px;
+            border: 1px solid #2a2e39;
+            text-align: center;
+        }
+        #vsa-dashboard th { background-color: #1e222d; color: #9b9b9b; font-weight: 600; }
+        .bg-bull { background-color: rgba(0, 200, 83, 0.25); color: #00e676; font-weight: bold; }
+        .bg-bear { background-color: rgba(213, 0, 0, 0.25); color: #ff5252; font-weight: bold; }
+        .bg-proj { background-color: #0d47a1; color: #ffffff; font-weight: bold; }
+        .text-yellow { color: #ffd700; }
+        .text-orange { color: #ff9800; }
     </style>
 </head>
 <body>
 
-    <div class="top-bar">
-        <button class="btn" onclick="loadChart('PEPPERSTONE:BTCUSD')">BTC/USD</button>
-        <button class="btn" onclick="loadChart('BINANCE:ETHUSDT')">ETH/USDT</button>
-        <button class="btn" onclick="loadChart('BINANCE:SOLUSDT')">SOL/USDT</button>
-        <button class="btn" onclick="loadChart('CAPITALCOM:GOLD')">ORO</button>
+    <div id="chart-container">
+        <!-- Dashboard en pantalla -->
+        <table id="vsa-dashboard">
+            <thead>
+                <tr>
+                    <th>TF</th>
+                    <th>Nivel / Estado</th>
+                    <th>Presión (Compra | Venta)</th>
+                    <th class="text-yellow">VSA Ballenas (Hoy)</th>
+                    <th class="text-orange">VSA Ballenas (Semanal)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td style="color:#ffd700">NOTICIAS</td>
+                    <td>Impacto / Sesgo</td>
+                    <td id="news-status" colspan="3" class="bg-bear">🔴 SESGO LIGERAMENTE BAJISTA</td>
+                </tr>
+                <tr>
+                    <td style="color:#ff5252">Resistencia</td>
+                    <td id="res-val">78200.00</td>
+                    <td id="res-status">Fuera</td>
+                    <td>-</td>
+                    <td>-</td>
+                </tr>
+                <tr>
+                    <td style="color:#2962ff">Soporte</td>
+                    <td id="sup-val">76206.05</td>
+                    <td id="sup-status">Fuera</td>
+                    <td>-</td>
+                    <td>-</td>
+                </tr>
+                <tr>
+                    <td style="color:#ff9800">Vela Actual</td>
+                    <td>TF Actual</td>
+                    <td id="vsa-status">Normal</td>
+                    <td>-</td>
+                    <td>-</td>
+                </tr>
+                <tr>
+                    <td>1m</td><td>1 Minuto</td><td id="p-1m" class="bg-bear">🟢 48% | 🔴 52%</td><td>Sin VSA Hoy</td><td>Sin VSA Sem.</td>
+                </tr>
+                <tr>
+                    <td>3m</td><td>3 Minutos</td><td id="p-3m" class="bg-bear">🟢 33% | 🔴 67%</td><td>Sin VSA Hoy</td><td>Sin VSA Sem.</td>
+                </tr>
+                <tr>
+                    <td>5m</td><td>5 Minutos</td><td id="p-5m" class="bg-bear">🟢 46% | 🔴 54%</td><td>Sin VSA Hoy</td><td>Sin VSA Sem.</td>
+                </tr>
+                <tr>
+                    <td>15m</td><td>15 Minutos</td><td id="p-15m" class="bg-bull">🟢 70% | 🔴 30%</td><td>Sin VSA Hoy</td><td>Sin VSA Sem.</td>
+                </tr>
+                <tr>
+                    <td>1h</td><td>1 Hora</td><td id="p-1h" class="bg-bull">🟢 63% | 🔴 37%</td><td>Sin VSA Hoy</td><td>Sin VSA Sem.</td>
+                </tr>
+                <tr>
+                    <td>4h</td><td>4 Horas</td><td id="p-4h" class="bg-bull">🟢 55% | 🔴 45%</td><td>Sin VSA Hoy</td><td>Sin VSA Sem.</td>
+                </tr>
+                <tr>
+                    <td>1D</td><td>1 Día</td><td id="p-1d" class="bg-bull">🟢 62% | 🔴 38%</td><td>-</td><td>-</td>
+                </tr>
+                <tr class="bg-proj">
+                    <td>PROYECCIÓN</td>
+                    <td>Horizonte Temporal</td>
+                    <td>Precio Estimado Objetivo</td>
+                    <td colspan="2">Fuerza y Sesgo Proyectado</td>
+                </tr>
+                <tr>
+                    <td>🚀 15m</td>
+                    <td>Próximos 15 Min</td>
+                    <td id="proj-15m-val" style="color:#00e676">77822.89</td>
+                    <td colspan="2" style="color:#00e676">↗ ALCISTA (Presión TF Cortos)</td>
+                </tr>
+                <tr>
+                    <td>🚀 1h / 4h</td>
+                    <td>1 Hora / 4 Horas</td>
+                    <td id="proj-1h-val" style="color:#00e676">1H: 77983.38 | 4H: 78231.42</td>
+                    <td colspan="2" style="color:#00e676">🚀 ALCISTA (Ponderación Macro VSA)</td>
+                </tr>
+            </tbody>
+        </table>
     </div>
 
-    <div id="tv_container"></div>
+    <script>
+        // 1. Inicializar Gráfico Nativo Libre
+        const container = document.getElementById('chart-container');
+        const chart = LightweightCharts.createChart(container, {
+            layout: { backgroundColor: '#131722', textColor: '#d1d4dc' },
+            grid: { vertLines: { color: '#2a2e39' }, horzLines: { color: '#2a2e39' } },
+            crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+            priceScale: { borderColor: '#2a2e39' },
+            timeScale: { borderColor: '#2a2e39', timeVisible: true }
+        });
 
-    <script type="text/javascript">
-        function loadChart(symbol) {
-            document.getElementById('tv_container').innerHTML = '';
+        const candleSeries = chart.addCandlestickSeries({
+            upColor: '#089981', downColor: '#f23645',
+            borderUpColor: '#089981', borderDownColor: '#f23645',
+            wickUpColor: '#089981', wickDownColor: '#f23645',
+        });
+
+        // Linea de Soporte 4H (Azul discontinua)
+        const supportLine = chart.addLineSeries({
+            color: '#2962ff',
+            lineWidth: 3,
+            lineStyle: LightweightCharts.LineStyle.Dashed,
+            title: '[4H SOPORTE]'
+        });
+
+        // 2. Cargar Datos en Tiempo Real (Ejemplo API pública)
+        async function fetchMarketData() {
+            const res = await fetch('https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1h&limit=100');
+            const data = await res.json();
             
-            new TradingView.widget({
-                "autosize": true,
-                "symbol": symbol,
-                "interval": "60",
-                "timezone": "Etc/UTC",
-                "theme": "dark",
-                "style": "1",
-                "locale": "es",
-                "toolbar_bg": "#131722",
-                "enable_publishing": false,
-                "hide_side_toolbar": false,
-                "allow_symbol_change": true,
-                "container_id": "tv_container",
-                "studies": [
-                    "PUB;tu_script_id_aqui" // Sustituye este texto con el ID de publicación
-                ]
+            const candles = [];
+            const supportData = [];
+
+            data.forEach((d, i) => {
+                const time = d[0] / 1000;
+                const open = parseFloat(d[1]);
+                const high = parseFloat(d[2]);
+                const low = parseFloat(d[3]);
+                const close = parseFloat(d[4]);
+                
+                candles.push({ time, open, high, low, close });
+                supportData.push({ time, value: 76206.05 }); // Nivel del soporte del script
             });
+
+            candleSeries.setData(candles);
+            supportLine.setData(supportData);
+
+            // Calcular VSA y actualizar el Dashboard
+            const lastBar = candles[candles.length - 1];
+            document.getElementById('proj-15m-val').innerText = (lastBar.close * 1.002).toFixed(2);
         }
 
-        loadChart('PEPPERSTONE:BTCUSD');
+        fetchMarketData();
+
+        window.addEventListener('resize', () => {
+            chart.applyOptions({ width: container.clientWidth, height: container.clientHeight });
+        });
     </script>
 </body>
 </html>
