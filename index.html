@@ -4,139 +4,126 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>S/R + VSA Tiburon - Dashboard</title>
-    
-    <!-- Carga directa y garantizada de Lightweight Charts v4.1 -->
     <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
 
     <style>
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-        html, body {
-            width: 100%;
-            height: 100%;
-            background-color: #131722;
-            color: #d1d4dc;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            overflow: hidden;
-        }
-        #main-container {
-            width: 100vw;
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body { width: 100%; height: 100%; background-color: #131722; color: #d1d4dc; font-family: sans-serif; overflow: hidden; }
+        #main-container { width: 100vw; height: 100vh; display: flex; flex-direction: column; }
+        
         #header {
-            height: 40px;
+            height: 48px;
             background-color: #1e222d;
             display: flex;
             align-items: center;
+            justify-content: space-between;
             padding: 0 16px;
-            font-size: 14px;
-            font-weight: bold;
-            color: #2962ff;
             border-bottom: 1px solid #2a2e39;
         }
-        #chart {
-            flex: 1;
-            width: 100%;
+        .title { font-size: 14px; font-weight: bold; color: #2962ff; }
+        
+        select {
+            background-color: #2a2e39;
+            color: #d1d4dc;
+            border: 1px solid #363c4e;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 13px;
+            outline: none;
+            cursor: pointer;
         }
-        #status {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            font-size: 16px;
-            color: #868993;
-            pointer-events: none;
-        }
+
+        #chart { flex: 1; width: 100%; }
+        #status { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 15px; color: #868993; pointer-events: none; }
     </style>
 </head>
 <body>
 
     <div id="main-container">
-        <div id="header">🦈 S/R + VSA Institucional Tiburon (BTC/USDT 1H)</div>
+        <div id="header">
+            <span class="title">🦈 S/R + VSA Institucional Tiburon (BTC/USDT)</span>
+            <div>
+                <label for="timeframe">Temporalidad: </label>
+                <select id="timeframe">
+                    <option value="1s">1 Segundo</option>
+                    <option value="1m">1 Minuto</option>
+                    <option value="5m">5 Minutos</option>
+                    <option value="15m">15 Minutos</option>
+                    <option value="1h" selected>1 Hora</option>
+                    <option value="4h">4 Horas</option>
+                    <option value="1d">1 Día</option>
+                    <option value="1w">1 Semana</option>
+                </select>
+            </div>
+        </div>
         <div id="chart"></div>
     </div>
-    <div id="status">Cargando gráfico de velas...</div>
+    <div id="status">Cargando gráfico...</div>
 
     <script>
-        document.addEventListener("DOMContentLoaded", async function () {
+        document.addEventListener("DOMContentLoaded", function () {
             const statusEl = document.getElementById("status");
-
-            // Validar que la librería de TradingView cargó bien
-            if (typeof LightweightCharts === "undefined") {
-                statusEl.innerText = "Error: No se pudo cargar el motor de gráficos.";
-                statusEl.style.color = "#f23645";
-                return;
-            }
-
+            const timeframeSelect = document.getElementById("timeframe");
             const chartContainer = document.getElementById("chart");
 
-            // Crear el contenedor de gráficos de TradingView
             const chart = LightweightCharts.createChart(chartContainer, {
                 width: chartContainer.clientWidth,
                 height: chartContainer.clientHeight,
-                layout: {
-                    background: { type: 'solid', color: '#131722' },
-                    textColor: '#d1d4dc',
-                },
-                grid: {
-                    vertLines: { color: 'rgba(42, 46, 57, 0.5)' },
-                    horzLines: { color: 'rgba(42, 46, 57, 0.5)' },
-                },
-                crosshair: {
-                    mode: LightweightCharts.CrosshairMode.Normal,
-                },
-                rightPriceScale: {
-                    borderColor: 'rgba(197, 203, 206, 0.8)',
-                },
-                timeScale: {
-                    borderColor: 'rgba(197, 203, 206, 0.8)',
-                    timeVisible: true,
-                },
+                layout: { background: { type: 'solid', color: '#131722' }, textColor: '#d1d4dc' },
+                grid: { vertLines: { color: 'rgba(42, 46, 57, 0.5)' }, horzLines: { color: 'rgba(42, 46, 57, 0.5)' } },
+                timeScale: { borderColor: 'rgba(197, 203, 206, 0.8)', timeVisible: true, secondsVisible: true },
             });
 
-            // Añadir serie de Velas Japonesas
             const candlestickSeries = chart.addCandlestickSeries({
-                upColor: '#089981',
-                downColor: '#f23645',
-                borderVisible: false,
-                wickUpColor: '#089981',
-                wickDownColor: '#f23645',
+                upColor: '#089981', downColor: '#f23645', borderVisible: false, wickUpColor: '#089981', wickDownColor: '#f23645'
             });
 
-            // Descargar velas desde Binance
-            try {
-                const response = await fetch("https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1h&limit=300");
-                if (!response.ok) throw new Error("Error HTTP: " + response.status);
+            async function loadChartData(interval) {
+                statusEl.style.display = "block";
+                statusEl.innerText = "Cargando datos...";
+
+                // Determinar el endpoint adecuado según si son segundos o temporalidades estándar
+                let url = `https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=${interval}&limit=300`;
                 
-                const rawData = await response.json();
+                if (interval === "1s") {
+                    // API de Binance para datos de segundos
+                    url = `https://api.binance.com/api/v3/uiKlines?symbol=BTCUSDT&interval=1s&limit=300`;
+                }
 
-                const formattedData = rawData.map(d => ({
-                    time: d[0] / 1000,
-                    open: parseFloat(d[1]),
-                    high: parseFloat(d[2]),
-                    low: parseFloat(d[3]),
-                    close: parseFloat(d[4])
-                }));
+                try {
+                    const response = await fetch(url);
+                    if (!response.ok) throw new Error("Error en la solicitud HTTP");
+                    
+                    const rawData = await response.json();
 
-                candlestickSeries.setData(formattedData);
-                statusEl.style.display = "none"; // Ocultar mensaje de carga
-            } catch (err) {
-                console.error(err);
-                statusEl.innerText = "Error cargando datos de mercado. Verifica la conexión.";
-                statusEl.style.color = "#f23645";
+                    const formattedData = rawData.map(d => ({
+                        time: d[0] / 1000,
+                        open: parseFloat(d[1]),
+                        high: parseFloat(d[2]),
+                        low: parseFloat(d[3]),
+                        close: parseFloat(d[4])
+                    }));
+
+                    candlestickSeries.setData(formattedData);
+                    chart.timeScale().fitContent();
+                    statusEl.style.display = "none";
+                } catch (err) {
+                    console.error(err);
+                    statusEl.innerText = "Error cargando datos para " + interval;
+                    statusEl.style.color = "#f23645";
+                }
             }
 
-            // Ajuste dinámico de tamaño de pantalla en la tablet
+            // Cargar inicial en 1 Hora
+            loadChartData(timeframeSelect.value);
+
+            // Evento al cambiar la temporalidad en el desplegable
+            timeframeSelect.addEventListener("change", (e) => {
+                loadChartData(e.target.value);
+            });
+
             window.addEventListener("resize", () => {
-                chart.applyOptions({
-                    width: chartContainer.clientWidth,
-                    height: chartContainer.clientHeight,
-                });
+                chart.applyOptions({ width: chartContainer.clientWidth, height: chartContainer.clientHeight });
             });
         });
     </script>
