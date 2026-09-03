@@ -50,9 +50,9 @@
                     <option value="15s">15 Segundos</option>
                     <option value="30s">30 Segundos</option>
                     <option value="1m">1 Minuto</option>
-                    <option value="3m">3 Minutos</option>
+                    <option value="3m" selected>3 Minutos</option>
                     <option value="5m">5 Minutos</option>
-                    <option value="15m" selected>15 Minutos</option>
+                    <option value="15m">15 Minutos</option>
                     <option value="1h">1 Hora</option>
                     <option value="4h">4 Horas</option>
                     <option value="1d">1 Día</option>
@@ -82,14 +82,6 @@
 
             const candlestickSeries = chart.addCandlestickSeries({
                 upColor: '#089981', downColor: '#f23645', borderVisible: false, wickUpColor: '#089981', wickDownColor: '#f23645'
-            });
-
-            // Línea del precio promedio institucional (Ballenas)
-            const whaleAvgLineSeries = chart.addLineSeries({
-                color: '#ffeb3b',
-                lineWidth: 2,
-                lineStyle: LightweightCharts.LineStyle.Solid,
-                title: 'Precio Promedio Ballenas'
             });
 
             function aggregateSecondsData(data1s, stepSeconds) {
@@ -136,84 +128,69 @@
             }
 
             // ==========================================
-            // DETECCION DE SEÑALES VSA Y LINEA DE PRECIO PROMEDIO
+            // DETECCION VSA + LÍNEA AMARILLA CONSTANTE DE BALLENAS
             // ==========================================
             function processWhaleData(candles, lineLevels) {
                 const markers = [];
-                const whaleAvgData = [];
                 const length = candles.length;
-                if (length < 20) return { markers, whaleAvgData };
+                if (length < 20) return { markers, lastWhalePrice: null };
 
-                let accumulatedVolPrice = 0;
-                let accumulatedVol = 0;
-                let currentWhalePrice = null;
+                let lastWhalePrice = null;
 
-                for (let i = 0; i < length; i++) {
+                for (let i = 20; i < length; i++) {
                     const currentCandle = candles[i];
 
-                    if (i >= 20) {
-                        let sumVol = 0;
-                        for (let j = i - 20; j < i; j++) {
-                            sumVol += (candles[j].volume || 1);
-                        }
-                        const avgVol = sumVol / 20;
-                        const isHighVolume = (currentCandle.volume || 0) > (avgVol * 2.2);
-
-                        const isBullish = currentCandle.close > currentCandle.open;
-                        const isBearish = currentCandle.close < currentCandle.open;
-
-                        let nearSupport = false;
-                        let nearResistance = false;
-
-                        lineLevels.forEach(lvl => {
-                            const diffPercent = Math.abs(currentCandle.close - lvl.price) / lvl.price;
-                            if (diffPercent < 0.0035) {
-                                if (lvl.title.includes("SOPORTE")) nearSupport = true;
-                                if (lvl.title.includes("RESISTENCIA")) nearResistance = true;
-                            }
-                        });
-
-                        // Si hay actividad de ballenas, actualizamos la línea de precio promedio
-                        if (isHighVolume) {
-                            const typicalPrice = (currentCandle.high + currentCandle.low + currentCandle.close) / 3;
-                            accumulatedVolPrice += typicalPrice * currentCandle.volume;
-                            accumulatedVol += currentCandle.volume;
-                            currentWhalePrice = accumulatedVolPrice / accumulatedVol;
-
-                            if (isBullish) {
-                                markers.push({
-                                    time: currentCandle.time,
-                                    position: 'belowBar',
-                                    color: '#00e676',
-                                    shape: 'arrowUp',
-                                    text: nearSupport ? 'BUY S/R' : 'BUY'
-                                });
-                            } else if (isBearish) {
-                                markers.push({
-                                    time: currentCandle.time,
-                                    position: 'aboveBar',
-                                    color: '#ff1744',
-                                    shape: 'arrowDown',
-                                    text: nearResistance ? 'SELL S/R' : 'SELL'
-                                });
-                            }
-                        }
+                    let sumVol = 0;
+                    for (let j = i - 20; j < i; j++) {
+                        sumVol += (candles[j].volume || 1);
                     }
+                    const avgVol = sumVol / 20;
+                    const isHighVolume = (currentCandle.volume || 0) > (avgVol * 2.2);
 
-                    // Trazar la línea de precio promedio institucional si ya existe
-                    if (currentWhalePrice) {
-                        whaleAvgData.push({
-                            time: currentCandle.time,
-                            value: currentWhalePrice
-                        });
+                    const isBullish = currentCandle.close > currentCandle.open;
+                    const isBearish = currentCandle.close < currentCandle.open;
+
+                    let nearSupport = false;
+                    let nearResistance = false;
+
+                    lineLevels.forEach(lvl => {
+                        const diffPercent = Math.abs(currentCandle.close - lvl.price) / lvl.price;
+                        if (diffPercent < 0.0035) {
+                            if (lvl.title.includes("SOPORTE")) nearSupport = true;
+                            if (lvl.title.includes("RESISTENCIA")) nearResistance = true;
+                        }
+                    });
+
+                    // Si hay clímax de volumen (ballena), guardamos ese nivel de precio
+                    if (isHighVolume) {
+                        lastWhalePrice = (currentCandle.high + currentCandle.low + currentCandle.close) / 3;
+
+                        if (isBullish) {
+                            markers.push({
+                                time: currentCandle.time,
+                                position: 'belowBar',
+                                color: '#00e676',
+                                shape: 'arrowUp',
+                                text: nearSupport ? 'BUY S/R' : 'BUY'
+                            });
+                        } else if (isBearish) {
+                            markers.push({
+                                time: currentCandle.time,
+                                position: 'aboveBar',
+                                color: '#ff1744',
+                                shape: 'arrowDown',
+                                text: nearResistance ? 'SELL S/R' : 'SELL'
+                            });
+                        }
                     }
                 }
 
-                return { markers, whaleAvgData };
+                return { markers, lastWhalePrice };
             }
 
             async function renderSRVisuals(currentFormattedData, currentInterval) {
                 try {
+                    // Limpieza total de líneas activas anteriores
                     activePriceLines.forEach(line => candlestickSeries.removePriceLine(line));
                     activePriceLines = [];
 
@@ -256,6 +233,22 @@
                         }
                     }
 
+                    // Procesar marcas VSA y obtener el precio constante de la última ballena
+                    const { markers, lastWhalePrice } = processWhaleData(currentFormattedData, lineLevels);
+                    candlestickSeries.setMarkers(markers);
+
+                    // Si se detectó una ballena, dibujamos la LÍNEA AMARILLA HORIZONTAL CONSTANTE
+                    if (lastWhalePrice) {
+                        lineLevels.push({
+                            price: lastWhalePrice,
+                            color: '#ffeb3b',
+                            title: '[ PRECIO BALLENA ]',
+                            width: 2,
+                            style: LightweightCharts.LineStyle.Solid
+                        });
+                    }
+
+                    // Renderizar todas las líneas horizontales
                     lineLevels.forEach(level => {
                         const line = candlestickSeries.createPriceLine({
                             price: level.price,
@@ -267,11 +260,6 @@
                         });
                         activePriceLines.push(line);
                     });
-
-                    // Procesar las marcas y la línea promedio de las ballenas
-                    const { markers, whaleAvgData } = processWhaleData(currentFormattedData, lineLevels);
-                    candlestickSeries.setMarkers(markers);
-                    whaleAvgLineSeries.setData(whaleAvgData);
 
                 } catch (e) {
                     console.error("Error al renderizar S/R y VSA:", e);
