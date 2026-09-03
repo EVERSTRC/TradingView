@@ -4,98 +4,141 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>S/R + VSA Tiburon - Dashboard</title>
-    <!-- Fondo oscuro inmediato para evitar el pantallazo blanco -->
+    
+    <!-- Carga directa y garantizada de Lightweight Charts v4.1 -->
+    <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
+
     <style>
-        body { 
-            margin: 0; 
-            padding: 0; 
-            background-color: #131722; 
-            color: #d1d4dc; 
-            font-family: sans-serif; 
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            width: 100vw;
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        html, body {
+            width: 100%;
+            height: 100%;
+            background-color: #131722;
+            color: #d1d4dc;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             overflow: hidden;
         }
-        #chart { 
-            width: 100%; 
-            height: 100%; 
-            display: none; /* Oculto hasta que carguen los datos */
+        #main-container {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
         }
-        #loading-message {
-            font-size: 1.5rem;
-            color: #089981;
+        #header {
+            height: 40px;
+            background-color: #1e222d;
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            font-size: 14px;
             font-weight: bold;
+            color: #2962ff;
+            border-bottom: 1px solid #2a2e39;
+        }
+        #chart {
+            flex: 1;
+            width: 100%;
+        }
+        #status {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 16px;
+            color: #868993;
+            pointer-events: none;
         }
     </style>
 </head>
 <body>
 
-    <!-- Mensaje de carga inicial -->
-    <div id="loading-message">Cargando gráfico...</div>
-    
-    <!-- Contenedor del gráfico -->
-    <div id="chart"></div>
-
-    <!-- Carga diferida de la librería para velocidad -->
-    <script async src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js" onload="initializeApp()"></script>
+    <div id="main-container">
+        <div id="header">🦈 S/R + VSA Institucional Tiburon (BTC/USDT 1H)</div>
+        <div id="chart"></div>
+    </div>
+    <div id="status">Cargando gráfico de velas...</div>
 
     <script>
-        function initializeApp() {
-            console.log("Librería cargada. Iniciando aplicación...");
-            // Ocultar mensaje de carga y mostrar el div del gráfico
-            document.getElementById('loading-message').style.display = 'none';
-            document.getElementById('chart').style.display = 'block';
+        document.addEventListener("DOMContentLoaded", async function () {
+            const statusEl = document.getElementById("status");
 
-            // 1. Crear el gráfico con estilo oscuro
-            const chart = LightweightCharts.createChart(document.getElementById('chart'), {
-                layout: { backgroundColor: '#131722', textColor: '#d1d4dc' },
-                grid: { vertLines: { color: '#1f2937' }, horzLines: { color: '#1f2937' } },
-                timeScale: { timeVisible: true, secondsVisible: false, borderVisible: false },
-                rightPriceScale: { borderVisible: false }
-            });
-
-            const candlestickSeries = chart.addCandlestickSeries({
-                upColor: '#089981', downColor: '#f23645',
-                borderUpColor: '#089981', borderDownColor: '#f23645',
-                wickUpColor: '#089981', wickDownColor: '#f23645',
-            });
-
-            // 2. Obtener datos en tiempo real desde la API de Binance
-            async function fetchMarketData() {
-                try {
-                    const res = await fetch('https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1h&limit=500');
-                    if (!res.ok) throw new Error("Fallo en la API");
-                    
-                    const data = await res.json();
-                    
-                    const formattedData = data.map(d => ({
-                        time: d[0] / 1000,
-                        open: parseFloat(d[1]),
-                        high: parseFloat(d[2]),
-                        low: parseFloat(d[3]),
-                        close: parseFloat(d[4])
-                    }));
-
-                    candlestickSeries.setData(formattedData);
-                    console.log("Datos cargados correctamente.");
-                } catch (error) {
-                    console.error("Error cargando datos:", error);
-                    document.getElementById('loading-message').innerText = "Error de conexión. Recarga la página.";
-                    document.getElementById('loading-message').style.display = 'block';
-                    document.getElementById('chart').style.display = 'none';
-                }
+            // Validar que la librería de TradingView cargó bien
+            if (typeof LightweightCharts === "undefined") {
+                statusEl.innerText = "Error: No se pudo cargar el motor de gráficos.";
+                statusEl.style.color = "#f23645";
+                return;
             }
 
-            fetchMarketData();
+            const chartContainer = document.getElementById("chart");
 
-            // Ajuste automático de tamaño en la tablet
-            window.addEventListener('resize', () => {
-                chart.applyOptions({ width: document.getElementById('chart').clientWidth, height: document.getElementById('chart').clientHeight });
+            // Crear el contenedor de gráficos de TradingView
+            const chart = LightweightCharts.createChart(chartContainer, {
+                width: chartContainer.clientWidth,
+                height: chartContainer.clientHeight,
+                layout: {
+                    background: { type: 'solid', color: '#131722' },
+                    textColor: '#d1d4dc',
+                },
+                grid: {
+                    vertLines: { color: 'rgba(42, 46, 57, 0.5)' },
+                    horzLines: { color: 'rgba(42, 46, 57, 0.5)' },
+                },
+                crosshair: {
+                    mode: LightweightCharts.CrosshairMode.Normal,
+                },
+                rightPriceScale: {
+                    borderColor: 'rgba(197, 203, 206, 0.8)',
+                },
+                timeScale: {
+                    borderColor: 'rgba(197, 203, 206, 0.8)',
+                    timeVisible: true,
+                },
             });
-        }
+
+            // Añadir serie de Velas Japonesas
+            const candlestickSeries = chart.addCandlestickSeries({
+                upColor: '#089981',
+                downColor: '#f23645',
+                borderVisible: false,
+                wickUpColor: '#089981',
+                wickDownColor: '#f23645',
+            });
+
+            // Descargar velas desde Binance
+            try {
+                const response = await fetch("https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1h&limit=300");
+                if (!response.ok) throw new Error("Error HTTP: " + response.status);
+                
+                const rawData = await response.json();
+
+                const formattedData = rawData.map(d => ({
+                    time: d[0] / 1000,
+                    open: parseFloat(d[1]),
+                    high: parseFloat(d[2]),
+                    low: parseFloat(d[3]),
+                    close: parseFloat(d[4])
+                }));
+
+                candlestickSeries.setData(formattedData);
+                statusEl.style.display = "none"; // Ocultar mensaje de carga
+            } catch (err) {
+                console.error(err);
+                statusEl.innerText = "Error cargando datos de mercado. Verifica la conexión.";
+                statusEl.style.color = "#f23645";
+            }
+
+            // Ajuste dinámico de tamaño de pantalla en la tablet
+            window.addEventListener("resize", () => {
+                chart.applyOptions({
+                    width: chartContainer.clientWidth,
+                    height: chartContainer.clientHeight,
+                });
+            });
+        });
     </script>
 </body>
 </html>
