@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>S/R + VSA Tiburon - Dashboard Visual PineScript</title>
+    <title>S/R + VSA Tiburon - Dashboard Visual</title>
     <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
 
     <style>
@@ -52,8 +52,8 @@
                     <option value="1m">1 Minuto</option>
                     <option value="3m">3 Minutos</option>
                     <option value="5m">5 Minutos</option>
-                    <option value="15m">15 Minutos</option>
-                    <option value="1h" selected>1 Hora</option>
+                    <option value="15m" selected>15 Minutos</option>
+                    <option value="1h">1 Hora</option>
                     <option value="4h">4 Horas</option>
                     <option value="1d">1 Día</option>
                     <option value="1w">1 Semana</option>
@@ -71,7 +71,6 @@
             const chartContainer = document.getElementById("chart");
 
             let activePriceLines = [];
-            let activeBoxes = [];
 
             const chart = LightweightCharts.createChart(chartContainer, {
                 width: chartContainer.clientWidth,
@@ -106,7 +105,7 @@
                 return aggregated;
             }
 
-            // Algoritmo de detección de Pivotes
+            // Algoritmo para calcular pivotes
             function calculatePivots(candles, leftBars = 15, rightBars = 15) {
                 let lastPivotHigh = null;
                 let lastPivotLow = null;
@@ -130,58 +129,90 @@
 
             async function renderSRVisuals(currentFormattedData, currentInterval) {
                 try {
-                    // Limpieza de objetos gráficos anteriores
+                    // Limpieza estricta de líneas de precio anteriores
                     activePriceLines.forEach(line => candlestickSeries.removePriceLine(line));
                     activePriceLines = [];
 
-                    activeBoxes.forEach(boxSeries => chart.removeSeries(boxSeries));
-                    activeBoxes = [];
-
-                    // 1. OBTENER DATOS DE 4H Y 1D
+                    // 1. Obtención de datos de 4H y 1D desde la API
                     const [raw4h, raw1d] = await Promise.all([
                         fetch('https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=4h&limit=200').then(r => r.json()),
                         fetch('https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&limit=200').then(r => r.json())
                     ]);
 
-                    const candles4h = raw4h.map(d => ({ time: Math.floor(d[0]/1000), open: parseFloat(d[1]), high: parseFloat(d[2]), low: parseFloat(d[3]), close: parseFloat(d[4]) }));
-                    const candles1d = raw1d.map(d => ({ time: Math.floor(d[0]/1000), open: parseFloat(d[1]), high: parseFloat(d[2]), low: parseFloat(d[3]), close: parseFloat(d[4]) }));
+                    const candles4h = raw4h.map(d => ({ high: parseFloat(d[2]), low: parseFloat(d[3]) }));
+                    const candles1d = raw1d.map(d => ({ high: parseFloat(d[2]), low: parseFloat(d[3]) }));
 
                     const pivots4h = calculatePivots(candles4h, 15, 15);
                     const pivots1d = calculatePivots(candles1d, 15, 15);
 
-                    // 2. DIBUJAR LÍNEAS HORIZONTALES ESTILO TRADINGVIEW (Niveles Macro)
                     const lineLevels = [];
 
-                    if (pivots4h.pivotHigh) {
-                        lineLevels.push({
-                            price: pivots4h.pivotHigh.high,
-                            color: '#ff9100',
-                            title: '[ 4H RESISTENCIA ]',
-                            width: 3,
-                            style: LightweightCharts.LineStyle.Dashed
-                        });
-                    }
-
-                    if (pivots4h.pivotLow) {
-                        lineLevels.push({
-                            price: pivots4h.pivotLow.low,
-                            color: '#2962ff',
-                            title: '[ 4H SOPORTE ]',
-                            width: 3,
-                            style: LightweightCharts.LineStyle.Dashed
-                        });
-                    }
-
+                    // Resistencia / Soporte de 1D (Grosor 3, Estilo Continuo)
                     if (pivots1d.pivotHigh) {
                         lineLevels.push({
                             price: pivots1d.pivotHigh.high,
                             color: '#ff1744',
                             title: '[ 1D RESISTENCIA ]',
-                            width: 4,
+                            width: 3,
+                            style: LightweightCharts.LineStyle.Solid
+                        });
+                    }
+                    if (pivots1d.pivotLow) {
+                        lineLevels.push({
+                            price: pivots1d.pivotLow.low,
+                            color: '#00e676',
+                            title: '[ 1D SOPORTE ]',
+                            width: 3,
                             style: LightweightCharts.LineStyle.Solid
                         });
                     }
 
+                    // Resistencia / Soporte de 4H (Grosor 2, Estilo Punteado Naranja/Azul)
+                    if (pivots4h.pivotHigh) {
+                        lineLevels.push({
+                            price: pivots4h.pivotHigh.high,
+                            color: '#ff9100',
+                            title: '[ 4H RESISTENCIA ]',
+                            width: 2,
+                            style: LightweightCharts.LineStyle.Dashed
+                        });
+                    }
+                    if (pivots4h.pivotLow) {
+                        lineLevels.push({
+                            price: pivots4h.pivotLow.low,
+                            color: '#2962ff',
+                            title: '[ 4H SOPORTE ]',
+                            width: 2,
+                            style: LightweightCharts.LineStyle.Dashed
+                        });
+                    }
+
+                    // Pivotes Locales del Timeframe Seleccionado (Línea Fina Rosa/Cian)
+                    if (currentFormattedData && currentFormattedData.length > 30 && currentInterval !== '4h' && currentInterval !== '1d') {
+                        const pivotsCurrent = calculatePivots(currentFormattedData, 15, 15);
+                        const label = currentInterval.toUpperCase();
+
+                        if (pivotsCurrent.pivotHigh) {
+                            lineLevels.push({
+                                price: pivotsCurrent.pivotHigh.high,
+                                color: '#e040fb',
+                                title: `[ RESISTENCIA ${label} ]`,
+                                width: 2,
+                                style: LightweightCharts.LineStyle.LargeDashed
+                            });
+                        }
+                        if (pivotsCurrent.pivotLow) {
+                            lineLevels.push({
+                                price: pivotsCurrent.pivotLow.low,
+                                color: '#00e5ff',
+                                title: `[ SOPORTE LOCAL ]`,
+                                width: 2,
+                                style: LightweightCharts.LineStyle.Solid
+                            });
+                        }
+                    }
+
+                    // Dibujar todas las líneas horizontales limpias
                     lineLevels.forEach(level => {
                         const line = candlestickSeries.createPriceLine({
                             price: level.price,
@@ -194,48 +225,8 @@
                         activePriceLines.push(line);
                     });
 
-                    // 3. DIBUJAR CAJAS RELLENAS DE SOPORTE/RESISTENCIA (Pivotes Locales / TF Actual)
-                    if (currentFormattedData && currentFormattedData.length > 30) {
-                        const pivotsCurrent = calculatePivots(currentFormattedData, 15, 15);
-
-                        // Resistencia en Bloque Rojo / Naranja
-                        if (pivotsCurrent.pivotHigh) {
-                            const resBoxSeries = chart.addHistogramSeries({
-                                color: 'rgba(255, 82, 82, 0.35)',
-                                priceFormat: { type: 'volume' },
-                                priceScaleId: 'overlay-res',
-                            });
-
-                            chart.priceScale('overlay-res').applyOptions({
-                                scaleMargins: { top: 0, bottom: 0 },
-                            });
-
-                            // Generar la caja rellena usando los datos del gráfico
-                            const boxData = currentFormattedData.map(c => ({
-                                time: c.time,
-                                value: (c.high >= pivotsCurrent.pivotHigh.high * 0.998) ? pivotsCurrent.pivotHigh.high : 0
-                            }));
-
-                            resBoxSeries.setData(boxData);
-                            activeBoxes.push(resBoxSeries);
-                        }
-
-                        // Soporte en Bloque Azul / Verde
-                        if (pivotsCurrent.pivotLow) {
-                            const supLine = candlestickSeries.createPriceLine({
-                                price: pivotsCurrent.pivotLow.low,
-                                color: '#00e676',
-                                lineWidth: 2,
-                                lineStyle: LightweightCharts.LineStyle.Solid,
-                                axisLabelVisible: true,
-                                title: '[ SOPORTE LOCAL ]'
-                            });
-                            activePriceLines.push(supLine);
-                        }
-                    }
-
                 } catch (e) {
-                    console.error("Error al renderizar visuales S/R:", e);
+                    console.error("Error al renderizar S/R:", e);
                 }
             }
 
@@ -274,7 +265,7 @@
 
                     candlestickSeries.setData(formattedData);
                     
-                    // Renderiza los visuales idénticos a la imagen
+                    // Carga dinámicamente las líneas de Pivotes (S/R)
                     await renderSRVisuals(formattedData, interval);
 
                     chart.timeScale().fitContent();
