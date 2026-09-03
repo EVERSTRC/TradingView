@@ -3,23 +3,65 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Plataforma Propia - S/R + VSA</title>
-    <!-- Librería Lightweight Charts cargada de CDN estable -->
+    <title>TradingView Native - S/R + VSA</title>
     <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        html, body { width: 100%; height: 100%; overflow: hidden; background-color: #131722; font-family: sans-serif; color: #d1d4dc; }
-        
-        #wrapper { width: 100vw; height: 100vh; position: relative; }
+        html, body { width: 100vw; height: 100vh; overflow: hidden; background-color: #131722; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #d1d4dc; }
+
+        #app { width: 100vw; height: 100vh; display: flex; flex-direction: column; }
+
+        /* BARRA SUPERIOR ESTILO TRADINGVIEW */
+        .tv-header {
+            height: 38px;
+            background-color: #131722;
+            border-bottom: 1px solid #2a2e39;
+            display: flex;
+            align-items: center;
+            padding: 0 12px;
+            gap: 12px;
+            z-index: 100;
+        }
+
+        .symbol-select, .tf-btn {
+            background-color: transparent;
+            color: #d1d4dc;
+            border: none;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+
+        .symbol-select { background-color: #1e222d; border: 1px solid #363a45; }
+        .tf-btn:hover, .symbol-select:hover { background-color: #2a2e39; color: #fff; }
+        .tf-btn.active { color: #2962ff; background-color: rgba(41, 98, 255, 0.1); }
+        .divider { width: 1px; height: 18px; background-color: #2a2e39; }
+
+        /* ENCABEZADO DE INFORMACIÓN DEL ACTIVO (ARRIBA A LA IZQUIERDA DEL GRÁFICO) */
+        .chart-info {
+            position: absolute;
+            top: 10px;
+            left: 12px;
+            z-index: 50;
+            font-size: 12px;
+            pointer-events: none;
+        }
+        .symbol-title { font-weight: bold; color: #ffffff; font-size: 14px; display: flex; align-items: center; gap: 6px; }
+        .status-dot { width: 8px; height: 8px; background-color: #089981; border-radius: 50%; display: inline-block; }
+        .ohlc-info { color: #787b86; margin-top: 2px; font-size: 11px; }
+
+        #chart-container { flex: 1; width: 100%; position: relative; }
         #chart { width: 100%; height: 100%; }
 
-        /* DASHBOARD FLOTANTE */
+        /* DASHBOARD FLOTANTE VSA */
         #vsa-dashboard {
             position: absolute;
             top: 10px;
-            right: 10px;
-            z-index: 100;
-            background-color: rgba(19, 23, 34, 0.95);
+            right: 12px;
+            z-index: 50;
+            background-color: rgba(19, 23, 34, 0.92);
             border: 1px solid #363a45;
             border-collapse: collapse;
             font-size: 11px;
@@ -35,70 +77,105 @@
 </head>
 <body>
 
-    <div id="wrapper">
-        <div id="chart"></div>
+    <div id="app">
+        <!-- BARRA SUPERIOR DE TRADINGVIEW -->
+        <div class="tv-header">
+            <select class="symbol-select" id="symbolSelect" onchange="changeSymbol(this.value)">
+                <option value="btcusdt">BTCUSDT (Bitcoin)</option>
+                <option value="ethusdt">ETHUSDT (Ethereum)</option>
+                <option value="solusdt">SOLUSDT (Solana)</option>
+            </select>
 
-        <table id="vsa-dashboard">
-            <thead>
-                <tr>
-                    <th>TF</th>
-                    <th>Nivel / Estado</th>
-                    <th>Presión (Compra | Venta)</th>
-                    <th style="color:#ffd700">VSA Ballenas (Hoy)</th>
-                    <th style="color:#ff9800">VSA Ballenas (Semanal)</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td style="color:#ffd700">NOTICIAS</td>
-                    <td>Impacto / Sesgo</td>
-                    <td id="news-status" colspan="3" class="bg-bear">🔴 SESGO LIGERAMENTE BAJISTA</td>
-                </tr>
-                <tr>
-                    <td style="color:#ff5252">Resistencia</td>
-                    <td>78200.00</td>
-                    <td>Fuera</td>
-                    <td>-</td>
-                    <td>-</td>
-                </tr>
-                <tr>
-                    <td style="color:#2962ff">Soporte</td>
-                    <td>76206.05</td>
-                    <td>Fuera</td>
-                    <td>-</td>
-                    <td>-</td>
-                </tr>
-                <tr>
-                    <td style="color:#ff9800">Vela Actual</td>
-                    <td>BTC/USD EN VIVO</td>
-                    <td id="live-price" class="bg-bull">Cargando...</td>
-                    <td>-</td>
-                    <td>-</td>
-                </tr>
-                <tr><td>1m</td><td>1 Minuto</td><td class="bg-bear">🟢 48% | 🔴 52%</td><td>Sin VSA Hoy</td><td>Sin VSA Sem.</td></tr>
-                <tr><td>5m</td><td>5 Minutos</td><td class="bg-bear">🟢 46% | 🔴 54%</td><td>Sin VSA Hoy</td><td>Sin VSA Sem.</td></tr>
-                <tr><td>15m</td><td>15 Minutos</td><td class="bg-bull">🟢 70% | 🔴 30%</td><td>Sin VSA Hoy</td><td>Sin VSA Sem.</td></tr>
-                <tr><td>1h</td><td>1 Hora</td><td class="bg-bull">🟢 63% | 🔴 37%</td><td>Sin VSA Hoy</td><td>Sin VSA Sem.</td></tr>
-                <tr class="bg-proj">
-                    <td>PROYECCIÓN</td>
-                    <td>Horizonte Temporal</td>
-                    <td>Precio Estimado Objetivo</td>
-                    <td colspan="2">Fuerza y Sesgo Proyectado</td>
-                </tr>
-                <tr>
-                    <td>🚀 15m</td>
-                    <td>Próximos 15 Min</td>
-                    <td id="proj-15m" style="color:#00e676">--</td>
-                    <td colspan="2" style="color:#00e676">↗ ALCISTA (Presión TF Cortos)</td>
-                </tr>
-            </tbody>
-        </table>
+            <div class="divider"></div>
+
+            <button class="tf-btn active" onclick="changeTF('1m', this)">1m</button>
+            <button class="tf-btn" onclick="changeTF('5m', this)">5m</button>
+            <button class="tf-btn" onclick="changeTF('15m', this)">15m</button>
+            <button class="tf-btn" onclick="changeTF('1h', this)">1h</button>
+            <button class="tf-btn" onclick="changeTF('4h', this)">4h</button>
+            <button class="tf-btn" onclick="changeTF('1d', this)">1D</button>
+        </div>
+
+        <div id="chart-container">
+            <!-- DETALLES DEL SIMBOLO DENTRO DEL GRÁFICO -->
+            <div class="chart-info">
+                <div class="symbol-title">
+                    <span class="status-dot"></span>
+                    <span id="display-symbol">Bitcoin / Dólar estadounidense</span> · <span id="display-tf">1h</span> · Binance
+                </div>
+                <div class="ohlc-info" id="ohlc-display">
+                    O: <span id="open-val">--</span> H: <span id="high-val">--</span> L: <span id="low-val">--</span> C: <span id="close-val">--</span>
+                </div>
+            </div>
+
+            <div id="chart"></div>
+
+            <!-- TABLA DASHBOARD VSA INSTITUCIONAL -->
+            <table id="vsa-dashboard">
+                <thead>
+                    <tr>
+                        <th>TF</th>
+                        <th>Nivel / Estado</th>
+                        <th>Presión (Compra | Venta)</th>
+                        <th style="color:#ffd700">VSA Ballenas (Hoy)</th>
+                        <th style="color:#ff9800">VSA Ballenas (Semanal)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td style="color:#ffd700">NOTICIAS</td>
+                        <td>Impacto / Sesgo</td>
+                        <td colspan="3" class="bg-bear">🔴 SESGO LIGERAMENTE BAJISTA</td>
+                    </tr>
+                    <tr>
+                        <td style="color:#ff5252">Resistencia</td>
+                        <td>78200.00</td>
+                        <td>Fuera</td>
+                        <td>-</td>
+                        <td>-</td>
+                    </tr>
+                    <tr>
+                        <td style="color:#2962ff">Soporte</td>
+                        <td>76206.05</td>
+                        <td>Fuera</td>
+                        <td>-</td>
+                        <td>-</td>
+                    </tr>
+                    <tr>
+                        <td style="color:#ff9800">Vela Actual</td>
+                        <td>TF Actual</td>
+                        <td id="live-price" class="bg-bull">Cargando...</td>
+                        <td>-</td>
+                        <td>-</td>
+                    </tr>
+                    <tr><td>1m</td><td>1 Minuto</td><td class="bg-bear">🟢 48% | 🔴 52%</td><td>Sin VSA Hoy</td><td>Sin VSA Sem.</td></tr>
+                    <tr><td>5m</td><td>5 Minutos</td><td class="bg-bear">🟢 46% | 🔴 54%</td><td>Sin VSA Hoy</td><td>Sin VSA Sem.</td></tr>
+                    <tr><td>15m</td><td>15 Minutos</td><td class="bg-bull">🟢 70% | 🔴 30%</td><td>Sin VSA Hoy</td><td>Sin VSA Sem.</td></tr>
+                    <tr><td>1h</td><td>1 Hora</td><td class="bg-bull">🟢 63% | 🔴 37%</td><td>Sin VSA Hoy</td><td>Sin VSA Sem.</td></tr>
+                    <tr class="bg-proj">
+                        <td>PROYECCIÓN</td>
+                        <td>Horizonte Temporal</td>
+                        <td>Precio Estimado Objetivo</td>
+                        <td colspan="2">Fuerza y Sesgo Proyectado</td>
+                    </tr>
+                    <tr>
+                        <td>🚀 15m</td>
+                        <td>Próximos 15 Min</td>
+                        <td id="proj-15m" style="color:#00e676">--</td>
+                        <td colspan="2" style="color:#00e676">↗ ALCISTA (Presión TF Cortos)</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
     </div>
 
     <script>
         const container = document.getElementById('chart');
-        
-        // Inicializar gráfico de TradingView Lighweight
+        let currentSymbol = 'btcusdt';
+        let currentTF = '1m';
+        let ws = null;
+
+        // Crear gráfico en el canvas
         const chart = LightweightCharts.createChart(container, {
             width: container.clientWidth,
             height: container.clientHeight,
@@ -113,48 +190,71 @@
             wickUpColor: '#089981', wickDownColor: '#f23645',
         });
 
-        // Generación de velas base iniciales
-        let basePrice = 77000;
-        let now = Math.floor(Date.now() / 1000) - (100 * 3600);
-        let data = [];
+        // Trazado del soporte azul de 4H
+        const supportLine = candleSeries.createPriceLine({
+            price: 76206.05,
+            color: '#2962ff',
+            lineWidth: 3,
+            lineStyle: LightweightCharts.LineStyle.Dashed,
+            axisLabelVisible: true,
+            title: '[4H SOPORTE]',
+        });
 
-        for (let i = 0; i < 100; i++) {
-            let open = basePrice + (Math.random() - 0.5) * 200;
-            let high = open + Math.random() * 150;
-            let low = open - Math.random() * 150;
-            let close = (high + low) / 2;
-            data.push({ time: now + (i * 3600), open, high, low, close });
-            basePrice = close;
+        function connectWebSocket() {
+            if (ws) ws.close();
+
+            ws = new WebSocket(`wss://stream.binance.com:9443/ws/${currentSymbol}@kline_${currentTF}`);
+            
+            ws.onmessage = (event) => {
+                const message = JSON.parse(event.data);
+                const k = message.k;
+                
+                const liveCandle = {
+                    time: Math.floor(k.t / 1000),
+                    open: parseFloat(k.o),
+                    high: parseFloat(k.h),
+                    low: parseFloat(k.l),
+                    close: parseFloat(k.c)
+                };
+
+                candleSeries.update(liveCandle);
+
+                // Actualizar cabecera OHLVC
+                document.getElementById('open-val').innerText = liveCandle.open.toFixed(2);
+                document.getElementById('high-val').innerText = liveCandle.high.toFixed(2);
+                document.getElementById('low-val').innerText = liveCandle.low.toFixed(2);
+                document.getElementById('close-val').innerText = liveCandle.close.toFixed(2);
+                
+                document.getElementById('live-price').innerText = `$${liveCandle.close.toFixed(2)}`;
+                document.getElementById('proj-15m').innerText = `$${(liveCandle.close * 1.0015).toFixed(2)}`;
+            };
         }
 
-        candleSeries.setData(data);
+        function changeTF(tf, btn) {
+            currentTF = tf;
+            document.querySelectorAll('.tf-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            document.getElementById('display-tf').innerText = tf;
+            connectWebSocket();
+        }
 
-        // Ajustar tamaño si cambia la ventana
+        function changeSymbol(symbol) {
+            currentSymbol = symbol;
+            const names = {
+                'btcusdt': 'Bitcoin / Dólar estadounidense',
+                'ethusdt': 'Ethereum / Dólar estadounidense',
+                'solusdt': 'Solana / Dólar estadounidense'
+            };
+            document.getElementById('display-symbol').innerText = names[symbol];
+            connectWebSocket();
+        }
+
         window.addEventListener('resize', () => {
             chart.resize(container.clientWidth, container.clientHeight);
         });
 
-        // Conexión WebSockets Binance para precio y velas en tiempo real
-        const ws = new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@kline_1m');
-        
-        ws.onmessage = (event) => {
-            const message = JSON.parse(event.data);
-            const candle = message.k;
-            
-            const liveCandle = {
-                time: Math.floor(candle.t / 1000),
-                open: parseFloat(candle.o),
-                high: parseFloat(candle.h),
-                low: parseFloat(candle.l),
-                close: parseFloat(candle.c)
-            };
-
-            candleSeries.update(liveCandle);
-
-            // Actualizar elementos del Dashboard
-            document.getElementById('live-price').innerText = `$${liveCandle.close.toFixed(2)}`;
-            document.getElementById('proj-15m').innerText = `$${(liveCandle.close * 1.0015).toFixed(2)}`;
-        };
+        // Inicializar transmisión
+        connectWebSocket();
     </script>
 </body>
 </html>
