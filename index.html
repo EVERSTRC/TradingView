@@ -80,25 +80,6 @@
                 timeScale: { borderColor: 'rgba(197, 203, 206, 0.8)', timeVisible: true, secondsVisible: true },
             });
 
-            // NUBES SUPERTREND (Sombreado/Áreas creadas ANTES de las velas para quedar al fondo)
-            const supertrendUpArea = chart.addAreaSeries({
-                topColor: 'rgba(0, 230, 118, 0.25)',
-                bottomColor: 'rgba(0, 230, 118, 0.02)',
-                lineColor: '#00e676',
-                lineWidth: 2,
-                priceLineVisible: false,
-                lastValueVisible: false,
-            });
-
-            const supertrendDownArea = chart.addAreaSeries({
-                topColor: 'rgba(255, 23, 68, 0.25)',
-                bottomColor: 'rgba(255, 23, 68, 0.02)',
-                lineColor: '#ff1744',
-                lineWidth: 2,
-                priceLineVisible: false,
-                lastValueVisible: false,
-            });
-
             // VELAS
             const candlestickSeries = chart.addCandlestickSeries({
                 upColor: '#089981', downColor: '#f23645', borderVisible: false, wickUpColor: '#089981', wickDownColor: '#f23645'
@@ -126,13 +107,11 @@
                 return aggregated;
             }
 
-            // FUNCIÓN PARA CALCULAR SUPERTREND
-            function calculateSupertrend(candles, period = 10, multiplier = 3.0) {
-                if (candles.length < period + 1) return { upData: [], downData: [] };
+            // CALCULAR SUPERTREND (Genera únicamente marcadores de cruce BUY/SELL ST)
+            function getSupertrendMarkers(candles, period = 10, multiplier = 3.0) {
+                if (candles.length < period + 1) return [];
 
-                const atr = [];
                 const tr = [];
-
                 for (let i = 0; i < candles.length; i++) {
                     if (i === 0) {
                         tr.push(candles[i].high - candles[i].low);
@@ -144,6 +123,7 @@
                     }
                 }
 
+                const atr = [];
                 let sumTR = 0;
                 for (let i = 0; i < period; i++) sumTR += tr[i];
                 atr[period - 1] = sumTR / period;
@@ -152,9 +132,7 @@
                     atr[i] = (atr[i - 1] * (period - 1) + tr[i]) / period;
                 }
 
-                const upData = [];
-                const downData = [];
-
+                const stMarkers = [];
                 let prevUpperBand = 0;
                 let prevLowerBand = 0;
                 let prevSupertrend = 0;
@@ -168,8 +146,10 @@
                     let upperBand = (basicUpperBand < prevUpperBand || candles[i - 1].close > prevUpperBand) ? basicUpperBand : prevUpperBand;
                     let lowerBand = (basicLowerBand > prevLowerBand || candles[i - 1].close < prevLowerBand) ? basicLowerBand : prevLowerBand;
 
+                    let prevTrend = isBullish;
+
                     if (i === period) {
-                        isBullish = candles[i].close > upperBand ? true : false;
+                        isBullish = candles[i].close > upperBand;
                     } else {
                         if (prevSupertrend === prevUpperBand) {
                             isBullish = candles[i].close > upperBand;
@@ -180,10 +160,25 @@
 
                     const currentSupertrend = isBullish ? lowerBand : upperBand;
 
-                    if (isBullish) {
-                        upData.push({ time: candles[i].time, value: currentSupertrend });
-                    } else {
-                        downData.push({ time: candles[i].time, value: currentSupertrend });
+                    // DETECTAR CRUCES
+                    if (i > period && isBullish !== prevTrend) {
+                        if (isBullish) {
+                            stMarkers.push({
+                                time: candles[i].time,
+                                position: 'belowBar',
+                                color: '#00e676',
+                                shape: 'arrowUp',
+                                text: 'BUY (ST)'
+                            });
+                        } else {
+                            stMarkers.push({
+                                time: candles[i].time,
+                                position: 'aboveBar',
+                                color: '#ff1744',
+                                shape: 'arrowDown',
+                                text: 'SELL (ST)'
+                            });
+                        }
                     }
 
                     prevUpperBand = upperBand;
@@ -191,7 +186,7 @@
                     prevSupertrend = currentSupertrend;
                 }
 
-                return { upData, downData };
+                return stMarkers;
             }
 
             function calculatePivots(candles, leftBars = 15, rightBars = 15) {
@@ -253,8 +248,8 @@
                             markers.push({
                                 time: currentCandle.time,
                                 position: 'belowBar',
-                                color: '#00e676',
-                                shape: 'arrowUp',
+                                color: '#00b0ff',
+                                shape: 'circle',
                                 text: nearSupport ? 'BUY S/R' : 'BUY'
                             });
                         } else if (isBearish) {
@@ -262,8 +257,8 @@
                             markers.push({
                                 time: currentCandle.time,
                                 position: 'aboveBar',
-                                color: '#ff1744',
-                                shape: 'arrowDown',
+                                color: '#ff4081',
+                                shape: 'circle',
                                 text: nearResistance ? 'SELL S/R' : 'SELL'
                             });
                         }
@@ -380,8 +375,15 @@
                         }
                     }
 
-                    const { markers } = processWhaleData(currentFormattedData, lineLevels);
-                    candlestickSeries.setMarkers(markers);
+                    // MARCADORES VSA / BALLENAS
+                    const { markers: whaleMarkers } = processWhaleData(currentFormattedData, lineLevels);
+                    
+                    // MARCADORES SUPERTREND
+                    const stMarkers = getSupertrendMarkers(currentFormattedData, 10, 3.0);
+
+                    // COMBINAR Y ORDENAR MARCADORES POR TIEMPO
+                    const allMarkers = [...whaleMarkers, ...stMarkers].sort((a, b) => a.time - b.time);
+                    candlestickSeries.setMarkers(allMarkers);
 
                     const { avgBuy, avgSell } = await getMultiTimeframeWhaleAvgs();
                     
@@ -496,11 +498,6 @@
                     }
 
                     candlestickSeries.setData(formattedData);
-
-                    // RENDERIZAR SUPERTREND COMO NUBE (AREA)
-                    const { upData, downData } = calculateSupertrend(formattedData, 10, 3.0);
-                    supertrendUpArea.setData(upData);
-                    supertrendDownArea.setData(downData);
 
                     await renderSRVisuals(formattedData, interval);
 
