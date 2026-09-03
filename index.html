@@ -70,6 +70,8 @@
             const timeframeSelect = document.getElementById("timeframe");
             const chartContainer = document.getElementById("chart");
 
+            let activePriceLines = []; // Guardará las líneas de S/R activas
+
             const chart = LightweightCharts.createChart(chartContainer, {
                 width: chartContainer.clientWidth,
                 height: chartContainer.clientHeight,
@@ -82,7 +84,7 @@
                 upColor: '#089981', downColor: '#f23645', borderVisible: false, wickUpColor: '#089981', wickDownColor: '#f23645'
             });
 
-            // Función para construir velas de N segundos a partir de datos de 1s
+            // Agrupador de datos en segundos
             function aggregateSecondsData(data1s, stepSeconds) {
                 const aggregated = [];
                 let currentCandle = null;
@@ -92,13 +94,7 @@
 
                     if (!currentCandle || currentCandle.time !== bucketTime) {
                         if (currentCandle) aggregated.push(currentCandle);
-                        currentCandle = {
-                            time: bucketTime,
-                            open: d.open,
-                            high: d.high,
-                            low: d.low,
-                            close: d.close
-                        };
+                        currentCandle = { time: bucketTime, open: d.open, high: d.high, low: d.low, close: d.close };
                     } else {
                         currentCandle.high = Math.max(currentCandle.high, d.high);
                         currentCandle.low = Math.min(currentCandle.low, d.low);
@@ -110,6 +106,50 @@
                 return aggregated;
             }
 
+            // Descarga y calcula Pivotes de Soportes y Resistencias (4h y 1d)
+            async function fetchHighTimeframeSR() {
+                try {
+                    // Limpiar líneas anteriores si las hay
+                    activePriceLines.forEach(line => candlestickSeries.removePriceLine(line));
+                    activePriceLines = [];
+
+                    // Fetch datos de 4 Horas y 1 Día
+                    const [res4h, res1d] = await Promise.all([
+                        fetch('https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=4h&limit=50').then(r => r.json()),
+                        fetch('https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&limit=50').then(r => r.json())
+                    ]);
+
+                    // Extraer los máximos y mínimos recientes
+                    const high4h = Math.max(...res4h.map(d => parseFloat(d[2])));
+                    const low4h = Math.min(...res4h.map(d => parseFloat(d[3])));
+                    
+                    const high1d = Math.max(...res1d.map(d => parseFloat(d[2])));
+                    const low1d = Math.min(...res1d.map(d => parseFloat(d[3])));
+
+                    // Crear Líneas de Precio Fijas
+                    const srLevels = [
+                        { price: high1d, color: '#ff1744', title: 'Resistencia 1D' },
+                        { price: low1d, color: '#00e676', title: 'Soporte 1D' },
+                        { price: high4h, color: '#ff9100', title: 'Resistencia 4H' },
+                        { price: low4h, color: '#00b0ff', title: 'Soporte 4H' }
+                    ];
+
+                    srLevels.forEach(level => {
+                        const line = candlestickSeries.createPriceLine({
+                            price: level.price,
+                            color: level.color,
+                            lineWidth: 2,
+                            lineStyle: LightweightCharts.LineStyle.Dashed,
+                            axisLabelVisible: true,
+                            title: level.title,
+                        });
+                        activePriceLines.push(line);
+                    });
+                } catch (e) {
+                    console.error("Error calculando S/R:", e);
+                }
+            }
+
             async function loadChartData(interval) {
                 statusEl.style.display = "block";
                 statusEl.innerText = "Cargando datos...";
@@ -117,7 +157,6 @@
                 try {
                     let formattedData = [];
 
-                    // Si el usuario pide 5s, 15s o 30s
                     if (["5s", "15s", "30s"].includes(interval)) {
                         const step = parseInt(interval.replace("s", ""));
                         const response = await fetch(`https://api.binance.com/api/v3/uiKlines?symbol=BTCUSDT&interval=1s&limit=1000`);
@@ -125,16 +164,11 @@
                         
                         const rawData = await response.json();
                         const parsed1s = rawData.map(d => ({
-                            time: Math.floor(d[0] / 1000),
-                            open: parseFloat(d[1]),
-                            high: parseFloat(d[2]),
-                            low: parseFloat(d[3]),
-                            close: parseFloat(d[4])
+                            time: Math.floor(d[0] / 1000), open: parseFloat(d[1]), high: parseFloat(d[2]), low: parseFloat(d[3]), close: parseFloat(d[4])
                         }));
 
                         formattedData = aggregateSecondsData(parsed1s, step);
                     } else {
-                        // Temporalidades nativas compatibles con Binance
                         let url = `https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=${interval}&limit=500`;
                         if (interval === "1s") {
                             url = `https://api.binance.com/api/v3/uiKlines?symbol=BTCUSDT&interval=1s&limit=500`;
@@ -145,15 +179,15 @@
                         
                         const rawData = await response.json();
                         formattedData = rawData.map(d => ({
-                            time: Math.floor(d[0] / 1000),
-                            open: parseFloat(d[1]),
-                            high: parseFloat(d[2]),
-                            low: parseFloat(d[3]),
-                            close: parseFloat(d[4])
+                            time: Math.floor(d[0] / 1000), open: parseFloat(d[1]), high: parseFloat(d[2]), low: parseFloat(d[3]), close: parseFloat(d[4])
                         }));
                     }
 
                     candlestickSeries.setData(formattedData);
+                    
+                    // Cargar y mantener S/R de 4H y 1D en segundo plano
+                    await fetchHighTimeframeSR();
+
                     chart.timeScale().fitContent();
                     statusEl.style.display = "none";
                 } catch (err) {
