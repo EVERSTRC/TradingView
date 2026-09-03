@@ -128,14 +128,15 @@
             }
 
             // ==========================================
-            // CÁLCULO EXACTO DE BALLENAS (CIERRE DE VELA CLÍMAX)
+            // CÁLCULO EXACTO DE BALLENAS (COMPRA / VENTA SEPARADOS)
             // ==========================================
             function processWhaleData(candles, lineLevels) {
                 const markers = [];
                 const length = candles.length;
-                if (length < 20) return { markers, lastWhalePrice: null };
+                if (length < 20) return { markers, lastBuyPrice: null, lastSellPrice: null };
 
-                let lastWhalePrice = null;
+                let buyPrices = [];
+                let sellPrices = [];
 
                 for (let i = 20; i < length; i++) {
                     const currentCandle = candles[i];
@@ -161,11 +162,9 @@
                         }
                     });
 
-                    // Usamos el CIERRE de la vela VSA para igualar Pine Script
                     if (isHighVolume) {
-                        lastWhalePrice = currentCandle.close;
-
                         if (isBullish) {
+                            buyPrices.push(currentCandle.close);
                             markers.push({
                                 time: currentCandle.time,
                                 position: 'belowBar',
@@ -174,6 +173,7 @@
                                 text: nearSupport ? 'BUY S/R' : 'BUY'
                             });
                         } else if (isBearish) {
+                            sellPrices.push(currentCandle.close);
                             markers.push({
                                 time: currentCandle.time,
                                 position: 'aboveBar',
@@ -185,7 +185,10 @@
                     }
                 }
 
-                return { markers, lastWhalePrice };
+                const lastBuyPrice = buyPrices.length > 0 ? buyPrices.reduce((a, b) => a + b, 0) / buyPrices.length : null;
+                const lastSellPrice = sellPrices.length > 0 ? sellPrices.reduce((a, b) => a + b, 0) / sellPrices.length : null;
+
+                return { markers, lastBuyPrice, lastSellPrice };
             }
 
             async function renderSRVisuals(currentFormattedData, currentInterval) {
@@ -232,14 +235,24 @@
                         }
                     }
 
-                    const { markers, lastWhalePrice } = processWhaleData(currentFormattedData, lineLevels);
+                    const { markers, lastBuyPrice, lastSellPrice } = processWhaleData(currentFormattedData, lineLevels);
                     candlestickSeries.setMarkers(markers);
 
-                    if (lastWhalePrice) {
+                    if (lastBuyPrice) {
                         lineLevels.push({
-                            price: lastWhalePrice,
-                            color: '#ff9100',
-                            title: '[ VSA BALLENAS ]',
+                            price: lastBuyPrice,
+                            color: '#00e676',
+                            title: '[ VSA BALLENAS COMPRA ]',
+                            width: 2,
+                            style: LightweightCharts.LineStyle.Dashed
+                        });
+                    }
+
+                    if (lastSellPrice) {
+                        lineLevels.push({
+                            price: lastSellPrice,
+                            color: '#ff1744',
+                            title: '[ VSA BALLENAS VENTA ]',
                             width: 2,
                             style: LightweightCharts.LineStyle.Dashed
                         });
