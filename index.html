@@ -185,7 +185,7 @@
                 return { markers, buyPrices, sellPrices };
             }
 
-            // PROCESA PROMEDIOS GRUESOS MULTI-TEMPORALIDAD
+            // PROCESA PROMEDIOS MULTI-TEMPORALIDAD
             async function getMultiTimeframeWhaleAvgs() {
                 try {
                     const tfList = ['1m', '1h', '4h'];
@@ -216,6 +216,37 @@
                 } catch (e) {
                     console.error("Error obteniendo datos multi-temporalidad:", e);
                     return { avgBuy: null, avgSell: null };
+                }
+            }
+
+            // CÁLCULO DE ACUMULADOS MACRO (DIARIO Y SEMANAL)
+            async function getMacroWhaleAvgs() {
+                try {
+                    const [raw1d, raw1w] = await Promise.all([
+                        fetch('https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&limit=200').then(r => r.json()),
+                        fetch('https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1w&limit=200').then(r => r.json())
+                    ]);
+
+                    const candles1d = raw1d.map(d => ({
+                        time: Math.floor(d[0] / 1000), open: parseFloat(d[1]), high: parseFloat(d[2]), low: parseFloat(d[3]), close: parseFloat(d[4]), volume: parseFloat(d[5])
+                    }));
+                    const candles1w = raw1w.map(d => ({
+                        time: Math.floor(d[0] / 1000), open: parseFloat(d[1]), high: parseFloat(d[2]), low: parseFloat(d[3]), close: parseFloat(d[4]), volume: parseFloat(d[5])
+                    }));
+
+                    const res1d = processWhaleData(candles1d, []);
+                    const res1w = processWhaleData(candles1w, []);
+
+                    const buy1d = res1d.buyPrices.length > 0 ? res1d.buyPrices.reduce((a, b) => a + b, 0) / res1d.buyPrices.length : null;
+                    const sell1d = res1d.sellPrices.length > 0 ? res1d.sellPrices.reduce((a, b) => a + b, 0) / res1d.sellPrices.length : null;
+
+                    const buy1w = res1w.buyPrices.length > 0 ? res1w.buyPrices.reduce((a, b) => a + b, 0) / res1w.buyPrices.length : null;
+                    const sell1w = res1w.sellPrices.length > 0 ? res1w.sellPrices.reduce((a, b) => a + b, 0) / res1w.sellPrices.length : null;
+
+                    return { buy1d, sell1d, buy1w, sell1w };
+                } catch (e) {
+                    console.error("Error calculando acumulados macro:", e);
+                    return { buy1d: null, sell1d: null, buy1w: null, sell1w: null };
                 }
             }
 
@@ -266,7 +297,7 @@
                     const { markers } = processWhaleData(currentFormattedData, lineLevels);
                     candlestickSeries.setMarkers(markers);
 
-                    // LÍNEAS PROMEDIO GRUESAS SEPARADAS (Grosor 4)
+                    // 1. LÍNEAS PROMEDIO MULTI-TEMPORALIDAD (INTRA-DAY)
                     const { avgBuy, avgSell } = await getMultiTimeframeWhaleAvgs();
                     
                     if (avgBuy) {
@@ -286,6 +317,47 @@
                             title: '[ PROMEDIO VENTA BALLENAS ]',
                             width: 4,
                             style: LightweightCharts.LineStyle.Solid
+                        });
+                    }
+
+                    // 2. LÍNEAS ACUMULADAS MACRO (1D Y 1W)
+                    const { buy1d, sell1d, buy1w, sell1w } = await getMacroWhaleAvgs();
+
+                    if (buy1d) {
+                        lineLevels.push({
+                            price: buy1d,
+                            color: '#00b0ff',
+                            title: '[ ACUMULADO DIARIO COMPRA ]',
+                            width: 4,
+                            style: LightweightCharts.LineStyle.Dotted
+                        });
+                    }
+                    if (sell1d) {
+                        lineLevels.push({
+                            price: sell1d,
+                            color: '#ff4081',
+                            title: '[ ACUMULADO DIARIO VENTA ]',
+                            width: 4,
+                            style: LightweightCharts.LineStyle.Dotted
+                        });
+                    }
+
+                    if (buy1w) {
+                        lineLevels.push({
+                            price: buy1w,
+                            color: '#76ff03',
+                            title: '[ ACUMULADO SEMANAL COMPRA ]',
+                            width: 4,
+                            style: LightweightCharts.LineStyle.LargeDashed
+                        });
+                    }
+                    if (sell1w) {
+                        lineLevels.push({
+                            price: sell1w,
+                            color: '#f50057',
+                            title: '[ ACUMULADO SEMANAL VENTA ]',
+                            width: 4,
+                            style: LightweightCharts.LineStyle.LargeDashed
                         });
                     }
 
