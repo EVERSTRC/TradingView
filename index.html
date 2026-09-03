@@ -105,42 +105,76 @@
                 return aggregated;
             }
 
+            // ==========================================
+            // CÁLCULO DE PIVOTES (S/R) PINE SCRIPT EN JS
+            // ==========================================
+            function calculatePivots(candles, leftBars = 15, rightBars = 15) {
+                let lastPivotHigh = null;
+                let lastPivotLow = null;
+
+                // Escaneo de pivotes evaluando barras a la izquierda y derecha
+                for (let i = leftBars; i < candles.length - rightBars; i++) {
+                    let isHighPivot = true;
+                    let isLowPivot = true;
+
+                    for (let j = i - leftBars; j <= i + rightBars; j++) {
+                        if (j === i) continue;
+                        if (candles[j].high >= candles[i].high) isHighPivot = false;
+                        if (candles[j].low <= candles[i].low) isLowPivot = false;
+                    }
+
+                    if (isHighPivot) lastPivotHigh = candles[i].high;
+                    if (isLowPivot) lastPivotLow = candles[i].low;
+                }
+
+                return { pivotHigh: lastPivotHigh, pivotLow: lastPivotLow };
+            }
+
             async function fetchHighTimeframeSR(currentFormattedData, currentInterval) {
                 try {
                     // Limpiar líneas existentes antes de redibujar
                     activePriceLines.forEach(line => candlestickSeries.removePriceLine(line));
                     activePriceLines = [];
 
-                    // Fetch niveles fijos mayores (4H y 1D)
-                    const [res4h, res1d] = await Promise.all([
-                        fetch('https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=4h&limit=50').then(r => r.json()),
-                        fetch('https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&limit=50').then(r => r.json())
+                    const srLevels = [];
+
+                    // 1. Obtener y calcular Pivotes 4H y 1D desde la API
+                    const [raw4h, raw1d] = await Promise.all([
+                        fetch('https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=4h&limit=200').then(r => r.json()),
+                        fetch('https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&limit=200').then(r => r.json())
                     ]);
 
-                    const high4h = Math.max(...res4h.map(d => parseFloat(d[2])));
-                    const low4h = Math.min(...res4h.map(d => parseFloat(d[3])));
-                    
-                    const high1d = Math.max(...res1d.map(d => parseFloat(d[2])));
-                    const low1d = Math.min(...res1d.map(d => parseFloat(d[3])));
+                    const candles4h = raw4h.map(d => ({ high: parseFloat(d[2]), low: parseFloat(d[3]) }));
+                    const candles1d = raw1d.map(d => ({ high: parseFloat(d[2]), low: parseFloat(d[3]) }));
 
-                    // Niveles base de S/R Superior
-                    const srLevels = [
-                        { price: high1d, color: '#ff1744', title: 'Resistencia 1D', width: 4, style: LightweightCharts.LineStyle.Solid },
-                        { price: low1d, color: '#00e676', title: 'Soporte 1D', width: 4, style: LightweightCharts.LineStyle.Solid },
-                        { price: high4h, color: '#ff9100', title: 'Resistencia 4H', width: 3, style: LightweightCharts.LineStyle.Solid },
-                        { price: low4h, color: '#00b0ff', title: 'Soporte 4H', width: 3, style: LightweightCharts.LineStyle.Solid }
-                    ];
+                    const pivots4h = calculatePivots(candles4h, 15, 15);
+                    const pivots1d = calculatePivots(candles1d, 15, 15);
 
-                    // Calcular Soporte y Resistencia del Timeframe Actual (si no es ni 4h ni 1d para evitar duplicar)
-                    if (currentFormattedData && currentFormattedData.length > 0 && currentInterval !== '4h' && currentInterval !== '1d') {
-                        const highTF = Math.max(...currentFormattedData.map(d => d.high));
-                        const lowTF = Math.min(...currentFormattedData.map(d => d.low));
+                    if (pivots1d.pivotHigh) {
+                        srLevels.push({ price: pivots1d.pivotHigh, color: '#ff1744', title: 'Resistencia 1D (Pivote)', width: 3, style: LightweightCharts.LineStyle.Solid });
+                    }
+                    if (pivots1d.pivotLow) {
+                        srLevels.push({ price: pivots1d.pivotLow, color: '#00e676', title: 'Soporte 1D (Pivote)', width: 3, style: LightweightCharts.LineStyle.Solid });
+                    }
+
+                    if (pivots4h.pivotHigh) {
+                        srLevels.push({ price: pivots4h.pivotHigh, color: '#ff9100', title: 'Resistencia 4H (Pivote)', width: 2, style: LightweightCharts.LineStyle.Solid });
+                    }
+                    if (pivots4h.pivotLow) {
+                        srLevels.push({ price: pivots4h.pivotLow, color: '#00b0ff', title: 'Soporte 4H (Pivote)', width: 2, style: LightweightCharts.LineStyle.Solid });
+                    }
+
+                    // 2. Calcular Pivotes del Timeframe Actual
+                    if (currentFormattedData && currentFormattedData.length > 30 && currentInterval !== '4h' && currentInterval !== '1d') {
+                        const pivotsCurrent = calculatePivots(currentFormattedData, 10, 10);
                         const label = currentInterval.toUpperCase();
 
-                        srLevels.push(
-                            { price: highTF, color: '#e040fb', title: `Resistencia ${label}`, width: 2, style: LightweightCharts.LineStyle.Dashed },
-                            { price: lowTF, color: '#18ffff', title: `Soporte ${label}`, width: 2, style: LightweightCharts.LineStyle.Dashed }
-                        );
+                        if (pivotsCurrent.pivotHigh) {
+                            srLevels.push({ price: pivotsCurrent.pivotHigh, color: '#e040fb', title: `Resistencia ${label}`, width: 2, style: LightweightCharts.LineStyle.Dashed });
+                        }
+                        if (pivotsCurrent.pivotLow) {
+                            srLevels.push({ price: pivotsCurrent.pivotLow, color: '#18ffff', title: `Soporte ${label}`, width: 2, style: LightweightCharts.LineStyle.Dashed });
+                        }
                     }
 
                     // Renderizar todas las líneas activas en el gráfico
@@ -195,7 +229,7 @@
 
                     candlestickSeries.setData(formattedData);
                     
-                    // Carga dinámicamente las líneas de 1D, 4H + la del TF seleccionado
+                    // Carga dinámicamente las líneas de Pivotes (S/R)
                     await fetchHighTimeframeSR(formattedData, interval);
 
                     chart.timeScale().fitContent();
