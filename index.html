@@ -93,11 +93,12 @@
 
                     if (!currentCandle || currentCandle.time !== bucketTime) {
                         if (currentCandle) aggregated.push(currentCandle);
-                        currentCandle = { time: bucketTime, open: d.open, high: d.high, low: d.low, close: d.close };
+                        currentCandle = { time: bucketTime, open: d.open, high: d.high, low: d.low, close: d.close, volume: d.volume || 0 };
                     } else {
                         currentCandle.high = Math.max(currentCandle.high, d.high);
                         currentCandle.low = Math.min(currentCandle.low, d.low);
                         currentCandle.close = d.close;
+                        currentCandle.volume += (d.volume || 0);
                     }
                 });
 
@@ -105,7 +106,6 @@
                 return aggregated;
             }
 
-            // Algoritmo para calcular pivotes
             function calculatePivots(candles, leftBars = 15, rightBars = 15) {
                 let lastPivotHigh = null;
                 let lastPivotLow = null;
@@ -127,13 +127,71 @@
                 return { pivotHigh: lastPivotHigh, pivotLow: lastPivotLow };
             }
 
+            // ==========================================
+            // DETECCION DE SEÑALES VSA / COMPRA Y VENTA BALLENAS
+            // ==========================================
+            function detectWhaleSignals(candles, lineLevels) {
+                const markers = [];
+                const length = candles.length;
+                if (length < 20) return markers;
+
+                // Calcular volumen medio móvil de 20 periodos
+                for (let i = 20; i < length; i++) {
+                    let sumVol = 0;
+                    for (let j = i - 20; j < i; j++) {
+                        sumVol += (candles[j].volume || 1);
+                    }
+                    const avgVol = sumVol / 20;
+                    const currentCandle = candles[i];
+                    const isHighVolume = (currentCandle.volume || 0) > (avgVol * 2.2); // Volumen Ultra Alto (Clímax)
+
+                    const isBullish = currentCandle.close > currentCandle.open;
+                    const isBearish = currentCandle.close < currentCandle.open;
+
+                    // Verificar cercanía a soportes o resistencias cargados
+                    let nearSupport = false;
+                    let nearResistance = false;
+
+                    lineLevels.forEach(lvl => {
+                        const diffPercent = Math.abs(currentCandle.close - lvl.price) / lvl.price;
+                        if (diffPercent < 0.0035) { // Cerca de un nivel clave (< 0.35% de distancia)
+                            if (lvl.title.includes("SOPORTE")) nearSupport = true;
+                            if (lvl.title.includes("RESISTENCIA")) nearResistance = true;
+                        }
+                    });
+
+                    // 1. BUY / BUY S/R
+                    if (isBullish && isHighVolume) {
+                        const textLabel = nearSupport ? 'BUY S/R' : 'BUY';
+                        markers.push({
+                            time: currentCandle.time,
+                            position: 'belowBar',
+                            color: '#00e676',
+                            shape: 'arrowUp',
+                            text: textLabel
+                        });
+                    }
+                    // 2. SELL / SELL S/R
+                    else if (isBearish && isHighVolume) {
+                        const textLabel = nearResistance ? 'SELL S/R' : 'SELL';
+                        markers.push({
+                            time: currentCandle.time,
+                            position: 'aboveBar',
+                            color: '#ff1744',
+                            shape: 'arrowDown',
+                            text: textLabel
+                        });
+                    }
+                }
+
+                return markers;
+            }
+
             async function renderSRVisuals(currentFormattedData, currentInterval) {
                 try {
-                    // Limpieza estricta de líneas de precio anteriores
                     activePriceLines.forEach(line => candlestickSeries.removePriceLine(line));
                     activePriceLines = [];
 
-                    // 1. Obtención de datos de 4H y 1D desde la API
                     const [raw4h, raw1d] = await Promise.all([
                         fetch('https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=4h&limit=200').then(r => r.json()),
                         fetch('https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&limit=200').then(r => r.json())
@@ -147,72 +205,32 @@
 
                     const lineLevels = [];
 
-                    // Resistencia / Soporte de 1D (Grosor 3, Estilo Continuo)
                     if (pivots1d.pivotHigh) {
-                        lineLevels.push({
-                            price: pivots1d.pivotHigh.high,
-                            color: '#ff1744',
-                            title: '[ 1D RESISTENCIA ]',
-                            width: 3,
-                            style: LightweightCharts.LineStyle.Solid
-                        });
+                        lineLevels.push({ price: pivots1d.pivotHigh.high, color: '#ff1744', title: '[ 1D RESISTENCIA ]', width: 3, style: LightweightCharts.LineStyle.Solid });
                     }
                     if (pivots1d.pivotLow) {
-                        lineLevels.push({
-                            price: pivots1d.pivotLow.low,
-                            color: '#00e676',
-                            title: '[ 1D SOPORTE ]',
-                            width: 3,
-                            style: LightweightCharts.LineStyle.Solid
-                        });
+                        lineLevels.push({ price: pivots1d.pivotLow.low, color: '#00e676', title: '[ 1D SOPORTE ]', width: 3, style: LightweightCharts.LineStyle.Solid });
                     }
 
-                    // Resistencia / Soporte de 4H (Grosor 2, Estilo Punteado Naranja/Azul)
                     if (pivots4h.pivotHigh) {
-                        lineLevels.push({
-                            price: pivots4h.pivotHigh.high,
-                            color: '#ff9100',
-                            title: '[ 4H RESISTENCIA ]',
-                            width: 2,
-                            style: LightweightCharts.LineStyle.Dashed
-                        });
+                        lineLevels.push({ price: pivots4h.pivotHigh.high, color: '#ff9100', title: '[ 4H RESISTENCIA ]', width: 2, style: LightweightCharts.LineStyle.Dashed });
                     }
                     if (pivots4h.pivotLow) {
-                        lineLevels.push({
-                            price: pivots4h.pivotLow.low,
-                            color: '#2962ff',
-                            title: '[ 4H SOPORTE ]',
-                            width: 2,
-                            style: LightweightCharts.LineStyle.Dashed
-                        });
+                        lineLevels.push({ price: pivots4h.pivotLow.low, color: '#2962ff', title: '[ 4H SOPORTE ]', width: 2, style: LightweightCharts.LineStyle.Dashed });
                     }
 
-                    // Pivotes Locales del Timeframe Seleccionado (Línea Fina Rosa/Cian)
                     if (currentFormattedData && currentFormattedData.length > 30 && currentInterval !== '4h' && currentInterval !== '1d') {
                         const pivotsCurrent = calculatePivots(currentFormattedData, 15, 15);
                         const label = currentInterval.toUpperCase();
 
                         if (pivotsCurrent.pivotHigh) {
-                            lineLevels.push({
-                                price: pivotsCurrent.pivotHigh.high,
-                                color: '#e040fb',
-                                title: `[ RESISTENCIA ${label} ]`,
-                                width: 2,
-                                style: LightweightCharts.LineStyle.LargeDashed
-                            });
+                            lineLevels.push({ price: pivotsCurrent.pivotHigh.high, color: '#e040fb', title: `[ RESISTENCIA ${label} ]`, width: 2, style: LightweightCharts.LineStyle.LargeDashed });
                         }
                         if (pivotsCurrent.pivotLow) {
-                            lineLevels.push({
-                                price: pivotsCurrent.pivotLow.low,
-                                color: '#00e5ff',
-                                title: `[ SOPORTE LOCAL ]`,
-                                width: 2,
-                                style: LightweightCharts.LineStyle.Solid
-                            });
+                            lineLevels.push({ price: pivotsCurrent.pivotLow.low, color: '#00e5ff', title: `[ SOPORTE LOCAL ]`, width: 2, style: LightweightCharts.LineStyle.Solid });
                         }
                     }
 
-                    // Dibujar todas las líneas horizontales limpias
                     lineLevels.forEach(level => {
                         const line = candlestickSeries.createPriceLine({
                             price: level.price,
@@ -225,8 +243,12 @@
                         activePriceLines.push(line);
                     });
 
+                    // Añadir marcas de BUY / SELL sobre las velas de las ballenas
+                    const signals = detectWhaleSignals(currentFormattedData, lineLevels);
+                    candlestickSeries.setMarkers(signals);
+
                 } catch (e) {
-                    console.error("Error al renderizar S/R:", e);
+                    console.error("Error al renderizar S/R y VSA:", e);
                 }
             }
 
@@ -244,7 +266,7 @@
                         
                         const rawData = await response.json();
                         const parsed1s = rawData.map(d => ({
-                            time: Math.floor(d[0] / 1000), open: parseFloat(d[1]), high: parseFloat(d[2]), low: parseFloat(d[3]), close: parseFloat(d[4])
+                            time: Math.floor(d[0] / 1000), open: parseFloat(d[1]), high: parseFloat(d[2]), low: parseFloat(d[3]), close: parseFloat(d[4]), volume: parseFloat(d[5])
                         }));
 
                         formattedData = aggregateSecondsData(parsed1s, step);
@@ -259,13 +281,11 @@
                         
                         const rawData = await response.json();
                         formattedData = rawData.map(d => ({
-                            time: Math.floor(d[0] / 1000), open: parseFloat(d[1]), high: parseFloat(d[2]), low: parseFloat(d[3]), close: parseFloat(d[4])
+                            time: Math.floor(d[0] / 1000), open: parseFloat(d[1]), high: parseFloat(d[2]), low: parseFloat(d[3]), close: parseFloat(d[4]), volume: parseFloat(d[5])
                         }));
                     }
 
                     candlestickSeries.setData(formattedData);
-                    
-                    // Carga dinámicamente las líneas de Pivotes (S/R)
                     await renderSRVisuals(formattedData, interval);
 
                     chart.timeScale().fitContent();
