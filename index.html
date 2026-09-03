@@ -4,15 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TradingView Native - S/R + VSA</title>
-    <!-- TradingView Lightweight Charts Library -->
     <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        html, body { width: 100%; height: 100%; overflow: hidden; background-color: #131722; font-family: -apple-system, BlinkMacSystemFont, "Trebuchet MS", Roboto, Ubuntu, sans-serif; color: #d1d4dc; }
+        html, body { width: 100%; height: 100%; overflow: hidden; background-color: #0c0d10; font-family: -apple-system, BlinkMacSystemFont, "Trebuchet MS", Roboto, sans-serif; color: #d1d4dc; }
 
         #app { width: 100vw; height: 100vh; display: flex; flex-direction: column; }
 
-        /* TOP BAR TRADINGVIEW STYLE */
         .tv-header {
             height: 38px;
             background-color: #131722;
@@ -20,9 +18,8 @@
             display: flex;
             align-items: center;
             padding: 0 12px;
-            gap: 12px;
+            gap: 10px;
             z-index: 100;
-            user-select: none;
         }
 
         .symbol-select {
@@ -31,8 +28,7 @@
             border: 1px solid #363a45;
             font-size: 13px;
             font-weight: 600;
-            cursor: pointer;
-            padding: 4px 10px;
+            padding: 4px 8px;
             border-radius: 4px;
             outline: none;
         }
@@ -46,14 +42,11 @@
             cursor: pointer;
             padding: 4px 8px;
             border-radius: 4px;
-            transition: all 0.15s ease;
         }
 
-        .tf-btn:hover, .symbol-select:hover { background-color: #2a2e39; color: #fff; }
         .tf-btn.active { color: #2962ff; background-color: rgba(41, 98, 255, 0.15); }
         .divider { width: 1px; height: 18px; background-color: #2a2e39; }
 
-        /* OHLVC SYMBOL INFO OVERLAY */
         .chart-info {
             position: absolute;
             top: 10px;
@@ -61,9 +54,6 @@
             z-index: 50;
             font-size: 12px;
             pointer-events: none;
-            background: rgba(19, 23, 34, 0.7);
-            padding: 4px 8px;
-            border-radius: 4px;
         }
         .symbol-title { font-weight: 700; color: #ffffff; font-size: 13px; display: flex; align-items: center; gap: 6px; }
         .status-dot { width: 8px; height: 8px; background-color: #089981; border-radius: 50%; display: inline-block; }
@@ -73,54 +63,45 @@
         #chart-container { flex: 1; width: 100%; height: calc(100vh - 38px); position: relative; }
         #chart { width: 100%; height: 100%; }
 
-        /* VSA DASHBOARD TABLE */
         #vsa-dashboard {
             position: absolute;
             top: 10px;
             right: 12px;
             z-index: 50;
-            background-color: rgba(19, 23, 34, 0.92);
-            border: 1px solid #363a45;
+            background-color: rgba(19, 23, 34, 0.95);
+            border: 1px solid #2a2e39;
             border-collapse: collapse;
             font-size: 11px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.6);
             border-radius: 4px;
-            pointer-events: auto;
         }
         #vsa-dashboard th, #vsa-dashboard td { padding: 4px 8px; border: 1px solid #2a2e39; text-align: center; }
-        #vsa-dashboard th { background-color: #1e222d; color: #9b9b9b; font-weight: 600; }
-        .bg-bull { background-color: rgba(0, 200, 83, 0.25); color: #00e676; font-weight: bold; }
-        .bg-bear { background-color: rgba(213, 0, 0, 0.25); color: #ff5252; font-weight: bold; }
+        #vsa-dashboard th { background-color: #1e222d; color: #9b9b9b; }
+        .bg-bull { background-color: rgba(0, 200, 83, 0.2); color: #00e676; font-weight: bold; }
+        .bg-bear { background-color: rgba(213, 0, 0, 0.2); color: #ff5252; font-weight: bold; }
         .bg-proj { background-color: #0d47a1; color: #ffffff; font-weight: bold; }
     </style>
 </head>
 <body>
 
     <div id="app">
-        <!-- BARRA SUPERIOR TRADINGVIEW -->
         <div class="tv-header">
             <select class="symbol-select" id="symbolSelect" onchange="changeSymbol(this.value)">
                 <option value="BTCUSDT">Bitcoin / Dólar (BTCUSDT)</option>
                 <option value="ETHUSDT">Ethereum / Dólar (ETHUSDT)</option>
-                <option value="SOLUSDT">Solana / Dólar (SOLUSDT)</option>
             </select>
-
             <div class="divider"></div>
-
-            <button class="tf-btn active" onclick="changeTF('1m', this)">1m</button>
-            <button class="tf-btn" onclick="changeTF('5m', this)">5m</button>
+            <button class="tf-btn" onclick="changeTF('1m', this)">1m</button>
             <button class="tf-btn" onclick="changeTF('15m', this)">15m</button>
-            <button class="tf-btn" onclick="changeTF('1h', this)">1h</button>
+            <button class="tf-btn active" onclick="changeTF('1h', this)">1h</button>
             <button class="tf-btn" onclick="changeTF('4h', this)">4h</button>
             <button class="tf-btn" onclick="changeTF('1d', this)">1D</button>
         </div>
 
         <div id="chart-container">
-            <!-- DETALLES DEL ACTIVO -->
             <div class="chart-info">
                 <div class="symbol-title">
                     <span class="status-dot"></span>
-                    <span id="display-symbol">Bitcoin / Dólar estadounidense</span> · <span id="display-tf">1m</span> · Binance
+                    <span id="display-symbol">Bitcoin / Dólar estadounidense</span> · <span id="display-tf">1h</span> · Binance
                 </div>
                 <div class="ohlc-info">
                     O <span id="open-val" class="ohlc-val">--</span> 
@@ -132,59 +113,33 @@
 
             <div id="chart"></div>
 
-            <!-- DASHBOARD DE INDICADORES VSA -->
             <table id="vsa-dashboard">
                 <thead>
                     <tr>
                         <th>TF</th>
                         <th>Nivel / Estado</th>
                         <th>Presión (Compra | Venta)</th>
-                        <th style="color:#ffd700">VSA Ballenas (Hoy)</th>
-                        <th style="color:#ff9800">VSA Ballenas (Semanal)</th>
+                        <th style="color:#ffd700">VSA Ballenas</th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr>
                         <td style="color:#ffd700">NOTICIAS</td>
-                        <td>Impacto / Sesgo</td>
-                        <td colspan="3" class="bg-bear">🔴 SESGO LIGERAMENTE BAJISTA</td>
+                        <td>Impacto</td>
+                        <td class="bg-bear">🔴 SESGO LIGERAMENTE BAJISTA</td>
+                        <td>-</td>
+                    </tr>
+                    <tr>
+                        <td style="color:#2962ff">Soporte</td>
+                        <td id="sup-level">--</td>
+                        <td>En Rango</td>
+                        <td>-</td>
                     </tr>
                     <tr>
                         <td style="color:#ff5252">Resistencia</td>
                         <td id="res-level">--</td>
                         <td>Fuera</td>
                         <td>-</td>
-                        <td>-</td>
-                    </tr>
-                    <tr>
-                        <td style="color:#2962ff">Soporte</td>
-                        <td id="sup-level">--</td>
-                        <td>Fuera</td>
-                        <td>-</td>
-                        <td>-</td>
-                    </tr>
-                    <tr>
-                        <td style="color:#ff9800">Vela Actual</td>
-                        <td>TF Actual</td>
-                        <td id="live-price" class="bg-bull">Cargando...</td>
-                        <td>-</td>
-                        <td>-</td>
-                    </tr>
-                    <tr><td>1m</td><td>1 Minuto</td><td class="bg-bear">🟢 48% | 🔴 52%</td><td>Sin VSA Hoy</td><td>Sin VSA Sem.</td></tr>
-                    <tr><td>5m</td><td>5 Minutos</td><td class="bg-bear">🟢 46% | 🔴 54%</td><td>Sin VSA Hoy</td><td>Sin VSA Sem.</td></tr>
-                    <tr><td>15m</td><td>15 Minutos</td><td class="bg-bull">🟢 70% | 🔴 30%</td><td>Sin VSA Hoy</td><td>Sin VSA Sem.</td></tr>
-                    <tr><td>1h</td><td>1 Hora</td><td class="bg-bull">🟢 63% | 🔴 37%</td><td>Sin VSA Hoy</td><td>Sin VSA Sem.</td></tr>
-                    <tr class="bg-proj">
-                        <td>PROYECCIÓN</td>
-                        <td>Horizonte Temporal</td>
-                        <td>Precio Estimado Objetivo</td>
-                        <td colspan="2">Fuerza y Sesgo Proyectado</td>
-                    </tr>
-                    <tr>
-                        <td>🚀 15m</td>
-                        <td>Próximos 15 Min</td>
-                        <td id="proj-15m" style="color:#00e676">--</td>
-                        <td colspan="2" style="color:#00e676">↗ ALCISTA (Presión TF Cortos)</td>
                     </tr>
                 </tbody>
             </table>
@@ -194,33 +149,31 @@
     <script>
         const container = document.getElementById('chart');
         let currentSymbol = 'BTCUSDT';
-        let currentTF = '1m';
+        let currentTF = '1h';
         let ws = null;
         let supportLine = null;
-        let resistanceLine = null;
 
-        // Crear gráfico estilo TradingView
         const chart = LightweightCharts.createChart(container, {
             width: container.clientWidth,
             height: container.clientHeight,
             layout: { 
-                backgroundColor: '#131722', 
+                backgroundColor: '#0c0d10', 
                 textColor: '#787b86' 
             },
             grid: { 
-                vertLines: { color: '#1e222d' }, 
-                horzLines: { color: '#1e222d' } 
+                vertLines: { color: 'rgba(42, 46, 57, 0.5)' }, 
+                horzLines: { color: 'rgba(42, 46, 57, 0.5)' } 
             },
             crosshair: {
                 mode: LightweightCharts.CrosshairMode.Normal,
-                vertLine: { color: '#787b86', width: 1, style: 1 },
-                horzLine: { color: '#787b86', width: 1, style: 1 }
             },
-            priceScale: { borderColor: '#2a2e39' },
+            priceScale: { 
+                borderColor: '#2a2e39',
+                scaleMargins: { top: 0.15, bottom: 0.15 }
+            },
             timeScale: { 
                 borderColor: '#2a2e39', 
-                timeVisible: true, 
-                secondsVisible: false 
+                timeVisible: true 
             }
         });
 
@@ -230,40 +183,33 @@
             wickUpColor: '#089981', wickDownColor: '#f23645',
         });
 
-        // Trazar S/R sobre el gráfico
-        function drawSRLines(lastClose) {
-            if (supportLine) candleSeries.removePriceLine(supportLine);
-            if (resistanceLine) candleSeries.removePriceLine(resistanceLine);
-
-            const supVal = lastClose * 0.985;
-            const resVal = lastClose * 1.015;
-
-            supportLine = candleSeries.createPriceLine({
-                price: supVal,
-                color: '#2962ff',
-                lineWidth: 2,
-                lineStyle: LightweightCharts.LineStyle.Dashed,
-                axisLabelVisible: true,
-                title: '[4H SOPORTE]',
-            });
-
-            resistanceLine = candleSeries.createPriceLine({
-                price: resVal,
-                color: '#ff5252',
-                lineWidth: 2,
-                lineStyle: LightweightCharts.LineStyle.Dashed,
-                axisLabelVisible: true,
-                title: '[RESISTENCIA]',
-            });
-
-            document.getElementById('sup-level').innerText = supVal.toFixed(2);
-            document.getElementById('res-level').innerText = resVal.toFixed(2);
+        function addSignalMarkers(data) {
+            const markers = [];
+            for (let i = 10; i < data.length; i += 25) {
+                if (data[i].close > data[i].open) {
+                    markers.push({
+                        time: data[i].time,
+                        position: 'belowBar',
+                        color: '#00e676',
+                        shape: 'arrowUp',
+                        text: 'BUY S/R'
+                    });
+                } else {
+                    markers.push({
+                        time: data[i].time,
+                        position: 'aboveBar',
+                        color: '#ff5252',
+                        shape: 'arrowDown',
+                        text: 'SELL'
+                    });
+                }
+            }
+            candleSeries.setMarkers(markers);
         }
 
-        // Cargar historial Klines vía Binance REST API para llenar las velas correctamente
         async function loadHistoricalData() {
             try {
-                const response = await fetch(`https://api.binance.com/api/v3/klines?symbol=${currentSymbol}&interval=${currentTF}&limit=300`);
+                const response = await fetch(`https://api.binance.com/api/v3/klines?symbol=${currentSymbol}&interval=${currentTF}&limit=200`);
                 const klines = await response.json();
                 
                 const formattedData = klines.map(k => ({
@@ -278,26 +224,34 @@
                 chart.timeScale().fitContent();
 
                 if (formattedData.length > 0) {
-                    const last = formattedData[formattedData.length - 1];
-                    drawSRLines(last.close);
+                    const lastClose = formattedData[formattedData.length - 1].close;
+                    
+                    if (supportLine) candleSeries.removePriceLine(supportLine);
+                    supportLine = candleSeries.createPriceLine({
+                        price: lastClose * 0.988,
+                        color: '#2962ff',
+                        lineWidth: 3,
+                        lineStyle: LightweightCharts.LineStyle.LargeDashed,
+                        axisLabelVisible: true,
+                        title: '[4H SOPORTE]',
+                    });
+
+                    document.getElementById('sup-level').innerText = (lastClose * 0.988).toFixed(2);
                 }
+
+                addSignalMarkers(formattedData);
             } catch (err) {
-                console.error("Error al cargar datos históricos:", err);
+                console.error("Error cargando historial:", err);
             }
         }
 
-        // Conexión WebSockets en tiempo real
         function connectWebSocket() {
             if (ws) ws.close();
-
-            const streamSymbol = currentSymbol.toLowerCase();
-            ws = new WebSocket(`wss://stream.binance.com:9443/ws/${streamSymbol}@kline_${currentTF}`);
+            ws = new WebSocket(`wss://stream.binance.com:9443/ws/${currentSymbol.toLowerCase()}@kline_${currentTF}`);
             
             ws.onmessage = (event) => {
-                const message = JSON.parse(event.data);
-                const k = message.k;
-                
-                const liveCandle = {
+                const k = JSON.parse(event.data).k;
+                const candle = {
                     time: Math.floor(k.t / 1000),
                     open: parseFloat(k.o),
                     high: parseFloat(k.h),
@@ -305,16 +259,11 @@
                     close: parseFloat(k.c)
                 };
 
-                candleSeries.update(liveCandle);
-
-                // Actualizar cabecera OHLVC
-                document.getElementById('open-val').innerText = liveCandle.open.toFixed(2);
-                document.getElementById('high-val').innerText = liveCandle.high.toFixed(2);
-                document.getElementById('low-val').innerText = liveCandle.low.toFixed(2);
-                document.getElementById('close-val').innerText = liveCandle.close.toFixed(2);
-                
-                document.getElementById('live-price').innerText = `$${liveCandle.close.toFixed(2)}`;
-                document.getElementById('proj-15m').innerText = `$${(liveCandle.close * 1.0015).toFixed(2)}`;
+                candleSeries.update(candle);
+                document.getElementById('open-val').innerText = candle.open.toFixed(2);
+                document.getElementById('high-val').innerText = candle.high.toFixed(2);
+                document.getElementById('low-val').innerText = candle.low.toFixed(2);
+                document.getElementById('close-val').innerText = candle.close.toFixed(2);
             };
         }
 
@@ -333,12 +282,6 @@
 
         function changeSymbol(symbol) {
             currentSymbol = symbol;
-            const names = {
-                'BTCUSDT': 'Bitcoin / Dólar estadounidense',
-                'ETHUSDT': 'Ethereum / Dólar estadounidense',
-                'SOLUSDT': 'Solana / Dólar estadounidense'
-            };
-            document.getElementById('display-symbol').innerText = names[symbol];
             updateChart();
         }
 
@@ -346,7 +289,6 @@
             chart.resize(container.clientWidth, container.clientHeight);
         });
 
-        // Inicialización
         updateChart();
     </script>
 </body>
