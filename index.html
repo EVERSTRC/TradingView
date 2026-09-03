@@ -84,6 +84,14 @@
                 upColor: '#089981', downColor: '#f23645', borderVisible: false, wickUpColor: '#089981', wickDownColor: '#f23645'
             });
 
+            // Línea del precio promedio institucional (Ballenas)
+            const whaleAvgLineSeries = chart.addLineSeries({
+                color: '#ffeb3b',
+                lineWidth: 2,
+                lineStyle: LightweightCharts.LineStyle.Solid,
+                title: 'Precio Promedio Ballenas'
+            });
+
             function aggregateSecondsData(data1s, stepSeconds) {
                 const aggregated = [];
                 let currentCandle = null;
@@ -128,63 +136,80 @@
             }
 
             // ==========================================
-            // DETECCION DE SEÑALES VSA / COMPRA Y VENTA BALLENAS
+            // DETECCION DE SEÑALES VSA Y LINEA DE PRECIO PROMEDIO
             // ==========================================
-            function detectWhaleSignals(candles, lineLevels) {
+            function processWhaleData(candles, lineLevels) {
                 const markers = [];
+                const whaleAvgData = [];
                 const length = candles.length;
-                if (length < 20) return markers;
+                if (length < 20) return { markers, whaleAvgData };
 
-                // Calcular volumen medio móvil de 20 periodos
-                for (let i = 20; i < length; i++) {
-                    let sumVol = 0;
-                    for (let j = i - 20; j < i; j++) {
-                        sumVol += (candles[j].volume || 1);
-                    }
-                    const avgVol = sumVol / 20;
+                let accumulatedVolPrice = 0;
+                let accumulatedVol = 0;
+                let currentWhalePrice = null;
+
+                for (let i = 0; i < length; i++) {
                     const currentCandle = candles[i];
-                    const isHighVolume = (currentCandle.volume || 0) > (avgVol * 2.2); // Volumen Ultra Alto (Clímax)
 
-                    const isBullish = currentCandle.close > currentCandle.open;
-                    const isBearish = currentCandle.close < currentCandle.open;
-
-                    // Verificar cercanía a soportes o resistencias cargados
-                    let nearSupport = false;
-                    let nearResistance = false;
-
-                    lineLevels.forEach(lvl => {
-                        const diffPercent = Math.abs(currentCandle.close - lvl.price) / lvl.price;
-                        if (diffPercent < 0.0035) { // Cerca de un nivel clave (< 0.35% de distancia)
-                            if (lvl.title.includes("SOPORTE")) nearSupport = true;
-                            if (lvl.title.includes("RESISTENCIA")) nearResistance = true;
+                    if (i >= 20) {
+                        let sumVol = 0;
+                        for (let j = i - 20; j < i; j++) {
+                            sumVol += (candles[j].volume || 1);
                         }
-                    });
+                        const avgVol = sumVol / 20;
+                        const isHighVolume = (currentCandle.volume || 0) > (avgVol * 2.2);
 
-                    // 1. BUY / BUY S/R
-                    if (isBullish && isHighVolume) {
-                        const textLabel = nearSupport ? 'BUY S/R' : 'BUY';
-                        markers.push({
-                            time: currentCandle.time,
-                            position: 'belowBar',
-                            color: '#00e676',
-                            shape: 'arrowUp',
-                            text: textLabel
+                        const isBullish = currentCandle.close > currentCandle.open;
+                        const isBearish = currentCandle.close < currentCandle.open;
+
+                        let nearSupport = false;
+                        let nearResistance = false;
+
+                        lineLevels.forEach(lvl => {
+                            const diffPercent = Math.abs(currentCandle.close - lvl.price) / lvl.price;
+                            if (diffPercent < 0.0035) {
+                                if (lvl.title.includes("SOPORTE")) nearSupport = true;
+                                if (lvl.title.includes("RESISTENCIA")) nearResistance = true;
+                            }
                         });
+
+                        // Si hay actividad de ballenas, actualizamos la línea de precio promedio
+                        if (isHighVolume) {
+                            const typicalPrice = (currentCandle.high + currentCandle.low + currentCandle.close) / 3;
+                            accumulatedVolPrice += typicalPrice * currentCandle.volume;
+                            accumulatedVol += currentCandle.volume;
+                            currentWhalePrice = accumulatedVolPrice / accumulatedVol;
+
+                            if (isBullish) {
+                                markers.push({
+                                    time: currentCandle.time,
+                                    position: 'belowBar',
+                                    color: '#00e676',
+                                    shape: 'arrowUp',
+                                    text: nearSupport ? 'BUY S/R' : 'BUY'
+                                });
+                            } else if (isBearish) {
+                                markers.push({
+                                    time: currentCandle.time,
+                                    position: 'aboveBar',
+                                    color: '#ff1744',
+                                    shape: 'arrowDown',
+                                    text: nearResistance ? 'SELL S/R' : 'SELL'
+                                });
+                            }
+                        }
                     }
-                    // 2. SELL / SELL S/R
-                    else if (isBearish && isHighVolume) {
-                        const textLabel = nearResistance ? 'SELL S/R' : 'SELL';
-                        markers.push({
+
+                    // Trazar la línea de precio promedio institucional si ya existe
+                    if (currentWhalePrice) {
+                        whaleAvgData.push({
                             time: currentCandle.time,
-                            position: 'aboveBar',
-                            color: '#ff1744',
-                            shape: 'arrowDown',
-                            text: textLabel
+                            value: currentWhalePrice
                         });
                     }
                 }
 
-                return markers;
+                return { markers, whaleAvgData };
             }
 
             async function renderSRVisuals(currentFormattedData, currentInterval) {
@@ -243,9 +268,10 @@
                         activePriceLines.push(line);
                     });
 
-                    // Añadir marcas de BUY / SELL sobre las velas de las ballenas
-                    const signals = detectWhaleSignals(currentFormattedData, lineLevels);
-                    candlestickSeries.setMarkers(signals);
+                    // Procesar las marcas y la línea promedio de las ballenas
+                    const { markers, whaleAvgData } = processWhaleData(currentFormattedData, lineLevels);
+                    candlestickSeries.setMarkers(markers);
+                    whaleAvgLineSeries.setData(whaleAvgData);
 
                 } catch (e) {
                     console.error("Error al renderizar S/R y VSA:", e);
