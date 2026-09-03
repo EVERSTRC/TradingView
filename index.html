@@ -3,25 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TradingView - S/R + VSA Institucional Tiburon</title>
+    <title>TradingView Clone - Custom VSA Engine</title>
+    <!-- Librería Oficial Lightweight Charts de TradingView -->
+    <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        html, body {
-            width: 100vw;
-            height: 100vh;
-            overflow: hidden;
-            background-color: #000000;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            display: flex;
-            flex-direction: column;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { width: 100vw; height: 100vh; overflow: hidden; background-color: #000000; font-family: sans-serif; display: flex; flex-direction: column; }
         
-        /* Contenedor Superior de Controles */
-        .controls-bar {
+        .toolbar {
             height: 42px;
             background-color: #131722;
             display: flex;
@@ -30,22 +19,7 @@
             gap: 12px;
             border-bottom: 1px solid #2a2e39;
         }
-
-        .group {
-            display: flex;
-            align-items: center;
-            gap: 4px;
-        }
-
-        .group-label {
-            color: #787b86;
-            font-size: 11px;
-            font-weight: 700;
-            text-transform: uppercase;
-            margin-right: 4px;
-        }
-
-        .nav-btn {
+        .btn {
             background-color: #2a2e39;
             color: #d1d4dc;
             border: none;
@@ -54,130 +28,102 @@
             cursor: pointer;
             font-size: 11px;
             font-weight: 600;
-            transition: all 0.15s ease;
         }
-
-        .nav-btn:hover {
-            background-color: #363a45;
-            color: #ffffff;
-        }
-
-        .nav-btn.active {
-            background-color: #2962ff;
-            color: #ffffff;
-        }
-
-        .divider {
-            width: 1px;
-            height: 18px;
-            background-color: #2a2e39;
-        }
-
-        /* Contenedor del Gráfico */
-        .tradingview-widget-container {
-            flex: 1;
-            width: 100%;
-            height: calc(100vh - 42px);
-        }
-
-        #widget_wrapper {
-            width: 100%;
-            height: 100%;
-        }
+        .btn.active { background-color: #2962ff; color: #fff; }
+        #chart-container { flex: 1; width: 100%; height: calc(100vh - 42px); }
     </style>
 </head>
 <body>
 
-    <!-- Barra de Controles -->
-    <div class="controls-bar">
-        <!-- Selección de Par -->
-        <div class="group">
-            <span class="group-label">Par:</span>
-            <button class="nav-btn btn-symbol active" onclick="changeSymbol('BINANCE:BTCUSDT', this)">BTC</button>
-            <button class="nav-btn btn-symbol" onclick="changeSymbol('BINANCE:ETHUSDT', this)">ETH</button>
-            <button class="nav-btn btn-symbol" onclick="changeSymbol('BINANCE:SOLUSDT', this)">SOL</button>
-            <button class="nav-btn btn-symbol" onclick="changeSymbol('BINANCE:BNBUSDT', this)">BNB</button>
-            <button class="nav-btn btn-symbol" onclick="changeSymbol('CAPITALCOM:GOLD', this)">ORO</button>
-        </div>
-
-        <div class="divider"></div>
-
-        <!-- Selección de Temporalidad -->
-        <div class="group">
-            <span class="group-label">TF:</span>
-            <button class="nav-btn btn-tf" onclick="changeTimeframe('1', this)">1m</button>
-            <button class="nav-btn btn-tf" onclick="changeTimeframe('15', this)">15m</button>
-            <button class="nav-btn btn-tf active" onclick="changeTimeframe('60', this)">1h</button>
-            <button class="nav-btn btn-tf" onclick="changeTimeframe('240', this)">4h</button>
-            <button class="nav-btn btn-tf" onclick="changeTimeframe('D', this)">1D</button>
-        </div>
+    <div class="toolbar">
+        <button class="btn active" onclick="loadMarket('BTCUSDT')">BTC/USDT</button>
+        <button class="btn" onclick="loadMarket('ETHUSDT')">ETH/USDT</button>
+        <button class="btn" onclick="loadMarket('SOLUSDT')">SOL/USDT</button>
     </div>
 
-    <!-- Contenedor del Gráfico TradingView -->
-    <div class="tradingview-widget-container">
-        <div id="widget_wrapper"></div>
-    </div>
+    <div id="chart-container"></div>
 
-    <script type="text/javascript">
-        // Estado inicial de la aplicación
-        let currentSymbol = 'BINANCE:BTCUSDT';
-        let currentInterval = '60';
+    <script>
+        // 1. Inicialización del Gráfico
+        const container = document.getElementById('chart-container');
+        const chart = LightweightCharts.createChart(container, {
+            layout: { backgroundColor: '#000000', textColor: '#d1d4dc' },
+            grid: { vertLines: { color: 'rgba(42, 46, 57, 0.2)' }, horzLines: { color: 'rgba(42, 46, 57, 0.2)' } },
+            timeScale: { timeVisible: true, secondsVisible: false }
+        });
 
-        // Cargar/Actualizar Widget de TradingView
-        function loadWidget() {
-            const container = document.getElementById('widget_wrapper');
-            container.innerHTML = ''; 
+        // Series de Precio y Volumen
+        const candleSeries = chart.addCandlestickSeries({
+            upColor: '#26a69a', downColor: '#ef5350', borderVisible: false, wickUpColor: '#26a69a', wickDownColor: '#ef5350'
+        });
+        const volumeSeries = chart.addHistogramSeries({
+            priceFormat: { type: 'volume' },
+            priceScaleId: '',
+            scaleMargins: { top: 0.8, bottom: 0 }
+        });
 
-            const script = document.createElement('script');
-            script.type = 'text/javascript';
-            script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
-            script.async = true;
-            
-            script.innerHTML = JSON.stringify({
-                "autosize": true,
-                "symbol": currentSymbol,
-                "interval": currentInterval,
-                "timezone": "Etc/UTC",
-                "theme": "dark",
-                "style": "1",
-                "locale": "es",
-                "backgroundColor": "#000000",
-                "gridColor": "rgba(42, 46, 57, 0)",
-                "hide_top_toolbar": false,
-                "hide_legend": false,
-                "save_image": false,
-                "calendar": false,
-                "hide_side_toolbar": false,
-                "allow_symbol_change": true,
-                "studies": [
-                    "PUB;5ttKryBy"
-                ],
-                "support_host": "https://www.tradingview.com"
+        // 2. Motor del Indicador Personalizado (Traducción de Pine Script a JS)
+        function calculateVSAAndTrend(data) {
+            const volumeMultiplier = 1.8;
+            const period = 20;
+
+            return data.map((bar, index) => {
+                if (index < period) return { ...bar, isWhale: false, color: '#26a69a' };
+
+                // Cálculo Promedio de Volumen
+                const slice = data.slice(index - period, index);
+                const avgVolume = slice.reduce((acc, curr) => acc + curr.volume, 0) / period;
+
+                // Detección VSA (Volumen Institucional / Ballenas)
+                const isWhale = bar.volume > (avgVolume * volumeMultiplier);
+                
+                // Color del Volumen según VSA
+                let volColor = bar.close >= bar.open ? 'rgba(38, 166, 154, 0.5)' : 'rgba(239, 83, 80, 0.5)';
+                if (isWhale) {
+                    volColor = bar.close >= bar.open ? '#00e676' : '#ff1744'; // Resaltado de VSA
+                }
+
+                return {
+                    time: bar.time,
+                    open: bar.open,
+                    high: bar.high,
+                    low: bar.low,
+                    close: bar.close,
+                    volume: bar.volume,
+                    volColor: volColor
+                };
             });
-
-            container.appendChild(script);
         }
 
-        // Cambiar Símbolo
-        function changeSymbol(symbol, btn) {
-            currentSymbol = symbol;
-            loadWidget();
-            
-            document.querySelectorAll('.btn-symbol').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
+        // 3. Conexión a la API pública de Binance para obtener velas en vivo
+        async function loadMarket(symbol) {
+            const response = await fetch(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=1h&limit=500`);
+            const rawData = await response.json();
+
+            const formattedData = rawData.map(d => ({
+                time: d[0] / 1000,
+                open: parseFloat(d[1]),
+                high: parseFloat(d[2]),
+                low: parseFloat(d[3]),
+                close: parseFloat(d[4]),
+                volume: parseFloat(d[5])
+            }));
+
+            // Procesar el indicador
+            const processedData = calculateVSAAndTrend(formattedData);
+
+            // Mapear datos a la interfaz gráfica
+            candleSeries.setData(processedData.map(d => ({ time: d.time, open: d.open, high: d.high, low: d.low, close: d.close })));
+            volumeSeries.setData(processedData.map(d => ({ time: d.time, value: d.volume, color: d.volColor })));
         }
 
-        // Cambiar Temporalidad
-        function changeTimeframe(tf, btn) {
-            currentInterval = tf;
-            loadWidget();
-            
-            document.querySelectorAll('.btn-tf').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-        }
+        // Carga inicial
+        loadMarket('BTCUSDT');
 
-        // Inicialización
-        loadWidget();
+        // Autoadaptación al tamaño de la pantalla
+        window.addEventListener('resize', () => {
+            chart.resize(container.clientWidth, container.clientHeight);
+        });
     </script>
 </body>
 </html>
