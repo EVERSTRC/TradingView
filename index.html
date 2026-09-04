@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>S/R + VSA Tiburon - BTC/USD en Tiempo Real + Macro News</title>
+    <title>S/R + VSA Tiburon - BTC/USD en Tiempo Real</title>
     <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
 
     <style>
@@ -40,53 +40,6 @@
 
         #chart-wrapper { flex: 1; width: 100%; position: relative; }
         #chart { width: 100%; height: 100%; }
-        
-        /* PANEL DE NOTICIAS ORIGINAL */
-        #news-dashboard {
-            position: absolute;
-            top: 12px;
-            left: 12px;
-            width: 360px;
-            max-height: 310px;
-            background: rgba(30, 34, 45, 0.95);
-            border: 1px solid #363c4e;
-            border-radius: 6px;
-            padding: 10px;
-            z-index: 8;
-            backdrop-filter: blur(6px);
-            box-shadow: 0 4px 14px rgba(0,0,0,0.5);
-            display: flex;
-            flex-direction: column;
-        }
-        .news-header {
-            font-size: 11px;
-            font-weight: bold;
-            color: #ff9100;
-            text-transform: uppercase;
-            margin-bottom: 8px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-            padding-bottom: 4px;
-        }
-        .tz-badge {
-            font-size: 10px;
-            background: #2962ff;
-            color: #fff;
-            padding: 2px 6px;
-            border-radius: 3px;
-            font-weight: 600;
-        }
-        .news-list { overflow-y: auto; flex: 1; font-size: 11px; }
-        .news-item { padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.06); display: flex; flex-direction: column; gap: 2px; }
-        .news-item:last-child { border-bottom: none; }
-        .news-time-exact { color: #00e5ff; font-weight: 700; font-family: monospace; font-size: 12px; }
-        .news-date { color: #868993; font-size: 10px; margin-left: 4px; }
-        .news-title { color: #d1d4dc; font-weight: 500; margin-top: 2px; }
-        .news-impact-med { color: #ff9100; font-weight: bold; }
-        .news-impact-bull { color: #00e676; font-weight: bold; }
-        .news-impact-bear { color: #ff1744; font-weight: bold; }
 
         #status { 
             position: absolute; 
@@ -125,17 +78,6 @@
         </div>
 
         <div id="chart-wrapper">
-            <!-- PANEL DE NOTICIAS ORIGINAL CON AUTO-REFRESH -->
-            <div id="news-dashboard">
-                <div class="news-header">
-                    <span>🔥 Impacto Macro (BTC/USD)</span>
-                    <span class="tz-badge">Costa Rica (UTC-6)</span>
-                </div>
-                <div class="news-list" id="news-container">
-                    <div style="color: #868993;">Actualizando noticias en vivo...</div>
-                </div>
-            </div>
-
             <div id="chart"></div>
         </div>
     </div>
@@ -146,7 +88,6 @@
             const statusEl = document.getElementById("status");
             const timeframeSelect = document.getElementById("timeframe");
             const chartContainer = document.getElementById("chart");
-            const newsContainer = document.getElementById("news-container");
 
             let activePriceLines = [];
             let wsConnection = null;
@@ -164,130 +105,7 @@
                 upColor: '#089981', downColor: '#f23645', borderVisible: false, wickUpColor: '#089981', wickDownColor: '#f23645'
             });
 
-            // FORMATO Y HORA EXACTA COSTA RICA (UTC-6)
-            function formatCRTime(dateObj) {
-                if (!dateObj || isNaN(dateObj.getTime())) return { timeString: '--:--:--', dateString: 'Hoy' };
-                const timeString = dateObj.toLocaleTimeString('es-CR', { 
-                    timeZone: 'America/Costa_Rica', 
-                    hour: '2-digit', 
-                    minute: '2-digit', 
-                    second: '2-digit',
-                    hour12: true 
-                });
-                const dateString = dateObj.toLocaleDateString('es-CR', {
-                    timeZone: 'America/Costa_Rica',
-                    day: '2-digit',
-                    month: '2-digit'
-                });
-                return { timeString, dateString };
-            }
-
-            // EVALUAR IMPACTO DEL DATO PUBLICADO
-            function analyzeImpact(item) {
-                const title = (item.title || item.event || '').toLowerCase();
-                const actual = parseFloat(item.actual);
-                const forecast = parseFloat(item.forecast || item.previous);
-
-                if (item.actual === undefined || item.actual === null || item.actual === '' || isNaN(actual)) {
-                    return { text: '⏳ [Pendiente de Publicar]', class: 'news-impact-med' };
-                }
-
-                if (title.includes('cpi') || title.includes('ipc') || title.includes('pce') || title.includes('rate') || title.includes('fed')) {
-                    if (actual < forecast) return { text: '🚀 ALCISTA BTC (Baja Inflación)', class: 'news-impact-bull' };
-                    if (actual > forecast) return { text: '💥 BAJISTA BTC (Alta Inflación)', class: 'news-impact-bear' };
-                }
-
-                if (title.includes('nfp') || title.includes('payroll') || title.includes('unemployment') || title.includes('empleo')) {
-                    if (title.includes('unemployment') || title.includes('desempleo')) {
-                        if (actual > forecast) return { text: '🚀 ALCISTA BTC', class: 'news-impact-bull' };
-                        if (actual < forecast) return { text: '💥 BAJISTA BTC', class: 'news-impact-bear' };
-                    } else {
-                        if (actual < forecast) return { text: '🚀 ALCISTA BTC', class: 'news-impact-bull' };
-                        if (actual > forecast) return { text: '💥 BAJISTA BTC', class: 'news-impact-bear' };
-                    }
-                }
-
-                return { text: actual >= forecast ? '🟢 Dato Publicado (Mayor)' : '🔴 Dato Publicado (Menor)', class: 'news-impact-med' };
-            }
-
-            // CARGAR NOTICIAS EN VIVO Y FORZAR REFRESH SIN CACHÉ
-            async function fetchLiveMacroNews() {
-                try {
-                    // Cache-buster para evitar datos desactualizados
-                    const timestamp = new Date().getTime();
-                    const apiUrl = `https://n3ws-api.vercel.app/api/calendar?t=${timestamp}`;
-
-                    const res = await fetch(apiUrl);
-                    if (res.ok) {
-                        const data = await res.json();
-                        if (Array.isArray(data) && data.length > 0) {
-                            renderNewsList(data);
-                            return;
-                        }
-                    }
-                } catch (e) {
-                    console.warn("Reintentando conexión con proveedor secundario...");
-                }
-
-                // Proveedor alternativo en tiempo real
-                try {
-                    const timestamp = new Date().getTime();
-                    const backupUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent('https://raw.githubusercontent.com/rrebase/economic-calendar/master/data/current.json')}?t=${timestamp}`;
-                    const res = await fetch(backupUrl);
-                    if (res.ok) {
-                        const data = await res.json();
-                        if (Array.isArray(data) && data.length > 0) {
-                            renderNewsList(data);
-                            return;
-                        }
-                    }
-                } catch (e) {
-                    console.error("Error al actualizar noticias:", e);
-                }
-            }
-
-            function renderNewsList(events) {
-                // Filtrar solo eventos de EE.UU (USD) de impacto Alto
-                const filtered = events.filter(e => 
-                    (e.country === 'USD' || e.currency === 'USD' || e.country === 'US') &&
-                    (e.impact === 'High' || e.impact === 'high' || e.importance === 3)
-                );
-
-                const listToRender = filtered.length > 0 ? filtered : events.slice(0, 8);
-
-                let html = '';
-                listToRender.slice(0, 6).forEach(item => {
-                    let dateObj;
-                    if (item.date) dateObj = new Date(item.date);
-                    else if (item.time) dateObj = new Date(item.time);
-                    else dateObj = new Date();
-
-                    const { timeString, dateString } = formatCRTime(dateObj);
-                    const analysis = analyzeImpact(item);
-
-                    html += `
-                        <div class="news-item">
-                            <div>
-                                <span class="news-time-exact">⏰ ${timeString}</span>
-                                <span class="news-date">(${dateString})</span>
-                            </div>
-                            <div class="news-title">${item.title || item.event || 'Noticia Macro USD'}</div>
-                            <div style="margin-top:2px; font-size:10px;">
-                                <span class="${analysis.class}">${analysis.text}</span>
-                                ${item.actual !== undefined && item.actual !== null && item.actual !== '' ? `<span style="color:#868993; margin-left:5px;">(Act: <b>${item.actual}</b> / Prev: ${item.forecast || item.previous || 'N/A'})</span>` : ''}
-                            </div>
-                        </div>
-                    `;
-                });
-
-                newsContainer.innerHTML = html;
-            }
-
-            // Cargar inmediatamente y actualizar automáticamente cada 60 segundos
-            fetchLiveMacroNews();
-            setInterval(fetchLiveMacroNews, 60000);
-
-            // SUPERTREND & PIVOT CALCULATIONS
+            // SUPERTREND CALCULATIONS
             function getSupertrendMarkers(candles, period = 10, multiplier = 3.0) {
                 if (!candles || candles.length < period + 1) return [];
 
@@ -351,6 +169,7 @@
                 return stMarkers;
             }
 
+            // PIVOTS (SOPORTES Y RESISTENCIAS)
             function calculatePivots(candles, leftBars = 15, rightBars = 15) {
                 let lastPivotHigh = null, lastPivotLow = null;
                 for (let i = leftBars; i < candles.length - rightBars; i++) {
@@ -366,6 +185,7 @@
                 return { pivotHigh: lastPivotHigh, pivotLow: lastPivotLow };
             }
 
+            // VSA / WHALE DETECTOR
             function processWhaleData(candles) {
                 const markers = [];
                 if (!candles || candles.length < 20) return { markers };
@@ -439,6 +259,7 @@
                 } catch (e) { console.error("Error en visuales:", e); }
             }
 
+            // CONEXIÓN WEBSOCKET DE BINANCE
             function connectWebSocket(interval) {
                 if (wsConnection) wsConnection.close();
 
