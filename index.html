@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>S/R + VSA Tiburon - Dashboard Visual</title>
+    <title>S/R + VSA Tiburon - BTC/USD con Dashboard de Noticias Macro</title>
     <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
 
     <style>
@@ -38,20 +38,20 @@
         #chart-wrapper { flex: 1; width: 100%; position: relative; }
         #chart { width: 100%; height: 100%; }
         
-        /* PANEL DE NOTICIAS IMPACTO MACRO */
+        /* PANEL DE NOTICIAS CON HORA EXACTA Y IMPACTO */
         #news-dashboard {
             position: absolute;
             top: 12px;
             left: 12px;
-            width: 320px;
-            max-height: 240px;
-            background: rgba(30, 34, 45, 0.92);
+            width: 350px;
+            max-height: 280px;
+            background: rgba(30, 34, 45, 0.94);
             border: 1px solid #363c4e;
             border-radius: 6px;
             padding: 10px;
             z-index: 8;
-            backdrop-filter: blur(4px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+            backdrop-filter: blur(6px);
+            box-shadow: 0 4px 14px rgba(0,0,0,0.5);
             display: flex;
             flex-direction: column;
         }
@@ -73,6 +73,7 @@
             color: #fff;
             padding: 2px 6px;
             border-radius: 3px;
+            font-weight: 600;
         }
         .news-list {
             overflow-y: auto;
@@ -81,16 +82,28 @@
         }
         .news-item {
             padding: 6px 0;
-            border-bottom: 1px solid rgba(255,255,255,0.05);
+            border-bottom: 1px solid rgba(255,255,255,0.06);
             display: flex;
             flex-direction: column;
             gap: 2px;
         }
         .news-item:last-child { border-bottom: none; }
-        .news-time { color: #00e5ff; font-weight: bold; }
-        .news-title { color: #d1d4dc; font-weight: 500; }
+        .news-time-exact { 
+            color: #00e5ff; 
+            font-weight: 700; 
+            font-family: monospace; 
+            font-size: 11.5px;
+        }
+        .news-date {
+            color: #868993;
+            font-size: 10px;
+            margin-left: 4px;
+        }
+        .news-title { color: #d1d4dc; font-weight: 500; margin-top: 2px; }
         .news-impact-high { color: #ff1744; font-weight: bold; }
-        .news-impact-med { color: #ff9100; }
+        .news-impact-med { color: #ff9100; font-weight: bold; }
+        .news-impact-bull { color: #00e676; font-weight: bold; }
+        .news-impact-bear { color: #ff1744; font-weight: bold; }
 
         #status { 
             position: absolute; 
@@ -100,7 +113,7 @@
             font-size: 14px; 
             color: #868993; 
             pointer-events: none; 
-            background: rgba(19, 23, 34, 0.8);
+            background: rgba(19, 23, 34, 0.85);
             padding: 8px 16px;
             border-radius: 4px;
             z-index: 5;
@@ -111,7 +124,7 @@
 
     <div id="main-container">
         <div id="header">
-            <span class="title">🦈 S/R + VSA + Supertrend Institucional Tiburon (BTC/USDT)</span>
+            <span class="title">🦈 S/R + VSA + Supertrend (BTC/USD)</span>
             <div>
                 <label for="timeframe">Temporalidad: </label>
                 <select id="timeframe">
@@ -135,8 +148,8 @@
             <!-- PANEL DE NOTICIAS -->
             <div id="news-dashboard">
                 <div class="news-header">
-                    <span>🔥 Eventos USD / Macro (BTC)</span>
-                    <span class="tz-badge">Hora CR (UTC-6)</span>
+                    <span>🔥 Impacto Macro (BTC/USD)</span>
+                    <span class="tz-badge">Costa Rica (UTC-6)</span>
                 </div>
                 <div class="news-list" id="news-container">
                     <div style="color: #868993;">Cargando calendario económico...</div>
@@ -146,7 +159,7 @@
             <div id="chart"></div>
         </div>
     </div>
-    <div id="status">Cargando gráfico...</div>
+    <div id="status">Cargando gráfico BTC/USD...</div>
 
     <script>
         document.addEventListener("DOMContentLoaded", function () {
@@ -169,24 +182,71 @@
                 upColor: '#089981', downColor: '#f23645', borderVisible: false, wickUpColor: '#089981', wickDownColor: '#f23645'
             });
 
-            // OBTENER Y TRANSFORMAR NOTICIAS A HORA COSTA RICA (UTC-6)
+            // FORMATO Y HORA EXACTA DE COSTA RICA (UTC-6)
+            function formatCRTime(dateObj) {
+                const timeString = dateObj.toLocaleTimeString('es-CR', { 
+                    timeZone: 'America/Costa_Rica', 
+                    hour: '2-digit', 
+                    minute: '2-digit', 
+                    second: '2-digit',
+                    hour12: true 
+                });
+                const dateString = dateObj.toLocaleDateString('es-CR', {
+                    timeZone: 'America/Costa_Rica',
+                    day: '2-digit',
+                    month: '2-digit'
+                });
+                return { timeString, dateString };
+            }
+
+            // EVALUAR SI EL IMPACTO DEL DATO ES ALCISTA O BAJISTA
+            function analyzeImpact(item) {
+                const title = (item.title || item.event || '').toLowerCase();
+                const actual = parseFloat(item.actual);
+                const forecast = parseFloat(item.forecast || item.previous);
+
+                if (isNaN(actual) || isNaN(forecast)) {
+                    return { text: '[Pendiente de Publicar]', class: 'news-impact-med' };
+                }
+
+                // Inflación y Tipos de Interés (IPC, CPI, PCE, Rate, FED)
+                if (title.includes('cpi') || title.includes('ipc') || title.includes('pce') || title.includes('rate') || title.includes('fed')) {
+                    if (actual < forecast) {
+                        return { text: '🚀 ALCISTA BTC (Menos Inflación)', class: 'news-impact-bull' };
+                    } else if (actual > forecast) {
+                        return { text: '💥 BAJISTA BTC (Más Inflación)', class: 'news-impact-bear' };
+                    }
+                }
+
+                // Empleo y NFP
+                if (title.includes('nfp') || title.includes('payroll') || title.includes('unemployment') || title.includes('empleo')) {
+                    if (title.includes('unemployment') || title.includes('desempleo')) {
+                        if (actual > forecast) return { text: '🚀 ALCISTA BTC', class: 'news-impact-bull' };
+                        if (actual < forecast) return { text: '💥 BAJISTA BTC', class: 'news-impact-bear' };
+                    } else {
+                        if (actual < forecast) return { text: '🚀 ALCISTA BTC', class: 'news-impact-bull' };
+                        if (actual > forecast) return { text: '💥 BAJISTA BTC', class: 'news-impact-bear' };
+                    }
+                }
+
+                return { text: actual >= forecast ? '🟢 Dato Mayor al Esperado' : '🔴 Dato Menor al Esperado', class: 'news-impact-med' };
+            }
+
             async function loadMacroNews() {
                 try {
                     const res = await fetch('https://n3ws-api.vercel.app/api/calendar'); 
-                    if (!res.ok) throw new Error("Fallback news service");
+                    if (!res.ok) throw new Error("API secundaria");
                     const events = await res.json();
-
                     renderNewsList(events);
                 } catch (e) {
-                    // Cargar lista alternativa/simulada con eventos clave si falla el API secundario
                     fetch('https://raw.githubusercontent.com/rrebase/economic-calendar/master/data/current.json')
                     .then(r => r.json())
                     .then(data => renderNewsList(data))
                     .catch(() => {
                         newsContainer.innerHTML = `
                             <div class="news-item">
-                                <span class="news-time">Atención Hoy</span>
-                                <span class="news-title">Noticias IPC / NFP / FED afectan alta volatilidad en BTC.</span>
+                                <span class="news-time-exact">⚠️ En Vivo</span>
+                                <span class="news-title">Noticias IPC / FED / NFP generan alta volatilidad directa en BTC/USD.</span>
                             </div>
                         `;
                     });
@@ -195,30 +255,36 @@
 
             function renderNewsList(events) {
                 if (!Array.isArray(events) || events.length === 0) {
-                    newsContainer.innerHTML = '<div style="color:#868993;">No hay noticias macro de alto impacto hoy.</div>';
+                    newsContainer.innerHTML = '<div style="color:#868993;">Sin eventos macro programados.</div>';
                     return;
                 }
 
-                // Filtrar solo USD o BTC de alto/medio impacto
                 const filtered = events.filter(e => e.country === 'USD' || e.currency === 'USD' || e.impact === 'High');
                 
                 let html = '';
                 filtered.slice(0, 5).forEach(item => {
-                    // Convertir a hora de Costa Rica
-                    let eventDate = new Date(item.date || item.time);
-                    let timeCR = eventDate.toLocaleTimeString('es-CR', { timeZone: 'America/Costa_Rica', hour: '2-digit', minute: '2-digit', hour12: true });
+                    const rawDate = item.date || item.time || new Date();
+                    const eventDate = new Date(rawDate);
                     
-                    const impactClass = item.impact === 'High' ? 'news-impact-high' : 'news-impact-med';
+                    const { timeString, dateString } = formatCRTime(eventDate);
+                    const analysis = analyzeImpact(item);
 
                     html += `
                         <div class="news-item">
-                            <div><span class="news-time">⏰ ${timeCR}</span> <span class="${impactClass}">[${item.impact || 'Alto'}]</span></div>
+                            <div>
+                                <span class="news-time-exact">⏰ ${timeString}</span>
+                                <span class="news-date">(${dateString})</span>
+                            </div>
                             <div class="news-title">${item.title || item.event}</div>
+                            <div style="margin-top:2px; font-size:10px;">
+                                <span class="${analysis.class}">${analysis.text}</span>
+                                ${item.actual ? `<span style="color:#868993; margin-left:5px;">(Act: ${item.actual} / Prev: ${item.forecast || item.previous})</span>` : ''}
+                            </div>
                         </div>
                     `;
                 });
 
-                newsContainer.innerHTML = html || '<div style="color:#868993;">Sin eventos de alto impacto para hoy.</div>';
+                newsContainer.innerHTML = html || '<div style="color:#868993;">Sin noticias de alto impacto para hoy.</div>';
             }
 
             loadMacroNews();
@@ -396,11 +462,13 @@
                 return { markers, buyPrices, sellPrices };
             }
 
+            // OBTENCIÓN DE DATOS BTCUSD DESDE BINANCE
             async function fetchKlines(interval, limit = 200) {
                 const isUi = ["1s", "5s", "15s", "30s"].includes(interval);
                 const endpoint = isUi ? 'uiKlines' : 'klines';
                 const apiInterval = isUi ? '1s' : interval;
-                const res = await fetch(`https://api.binance.com/api/v3/${endpoint}?symbol=BTCUSDT&interval=${apiInterval}&limit=${limit}`);
+                
+                const res = await fetch(`https://api.binance.com/api/v3/${endpoint}?symbol=BTCUSD&interval=${apiInterval}&limit=${limit}`);
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 const data = await res.json();
                 return data.map(d => ({
@@ -481,13 +549,13 @@
                     });
 
                 } catch (e) {
-                    console.error("Error al renderizar S/R y VSA:", e);
+                    console.error("Error cargando visuales BTCUSD:", e);
                 }
             }
 
             async function loadChartData(interval) {
                 statusEl.style.display = "block";
-                statusEl.innerText = "Cargando datos...";
+                statusEl.innerText = "Cargando BTC/USD...";
 
                 try {
                     let formattedData = [];
@@ -507,7 +575,7 @@
                     statusEl.style.display = "none";
                 } catch (err) {
                     console.error(err);
-                    statusEl.innerText = "Error cargando " + interval;
+                    statusEl.innerText = "Error cargando datos de BTC/USD";
                     statusEl.style.color = "#f23645";
                 }
             }
