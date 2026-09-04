@@ -60,7 +60,7 @@
 
     <div id="main-container">
         <div id="header">
-            <span class="title"><span class="live-dot"></span> 🦈 BTC/USD TIEMPO REAL (WebSocket Binance)</span>
+            <span class="title"><span class="live-dot"></span> 🦈 S/R + VSA + Supertrend Institucional Tiburon (BTC/USDT)</span>
             <div>
                 <label for="timeframe">Temporalidad: </label>
                 <select id="timeframe">
@@ -185,11 +185,12 @@
                 return { pivotHigh: lastPivotHigh, pivotLow: lastPivotLow };
             }
 
-            // VSA / WHALE DETECTOR
+            // DETECTOR DE BALLENAS + PROMEDIOS VWAP INSTITUCIONALES
             function processWhaleData(candles) {
                 const markers = [];
-                if (!candles || candles.length < 20) return { markers };
+                if (!candles || candles.length < 20) return { markers, buyPrices: [], sellPrices: [] };
 
+                const buyPrices = [], sellPrices = [];
                 let rollingVolumeSum = 0;
                 for (let i = 0; i < 20; i++) rollingVolumeSum += (candles[i].volume || 1);
 
@@ -202,13 +203,15 @@
 
                     if (isHighVolume) {
                         if (currentCandle.close > currentCandle.open) {
+                            buyPrices.push(currentCandle.close);
                             markers.push({ time: currentCandle.time, position: 'belowBar', color: '#00b0ff', shape: 'circle', text: 'BUY' });
                         } else if (currentCandle.close < currentCandle.open) {
+                            sellPrices.push(currentCandle.close);
                             markers.push({ time: currentCandle.time, position: 'aboveBar', color: '#ff4081', shape: 'circle', text: 'SELL' });
                         }
                     }
                 }
-                return { markers };
+                return { markers, buyPrices, sellPrices };
             }
 
             async function fetchKlines(interval, limit = 300) {
@@ -243,9 +246,20 @@
                     if (pivots4h.pivotHigh) lineLevels.push({ price: pivots4h.pivotHigh.high, color: '#ff9100', title: '[ 4H RESISTENCIA ]', width: 2, style: LightweightCharts.LineStyle.Dashed });
                     if (pivots4h.pivotLow) lineLevels.push({ price: pivots4h.pivotLow.low, color: '#2962ff', title: '[ 4H SOPORTE ]', width: 2, style: LightweightCharts.LineStyle.Dashed });
 
-                    const { markers: whaleMarkers } = processWhaleData(currentFormattedData);
-                    const stMarkers = getSupertrendMarkers(currentFormattedData, 10, 3.0);
+                    // PROMEDIOS DE COMPRA Y VENTA DE BALLENAS
+                    const { markers: whaleMarkers, buyPrices, sellPrices } = processWhaleData(currentFormattedData);
 
+                    if (buyPrices.length > 0) {
+                        const avgBuy = buyPrices.reduce((a, b) => a + b, 0) / buyPrices.length;
+                        lineLevels.push({ price: avgBuy, color: '#00e676', title: '[ PROMEDIO COMPRA BALLENAS ]', width: 3, style: LightweightCharts.LineStyle.Solid });
+                    }
+
+                    if (sellPrices.length > 0) {
+                        const avgSell = sellPrices.reduce((a, b) => a + b, 0) / sellPrices.length;
+                        lineLevels.push({ price: avgSell, color: '#ff1744', title: '[ PROMEDIO VENTA BALLENAS ]', width: 3, style: LightweightCharts.LineStyle.Solid });
+                    }
+
+                    const stMarkers = getSupertrendMarkers(currentFormattedData, 10, 3.0);
                     const allMarkers = [...whaleMarkers, ...stMarkers].sort((a, b) => a.time - b.time);
                     candlestickSeries.setMarkers(allMarkers);
 
@@ -259,7 +273,7 @@
                 } catch (e) { console.error("Error en visuales:", e); }
             }
 
-            // CONEXIÓN WEBSOCKET DE BINANCE
+            // CONEXIÓN WEBSOCKET DE BINANCE EN TIEMPO REAL
             function connectWebSocket(interval) {
                 if (wsConnection) wsConnection.close();
 
