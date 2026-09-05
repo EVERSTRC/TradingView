@@ -41,26 +41,27 @@
         #chart-wrapper { flex: 1; width: 100%; position: relative; }
         #chart { width: 100%; height: 100%; }
 
-        /* DASHBOARD FLOTANTE & TEMPORIZADOR DE VELA */
+        /* DASHBOARD FLOTANTE EN TIEMPO REAL */
         #candle-dashboard {
             position: absolute;
             top: 16px;
             left: 16px;
             z-index: 8;
-            background: rgba(30, 34, 45, 0.85);
+            background: rgba(26, 30, 41, 0.90);
             backdrop-filter: blur(8px);
             border: 1px solid #2a2e39;
-            border-radius: 6px;
-            padding: 10px 14px;
+            border-radius: 8px;
+            padding: 12px 16px;
             display: flex;
             flex-direction: column;
-            gap: 6px;
-            min-width: 170px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+            gap: 8px;
+            min-width: 220px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.5);
         }
         .dash-row { display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 600; }
         .dash-label { color: #787b86; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px; }
-        .dash-value { color: #00e5ff; font-family: monospace; font-size: 14px; }
+        .dash-value { font-family: monospace; font-size: 13px; }
+        .dash-divider { height: 1px; background-color: #2a2e39; margin: 2px 0; }
         
         .progress-bar-bg {
             width: 100%;
@@ -113,14 +114,29 @@
         </div>
 
         <div id="chart-wrapper">
-            <!-- DASHBOARD TEMPORIZADOR -->
+            <!-- DASHBOARD COMPLETO EN TIEMPO REAL -->
             <div id="candle-dashboard">
                 <div class="dash-row">
                     <span class="dash-label">Cierre de Vela</span>
-                    <span id="timer-display" class="dash-value">00:00</span>
+                    <span id="timer-display" class="dash-value" style="color: #00e5ff;">00:00</span>
                 </div>
                 <div class="progress-bar-bg">
                     <div id="timer-progress" class="progress-bar-fill"></div>
+                </div>
+
+                <div class="dash-divider"></div>
+
+                <div class="dash-row">
+                    <span class="dash-label">Sesgo Mercado</span>
+                    <span id="dash-bias" class="dash-value">--</span>
+                </div>
+                <div class="dash-row">
+                    <span class="dash-label">Objetivo Abajo</span>
+                    <span id="dash-target" class="dash-value" style="color: #ff5252;">--</span>
+                </div>
+                <div class="dash-row">
+                    <span class="dash-label">Invalidación</span>
+                    <span id="dash-invalid" class="dash-value" style="color: #00e676;">--</span>
                 </div>
             </div>
 
@@ -134,13 +150,20 @@
             const statusEl = document.getElementById("status");
             const timeframeSelect = document.getElementById("timeframe");
             const chartContainer = document.getElementById("chart");
+
             const timerDisplay = document.getElementById("timer-display");
             const timerProgress = document.getElementById("timer-progress");
+            const dashBias = document.getElementById("dash-bias");
+            const dashTarget = document.getElementById("dash-target");
+            const dashInvalid = document.getElementById("dash-invalid");
 
             let activePriceLines = [];
             let wsConnection = null;
             let currentCandleData = [];
             let timerInterval = null;
+
+            let currentFootprintRes = null;
+            let currentWhaleBuyAvg = null;
 
             const chart = LightweightCharts.createChart(chartContainer, {
                 width: chartContainer.clientWidth,
@@ -154,7 +177,35 @@
                 upColor: '#089981', downColor: '#f23645', borderVisible: false, wickUpColor: '#089981', wickDownColor: '#f23645'
             });
 
-            // LÓGICA DEL TEMPORIZADOR DE CIERRE DE VELA
+            // ACTUALIZACIÓN DEL ANÁLISIS EN TIEMPO REAL (PUNTO 4)
+            function updateRealtimeAnalysis(lastClosePrice) {
+                if (!lastClosePrice) return;
+
+                if (currentFootprintRes) {
+                    const invalidLevel = currentFootprintRes + 35; // Margen por encima del POC
+                    dashInvalid.innerText = `$${invalidLevel.toFixed(2)}`;
+
+                    if (lastClosePrice < currentFootprintRes) {
+                        dashBias.innerText = "BAJISTA 🐻";
+                        dashBias.style.color = "#ff5252";
+                    } else {
+                        dashBias.innerText = "ALCISTA 🚀";
+                        dashBias.style.color = "#00e676";
+                    }
+                } else {
+                    dashBias.innerText = "NEUTRO";
+                    dashBias.style.color = "#d1d4dc";
+                    dashInvalid.innerText = "--";
+                }
+
+                if (currentWhaleBuyAvg) {
+                    dashTarget.innerText = `$${currentWhaleBuyAvg.toFixed(2)}`;
+                } else {
+                    dashTarget.innerText = "--";
+                }
+            }
+
+            // TEMPORIZADOR DE CIERRE DE VELA
             function getIntervalInSeconds(interval) {
                 const unit = interval.slice(-1);
                 const val = parseInt(interval);
@@ -361,18 +412,18 @@
                     const pivots1d = calculatePivots(raw1d, 15, 15);
                     const lineLevels = [];
 
-                    // Soportes y Resistencias Macro
                     if (pivots1d.pivotHigh) lineLevels.push({ price: pivots1d.pivotHigh.high, color: '#ff1744', title: '[ 1D RESISTENCIA ]', width: 3, style: LightweightCharts.LineStyle.Solid });
                     if (pivots1d.pivotLow) lineLevels.push({ price: pivots1d.pivotLow.low, color: '#00e676', title: '[ 1D SOPORTE ]', width: 3, style: LightweightCharts.LineStyle.Solid });
                     if (pivots4h.pivotHigh) lineLevels.push({ price: pivots4h.pivotHigh.high, color: '#ff9100', title: '[ 4H RESISTENCIA ]', width: 2, style: LightweightCharts.LineStyle.Dashed });
                     if (pivots4h.pivotLow) lineLevels.push({ price: pivots4h.pivotLow.low, color: '#2962ff', title: '[ 4H SOPORTE ]', width: 2, style: LightweightCharts.LineStyle.Dashed });
 
-                    // Promedios de Ballenas
                     const { markers: whaleMarkers, buyPrices, sellPrices } = processWhaleData(currentFormattedData);
 
                     if (buyPrices.length > 0) {
-                        const avgBuy = buyPrices.reduce((a, b) => a + b, 0) / buyPrices.length;
-                        lineLevels.push({ price: avgBuy, color: '#00e676', title: '[ PROMEDIO COMPRA BALLENAS ]', width: 3, style: LightweightCharts.LineStyle.Solid });
+                        currentWhaleBuyAvg = buyPrices.reduce((a, b) => a + b, 0) / buyPrices.length;
+                        lineLevels.push({ price: currentWhaleBuyAvg, color: '#00e676', title: '[ PROMEDIO COMPRA BALLENAS ]', width: 3, style: LightweightCharts.LineStyle.Solid });
+                    } else {
+                        currentWhaleBuyAvg = null;
                     }
 
                     if (sellPrices.length > 0) {
@@ -380,9 +431,11 @@
                         lineLevels.push({ price: avgSell, color: '#ff1744', title: '[ PROMEDIO VENTA BALLENAS ]', width: 3, style: LightweightCharts.LineStyle.Solid });
                     }
 
-                    // Footprint POC / Imbalance
                     const { footprintPOCs } = calculateFootprintLevels(currentFormattedData);
+                    currentFootprintRes = null;
+
                     footprintPOCs.forEach(poc => {
+                        if (!poc.isBullish) currentFootprintRes = poc.price;
                         lineLevels.push({
                             price: poc.price,
                             color: poc.isBullish ? '#00f0ff' : '#ff007f',
@@ -402,6 +455,10 @@
                         });
                         activePriceLines.push(line);
                     });
+
+                    if (currentFormattedData.length > 0) {
+                        updateRealtimeAnalysis(currentFormattedData[currentFormattedData.length - 1].close);
+                    }
 
                 } catch (e) { console.error("Error en visuales:", e); }
             }
@@ -429,6 +486,7 @@
                     };
 
                     candlestickSeries.update(updatedCandle);
+                    updateRealtimeAnalysis(updatedCandle.close);
 
                     if (currentCandleData.length > 0) {
                         const lastIndex = currentCandleData.length - 1;
