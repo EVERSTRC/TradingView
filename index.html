@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>S/R + VSA Tiburon - BTC/USD en Tiempo Real</title>
+    <title>S/R + VSA + Footprint Tiburon - BTC/USD</title>
     <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
 
     <style>
@@ -60,7 +60,7 @@
 
     <div id="main-container">
         <div id="header">
-            <span class="title"><span class="live-dot"></span> 🦈 S/R + VSA + Supertrend Institucional Tiburon (BTC/USDT)</span>
+            <span class="title"><span class="live-dot"></span> 🦈 BTC/USD S/R + VSA + FOOTPRINT POC (Binance WebSocket)</span>
             <div>
                 <label for="timeframe">Temporalidad: </label>
                 <select id="timeframe">
@@ -105,7 +105,39 @@
                 upColor: '#089981', downColor: '#f23645', borderVisible: false, wickUpColor: '#089981', wickDownColor: '#f23645'
             });
 
-            // SUPERTREND CALCULATIONS
+            // CALCULADORA FOOTPRINT / IMBALANCE POC
+            function calculateFootprintLevels(candles) {
+                if (!candles || candles.length < 20) return { footprintPOCs: [] };
+
+                const footprintPOCs = [];
+                let rollingVolumeSum = 0;
+                for (let i = 0; i < 20; i++) rollingVolumeSum += (candles[i].volume || 1);
+
+                for (let i = 20; i < candles.length; i++) {
+                    const c = candles[i];
+                    const avgVol = rollingVolumeSum / 20;
+                    rollingVolumeSum += (c.volume || 1) - (candles[i - 20].volume || 1);
+
+                    // Si es volumen institucional
+                    if ((c.volume || 0) > (avgVol * 2.2)) {
+                        // Nivel de Punto de Control de la Huella (Mid-body de absorción)
+                        const footprintPOC = c.open < c.close 
+                            ? c.open + ((c.close - c.open) * 0.70)  // Punto de empuje comprador
+                            : c.open - ((c.open - c.close) * 0.70); // Punto de rechazo vendedor
+
+                        footprintPOCs.push({
+                            price: footprintPOC,
+                            isBullish: c.close > c.open,
+                            time: c.time
+                        });
+                    }
+                }
+                
+                // Retornar los últimos 2 niveles Footprint más relevantes
+                return { footprintPOCs: footprintPOCs.slice(-2) };
+            }
+
+            // SUPERTREND
             function getSupertrendMarkers(candles, period = 10, multiplier = 3.0) {
                 if (!candles || candles.length < period + 1) return [];
 
@@ -169,7 +201,7 @@
                 return stMarkers;
             }
 
-            // PIVOTS (SOPORTES Y RESISTENCIAS)
+            // PIVOTS
             function calculatePivots(candles, leftBars = 15, rightBars = 15) {
                 let lastPivotHigh = null, lastPivotLow = null;
                 for (let i = leftBars; i < candles.length - rightBars; i++) {
@@ -185,7 +217,7 @@
                 return { pivotHigh: lastPivotHigh, pivotLow: lastPivotLow };
             }
 
-            // DETECTOR DE BALLENAS + PROMEDIOS VWAP INSTITUCIONALES
+            // VSA / WHALE DETECTOR
             function processWhaleData(candles) {
                 const markers = [];
                 if (!candles || candles.length < 20) return { markers, buyPrices: [], sellPrices: [] };
@@ -241,12 +273,13 @@
                     const pivots1d = calculatePivots(raw1d, 15, 15);
                     const lineLevels = [];
 
+                    // 1. Soportes y Resistencias Macro
                     if (pivots1d.pivotHigh) lineLevels.push({ price: pivots1d.pivotHigh.high, color: '#ff1744', title: '[ 1D RESISTENCIA ]', width: 3, style: LightweightCharts.LineStyle.Solid });
                     if (pivots1d.pivotLow) lineLevels.push({ price: pivots1d.pivotLow.low, color: '#00e676', title: '[ 1D SOPORTE ]', width: 3, style: LightweightCharts.LineStyle.Solid });
                     if (pivots4h.pivotHigh) lineLevels.push({ price: pivots4h.pivotHigh.high, color: '#ff9100', title: '[ 4H RESISTENCIA ]', width: 2, style: LightweightCharts.LineStyle.Dashed });
                     if (pivots4h.pivotLow) lineLevels.push({ price: pivots4h.pivotLow.low, color: '#2962ff', title: '[ 4H SOPORTE ]', width: 2, style: LightweightCharts.LineStyle.Dashed });
 
-                    // PROMEDIOS DE COMPRA Y VENTA DE BALLENAS
+                    // 2. Promedios de Ballenas (VWAP)
                     const { markers: whaleMarkers, buyPrices, sellPrices } = processWhaleData(currentFormattedData);
 
                     if (buyPrices.length > 0) {
@@ -258,6 +291,18 @@
                         const avgSell = sellPrices.reduce((a, b) => a + b, 0) / sellPrices.length;
                         lineLevels.push({ price: avgSell, color: '#ff1744', title: '[ PROMEDIO VENTA BALLENAS ]', width: 3, style: LightweightCharts.LineStyle.Solid });
                     }
+
+                    // 3. FOOTPRINT POC / IMBALANCE
+                    const { footprintPOCs } = calculateFootprintLevels(currentFormattedData);
+                    footprintPOCs.forEach(poc => {
+                        lineLevels.push({
+                            price: poc.price,
+                            color: poc.isBullish ? '#00e5ff' : '#e91e63',
+                            title: poc.isBullish ? '👣 FOOTPRINT POC (Soporte)' : '👣 FOOTPRINT POC (Resistencia)',
+                            width: 1,
+                            style: LightweightCharts.LineStyle.Dotted
+                        });
+                    });
 
                     const stMarkers = getSupertrendMarkers(currentFormattedData, 10, 3.0);
                     const allMarkers = [...whaleMarkers, ...stMarkers].sort((a, b) => a.time - b.time);
@@ -273,7 +318,6 @@
                 } catch (e) { console.error("Error en visuales:", e); }
             }
 
-            // CONEXIÓN WEBSOCKET DE BINANCE EN TIEMPO REAL
             function connectWebSocket(interval) {
                 if (wsConnection) wsConnection.close();
 
