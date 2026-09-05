@@ -41,6 +41,41 @@
         #chart-wrapper { flex: 1; width: 100%; position: relative; }
         #chart { width: 100%; height: 100%; }
 
+        /* DASHBOARD FLOTANTE & TEMPORIZADOR DE VELA */
+        #candle-dashboard {
+            position: absolute;
+            top: 16px;
+            left: 16px;
+            z-index: 8;
+            background: rgba(30, 34, 45, 0.85);
+            backdrop-filter: blur(8px);
+            border: 1px solid #2a2e39;
+            border-radius: 6px;
+            padding: 10px 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            min-width: 170px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+        }
+        .dash-row { display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 600; }
+        .dash-label { color: #787b86; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px; }
+        .dash-value { color: #00e5ff; font-family: monospace; font-size: 14px; }
+        
+        .progress-bar-bg {
+            width: 100%;
+            height: 4px;
+            background-color: #2a2e39;
+            border-radius: 2px;
+            overflow: hidden;
+        }
+        .progress-bar-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #2962ff, #00e5ff);
+            transition: width 0.3s ease;
+        }
+
         #status { 
             position: absolute; 
             top: 50%; 
@@ -78,6 +113,17 @@
         </div>
 
         <div id="chart-wrapper">
+            <!-- DASHBOARD TEMPORIZADOR -->
+            <div id="candle-dashboard">
+                <div class="dash-row">
+                    <span class="dash-label">Cierre de Vela</span>
+                    <span id="timer-display" class="dash-value">00:00</span>
+                </div>
+                <div class="progress-bar-bg">
+                    <div id="timer-progress" class="progress-bar-fill"></div>
+                </div>
+            </div>
+
             <div id="chart"></div>
         </div>
     </div>
@@ -88,10 +134,13 @@
             const statusEl = document.getElementById("status");
             const timeframeSelect = document.getElementById("timeframe");
             const chartContainer = document.getElementById("chart");
+            const timerDisplay = document.getElementById("timer-display");
+            const timerProgress = document.getElementById("timer-progress");
 
             let activePriceLines = [];
             let wsConnection = null;
             let currentCandleData = [];
+            let timerInterval = null;
 
             const chart = LightweightCharts.createChart(chartContainer, {
                 width: chartContainer.clientWidth,
@@ -104,6 +153,49 @@
             const candlestickSeries = chart.addCandlestickSeries({
                 upColor: '#089981', downColor: '#f23645', borderVisible: false, wickUpColor: '#089981', wickDownColor: '#f23645'
             });
+
+            // LÓGICA DEL TEMPORIZADOR DE CIERRE DE VELA
+            function getIntervalInSeconds(interval) {
+                const unit = interval.slice(-1);
+                const val = parseInt(interval);
+                if (unit === 's') return val;
+                if (unit === 'm') return val * 60;
+                if (unit === 'h') return val * 3600;
+                if (unit === 'd') return val * 86400;
+                if (unit === 'w') return val * 604800;
+                return 60;
+            }
+
+            function startCandleTimer(interval) {
+                if (timerInterval) clearInterval(timerInterval);
+
+                const intervalSecs = getIntervalInSeconds(interval);
+
+                function updateTimer() {
+                    const nowSecs = Math.floor(Date.now() / 1000);
+                    const elapsed = nowSecs % intervalSecs;
+                    const remaining = intervalSecs - elapsed;
+
+                    const mins = Math.floor(remaining / 60);
+                    const secs = remaining % 60;
+
+                    if (intervalSecs < 60) {
+                        timerDisplay.innerText = `${remaining}s`;
+                    } else if (mins >= 60) {
+                        const hrs = Math.floor(mins / 60);
+                        const remMins = mins % 60;
+                        timerDisplay.innerText = `${hrs}h ${remMins.toString().padStart(2, '0')}m`;
+                    } else {
+                        timerDisplay.innerText = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+                    }
+
+                    const pct = (elapsed / intervalSecs) * 100;
+                    timerProgress.style.width = `${pct}%`;
+                }
+
+                updateTimer();
+                timerInterval = setInterval(updateTimer, 1000);
+            }
 
             // CALCULADORA FOOTPRINT / IMBALANCE POC
             function calculateFootprintLevels(candles) {
@@ -118,12 +210,10 @@
                     const avgVol = rollingVolumeSum / 20;
                     rollingVolumeSum += (c.volume || 1) - (candles[i - 20].volume || 1);
 
-                    // Si es volumen institucional
                     if ((c.volume || 0) > (avgVol * 2.2)) {
-                        // Nivel de Punto de Control de la Huella (Mid-body de absorción)
                         const footprintPOC = c.open < c.close 
-                            ? c.open + ((c.close - c.open) * 0.70)  // Punto de empuje comprador
-                            : c.open - ((c.open - c.close) * 0.70); // Punto de rechazo vendedor
+                            ? c.open + ((c.close - c.open) * 0.70)
+                            : c.open - ((c.open - c.close) * 0.70);
 
                         footprintPOCs.push({
                             price: footprintPOC,
@@ -132,8 +222,6 @@
                         });
                     }
                 }
-                
-                // Retornar los últimos 2 niveles Footprint más relevantes
                 return { footprintPOCs: footprintPOCs.slice(-2) };
             }
 
@@ -273,13 +361,13 @@
                     const pivots1d = calculatePivots(raw1d, 15, 15);
                     const lineLevels = [];
 
-                    // 1. Soportes y Resistencias Macro
+                    // Soportes y Resistencias Macro
                     if (pivots1d.pivotHigh) lineLevels.push({ price: pivots1d.pivotHigh.high, color: '#ff1744', title: '[ 1D RESISTENCIA ]', width: 3, style: LightweightCharts.LineStyle.Solid });
                     if (pivots1d.pivotLow) lineLevels.push({ price: pivots1d.pivotLow.low, color: '#00e676', title: '[ 1D SOPORTE ]', width: 3, style: LightweightCharts.LineStyle.Solid });
                     if (pivots4h.pivotHigh) lineLevels.push({ price: pivots4h.pivotHigh.high, color: '#ff9100', title: '[ 4H RESISTENCIA ]', width: 2, style: LightweightCharts.LineStyle.Dashed });
                     if (pivots4h.pivotLow) lineLevels.push({ price: pivots4h.pivotLow.low, color: '#2962ff', title: '[ 4H SOPORTE ]', width: 2, style: LightweightCharts.LineStyle.Dashed });
 
-                    // 2. Promedios de Ballenas (VWAP)
+                    // Promedios de Ballenas
                     const { markers: whaleMarkers, buyPrices, sellPrices } = processWhaleData(currentFormattedData);
 
                     if (buyPrices.length > 0) {
@@ -292,15 +380,15 @@
                         lineLevels.push({ price: avgSell, color: '#ff1744', title: '[ PROMEDIO VENTA BALLENAS ]', width: 3, style: LightweightCharts.LineStyle.Solid });
                     }
 
-                    // 3. FOOTPRINT POC / IMBALANCE (AJUSTADO PARA SER MÁS VISIBLE)
+                    // Footprint POC / Imbalance
                     const { footprintPOCs } = calculateFootprintLevels(currentFormattedData);
                     footprintPOCs.forEach(poc => {
                         lineLevels.push({
                             price: poc.price,
-                            color: poc.isBullish ? '#00f0ff' : '#ff007f', // Cyan Neón / Magenta Neón
+                            color: poc.isBullish ? '#00f0ff' : '#ff007f',
                             title: poc.isBullish ? '👣 FOOTPRINT POC (Soporte)' : '👣 FOOTPRINT POC (Resistencia)',
-                            width: 2, // Grosor incrementado a 2px
-                            style: LightweightCharts.LineStyle.Dashed // Trazos punteados más grandes
+                            width: 2,
+                            style: LightweightCharts.LineStyle.Dashed
                         });
                     });
 
@@ -370,6 +458,7 @@
                     
                     chart.timeScale().fitContent();
                     connectWebSocket(interval);
+                    startCandleTimer(interval);
 
                 } catch (err) {
                     console.error(err);
