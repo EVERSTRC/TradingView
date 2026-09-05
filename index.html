@@ -292,15 +292,15 @@
                         lineLevels.push({ price: avgSell, color: '#ff1744', title: '[ PROMEDIO VENTA BALLENAS ]', width: 3, style: LightweightCharts.LineStyle.Solid });
                     }
 
-                    // 3. FOOTPRINT POC / IMBALANCE
+                    // 3. FOOTPRINT POC / IMBALANCE (AJUSTADO PARA SER MÁS VISIBLE)
                     const { footprintPOCs } = calculateFootprintLevels(currentFormattedData);
                     footprintPOCs.forEach(poc => {
                         lineLevels.push({
                             price: poc.price,
-                            color: poc.isBullish ? '#00e5ff' : '#e91e63',
+                            color: poc.isBullish ? '#00f0ff' : '#ff007f', // Cyan Neón / Magenta Neón
                             title: poc.isBullish ? '👣 FOOTPRINT POC (Soporte)' : '👣 FOOTPRINT POC (Resistencia)',
-                            width: 1,
-                            style: LightweightCharts.LineStyle.Dotted
+                            width: 2, // Grosor incrementado a 2px
+                            style: LightweightCharts.LineStyle.Dashed // Trazos punteados más grandes
                         });
                     });
 
