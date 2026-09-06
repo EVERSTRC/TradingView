@@ -80,7 +80,7 @@
             display: flex;
             flex-direction: column;
             gap: 8px;
-            min-width: 240px;
+            min-width: 260px;
             box-shadow: 0 4px 16px rgba(0,0,0,0.5);
         }
         .dash-row { display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 600; }
@@ -161,13 +161,30 @@
                     <span class="dash-label">Sesgo Mercado</span>
                     <span id="dash-bias" class="dash-value">--</span>
                 </div>
+                
+                <!-- SECCIÓN PERSONALIZADA: ENTRADA, TP Y SL -->
                 <div class="dash-row">
-                    <span class="dash-label">Objetivo Abajo</span>
-                    <span id="dash-target" class="dash-value" style="color: #ff5252;">--</span>
+                    <span class="dash-label">Punto de Entrada</span>
+                    <span id="dash-entry" class="dash-value" style="color: #00e5ff;">--</span>
                 </div>
                 <div class="dash-row">
-                    <span class="dash-label">Invalidación</span>
-                    <span id="dash-invalid" class="dash-value" style="color: #00e676;">--</span>
+                    <span class="dash-label">Take Profit (Objetivo)</span>
+                    <span id="dash-tp" class="dash-value" style="color: #00e676;">--</span>
+                </div>
+                <div class="dash-row">
+                    <span class="dash-label">Stop Loss (Invalidación)</span>
+                    <span id="dash-sl" class="dash-value" style="color: #ff5252;">--</span>
+                </div>
+
+                <div class="dash-divider"></div>
+
+                <div class="dash-row">
+                    <span class="dash-label">Objetivo Abajo</span>
+                    <span id="dash-target" class="dash-value" style="color: #ff9100;">--</span>
+                </div>
+                <div class="dash-row">
+                    <span class="dash-label">Invalidación Metodología</span>
+                    <span id="dash-invalid" class="dash-value" style="color: #e040fb;">--</span>
                 </div>
 
                 <div class="dash-divider"></div>
@@ -213,6 +230,10 @@
             const dashTarget = document.getElementById("dash-target");
             const dashInvalid = document.getElementById("dash-invalid");
 
+            const dashEntry = document.getElementById("dash-entry");
+            const dashTp = document.getElementById("dash-tp");
+            const dashSl = document.getElementById("dash-sl");
+
             const dashWhale1dPct = document.getElementById("dash-whale-1d-pct");
             const dashWhale1dNet = document.getElementById("dash-whale-1d-net");
             const dashWhale1wPct = document.getElementById("dash-whale-1w-pct");
@@ -227,6 +248,7 @@
 
             let currentFootprintRes = null;
             let currentWhaleBuyAvg = null;
+            let currentMainTarget = null;
             let showMultiFootprint = false;
 
             const chart = LightweightCharts.createChart(chartContainer, {
@@ -245,6 +267,8 @@
             function updateRealtimeAnalysis(lastClosePrice) {
                 if (!lastClosePrice) return;
 
+                let isBullish = false;
+
                 if (currentFootprintRes) {
                     const invalidLevel = currentFootprintRes + 35;
                     dashInvalid.innerText = `$${invalidLevel.toFixed(2)}`;
@@ -252,9 +276,11 @@
                     if (lastClosePrice < currentFootprintRes) {
                         dashBias.innerText = "BAJISTA 🐻";
                         dashBias.style.color = "#ff5252";
+                        isBullish = false;
                     } else {
                         dashBias.innerText = "ALCISTA 🚀";
                         dashBias.style.color = "#00e676";
+                        isBullish = true;
                     }
                 } else {
                     dashBias.innerText = "NEUTRO";
@@ -266,6 +292,28 @@
                     dashTarget.innerText = `$${currentWhaleBuyAvg.toFixed(2)}`;
                 } else {
                     dashTarget.innerText = "--";
+                }
+
+                // CÁLCULO EN TIEMPO REAL: PUNTO DE ENTRADA (AZUL), TAKE PROFIT (VERDE), STOP LOSS (ROJO)
+                if (currentFootprintRes) {
+                    let entryPrice = lastClosePrice; 
+                    let slPrice = isBullish ? currentFootprintRes * 0.997 : currentFootprintRes * 1.003; 
+                    
+                    let tpPrice;
+                    if (currentMainTarget && ((isBullish && currentMainTarget > entryPrice) || (!isBullish && currentMainTarget < entryPrice))) {
+                        tpPrice = currentMainTarget;
+                    } else {
+                        let risk = Math.abs(entryPrice - slPrice);
+                        tpPrice = isBullish ? entryPrice + (risk * 2) : entryPrice - (risk * 2);
+                    }
+
+                    dashEntry.innerText = `$${entryPrice.toFixed(2)}`;
+                    dashTp.innerText = `$${tpPrice.toFixed(2)}`;
+                    dashSl.innerText = `$${slPrice.toFixed(2)}`;
+                } else {
+                    dashEntry.innerText = "--";
+                    dashTp.innerText = "--";
+                    dashSl.innerText = "--";
                 }
             }
 
@@ -541,7 +589,10 @@
                     const pivots1d = calculatePivots(raw1d, 15, 15);
                     const lineLevels = [];
 
-                    if (pivots1d.pivotHigh) lineLevels.push({ price: pivots1d.pivotHigh.high, color: '#ff1744', title: '[ 1D RESISTENCIA ]', width: 3, style: LightweightCharts.LineStyle.Solid });
+                    if (pivots1d.pivotHigh) {
+                        lineLevels.push({ price: pivots1d.pivotHigh.high, color: '#ff1744', title: '[ 1D RESISTENCIA ]', width: 3, style: LightweightCharts.LineStyle.Solid });
+                        currentMainTarget = pivots1d.pivotHigh.high;
+                    }
                     if (pivots1d.pivotLow) lineLevels.push({ price: pivots1d.pivotLow.low, color: '#00e676', title: '[ 1D SOPORTE ]', width: 3, style: LightweightCharts.LineStyle.Solid });
                     if (pivots4h.pivotHigh) lineLevels.push({ price: pivots4h.pivotHigh.high, color: '#ff9100', title: '[ 4H RESISTENCIA ]', width: 2, style: LightweightCharts.LineStyle.Dashed });
                     if (pivots4h.pivotLow) lineLevels.push({ price: pivots4h.pivotLow.low, color: '#2962ff', title: '[ 4H SOPORTE ]', width: 2, style: LightweightCharts.LineStyle.Dashed });
@@ -573,6 +624,26 @@
                             style: LightweightCharts.LineStyle.Dashed
                         });
                     });
+
+                    // DIBUJO DIRECTO EN EL GRÁFICO: ENTRADA (AZUL), TAKE PROFIT (VERDE), STOP LOSS (ROJO)
+                    if (currentFootprintRes && currentFormattedData.length > 0) {
+                        const lastClose = currentFormattedData[currentFormattedData.length - 1].close;
+                        const isBull = lastClose >= currentFootprintRes;
+                        const entry = lastClose;
+                        const sl = isBull ? currentFootprintRes * 0.997 : currentFootprintRes * 1.003;
+                        
+                        let tp;
+                        if (currentMainTarget && ((isBull && currentMainTarget > entry) || (!isBull && currentMainTarget < entry))) {
+                            tp = currentMainTarget;
+                        } else {
+                            let risk = Math.abs(entry - sl);
+                            tp = isBull ? entry + (risk * 2) : entry - (risk * 2);
+                        }
+
+                        lineLevels.push({ price: entry, color: '#00e5ff', title: '🔵 PUNTO DE ENTRADA', width: 2, style: LightweightCharts.LineStyle.Solid });
+                        lineLevels.push({ price: tp, color: '#00e676', title: '🟢 TAKE PROFIT (OBJETIVO)', width: 2, style: LightweightCharts.LineStyle.Solid });
+                        lineLevels.push({ price: sl, color: '#ff5252', title: '🔴 STOP LOSS (INVALIDACIÓN)', width: 2, style: LightweightCharts.LineStyle.Solid });
+                    }
 
                     if (showMultiFootprint) {
                         const [raw1mFP, raw5mFP, raw15mFP, raw1hFP, raw4hFP] = await Promise.all([
