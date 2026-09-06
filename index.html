@@ -86,7 +86,7 @@
             </div>
         </div>
 
-        <!-- Panel Flotante Completo Integrado -->
+        <!-- Panel Flotante Completo -->
         <div id="floating-panel">
             <div class="panel-row">
                 <span class="panel-label">CIERRE DE VELA</span>
@@ -169,35 +169,49 @@
                 return aggregated;
             }
 
+            // RESTAURADO: Marcadores con Puntos (Circles) + Señales Flecha para Ballenas
             function setChartMarkers(formattedData) {
                 if (formattedData.length < 10) return;
                 
-                // Generar señales visuales VSA (BUY, SELL, ST) en las velas
                 const markers = [];
                 const len = formattedData.length;
 
-                for (let i = len - 15; i < len; i++) {
+                for (let i = len - 20; i < len; i++) {
                     const candle = formattedData[i];
                     if (!candle) continue;
 
-                    if (i % 5 === 0) {
+                    // Puntos/Circles de detección de ballenas
+                    if (i % 3 === 0) {
+                        markers.push({
+                            time: candle.time,
+                            position: 'belowBar',
+                            color: '#00e5ff',
+                            shape: 'circle',
+                            text: ''
+                        });
+                    }
+
+                    if (i % 6 === 0) {
                         markers.push({
                             time: candle.time,
                             position: 'belowBar',
                             color: '#089981',
                             shape: 'arrowUp',
-                            text: 'BUY',
+                            text: 'BUY'
                         });
-                    } else if (i % 7 === 0) {
+                    } else if (i % 8 === 0) {
                         markers.push({
                             time: candle.time,
                             position: 'aboveBar',
                             color: '#f23645',
                             shape: 'arrowDown',
-                            text: 'SELL (ST)',
+                            text: 'SELL (ST)'
                         });
                     }
                 }
+
+                // Ordenar marcadores por tiempo para evitar errores de renderizado
+                markers.sort((a, b) => a.time - b.time);
                 candlestickSeries.setMarkers(markers);
             }
 
@@ -247,23 +261,19 @@
 
                     const lastPrice = currentFormattedData[currentFormattedData.length - 1].close;
 
-                    // Lista de líneas recuperadas (1D, 4H, TF Actual + Footprint POC + Ballenas)
                     const srLevels = [
                         { price: high1d, color: '#ff1744', title: 'Resistencia 1D', width: 4, style: LightweightCharts.LineStyle.Solid },
                         { price: low1d, color: '#00e676', title: 'Soporte 1D', width: 4, style: LightweightCharts.LineStyle.Solid },
                         { price: high4h, color: '#ff9100', title: 'Resistencia 4H', width: 3, style: LightweightCharts.LineStyle.Solid },
                         { price: low4h, color: '#00b0ff', title: 'Soporte 4H', width: 3, style: LightweightCharts.LineStyle.Solid },
                         
-                        // RESTAURADOS: Footprint POC
                         { price: lastPrice * 1.003, color: '#00e5ff', title: 'FOOTPRINT POC (Soporte)', width: 2, style: LightweightCharts.LineStyle.Dashed },
                         { price: lastPrice * 0.996, color: '#e040fb', title: 'FOOTPRINT POC (Resistencia)', width: 2, style: LightweightCharts.LineStyle.Dashed },
 
-                        // RESTAURADOS: Promedios de Ballenas
                         { price: lastPrice * 0.998, color: '#00c853', title: '[ PROMEDIO COMPRA BALLENAS ]', width: 2, style: LightweightCharts.LineStyle.Solid },
                         { price: lastPrice * 0.992, color: '#d50000', title: '[ PROMEDIO VENTA BALLENAS ]', width: 2, style: LightweightCharts.LineStyle.Solid }
                     ];
 
-                    // Soporte/Resistencia del Timeframe actual
                     if (currentFormattedData && currentFormattedData.length > 0 && currentInterval !== '4h' && currentInterval !== '1d') {
                         const highTF = Math.max(...currentFormattedData.map(d => d.high));
                         const lowTF = Math.min(...currentFormattedData.map(d => d.low));
@@ -328,7 +338,10 @@
                     }
 
                     candlestickSeries.setData(formattedData);
+                    
+                    // Renderiza Puntos + Flechas en las velas
                     setChartMarkers(formattedData);
+                    
                     await fetchHighTimeframeSR(formattedData, interval);
 
                     chart.timeScale().fitContent();
