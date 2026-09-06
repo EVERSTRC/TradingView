@@ -26,6 +26,8 @@
         
         @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
 
+        .controls-container { display: flex; align-items: center; gap: 12px; }
+
         select {
             background-color: #2a2e39;
             color: #d1d4dc;
@@ -37,6 +39,29 @@
             cursor: pointer;
         }
         select:hover { border-color: #2962ff; }
+
+        /* BOTÓN MULTI-FOOTPRINT */
+        .btn-fp {
+            background-color: #2a2e39;
+            color: #d1d4dc;
+            border: 1px solid #363c4e;
+            padding: 6px 14px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .btn-fp:hover { border-color: #00e5ff; color: #00e5ff; }
+        .btn-fp.active {
+            background-color: rgba(0, 229, 255, 0.15);
+            border-color: #00e5ff;
+            color: #00e5ff;
+            box-shadow: 0 0 8px rgba(0, 229, 255, 0.3);
+        }
 
         #chart-wrapper { flex: 1; width: 100%; position: relative; }
         #chart { width: 100%; height: 100%; }
@@ -97,19 +122,24 @@
     <div id="main-container">
         <div id="header">
             <span class="title"><span class="live-dot"></span> 🦈 BTC/USD S/R + VSA + FOOTPRINT POC (Binance WebSocket)</span>
-            <div>
-                <label for="timeframe">Temporalidad: </label>
-                <select id="timeframe">
-                    <option value="1s">1 Segundo</option>
-                    <option value="1m">1 Minuto</option>
-                    <option value="3m">3 Minutos</option>
-                    <option value="5m">5 Minutos</option>
-                    <option value="15m" selected>15 Minutos</option>
-                    <option value="1h">1 Hora</option>
-                    <option value="4h">4 Horas</option>
-                    <option value="1d">1 Día</option>
-                    <option value="1w">1 Semana</option>
-                </select>
+            <div class="controls-container">
+                <button id="toggle-multi-fp" class="btn-fp">
+                    <span>👣</span> Multi-Footprint
+                </button>
+                <div>
+                    <label for="timeframe">Temporalidad: </label>
+                    <select id="timeframe">
+                        <option value="1s">1 Segundo</option>
+                        <option value="1m">1 Minuto</option>
+                        <option value="3m">3 Minutos</option>
+                        <option value="5m">5 Minutos</option>
+                        <option value="15m" selected>15 Minutos</option>
+                        <option value="1h">1 Hora</option>
+                        <option value="4h">4 Horas</option>
+                        <option value="1d">1 Día</option>
+                        <option value="1w">1 Semana</option>
+                    </select>
+                </div>
             </div>
         </div>
 
@@ -149,6 +179,7 @@
         document.addEventListener("DOMContentLoaded", function () {
             const statusEl = document.getElementById("status");
             const timeframeSelect = document.getElementById("timeframe");
+            const toggleMultiFpBtn = document.getElementById("toggle-multi-fp");
             const chartContainer = document.getElementById("chart");
 
             const timerDisplay = document.getElementById("timer-display");
@@ -164,6 +195,7 @@
 
             let currentFootprintRes = null;
             let currentWhaleBuyAvg = null;
+            let showMultiFootprint = false;
 
             const chart = LightweightCharts.createChart(chartContainer, {
                 width: chartContainer.clientWidth,
@@ -177,12 +209,12 @@
                 upColor: '#089981', downColor: '#f23645', borderVisible: false, wickUpColor: '#089981', wickDownColor: '#f23645'
             });
 
-            // ACTUALIZACIÓN DEL ANÁLISIS EN TIEMPO REAL (PUNTO 4)
+            // ACTUALIZACIÓN DEL ANÁLISIS EN TIEMPO REAL
             function updateRealtimeAnalysis(lastClosePrice) {
                 if (!lastClosePrice) return;
 
                 if (currentFootprintRes) {
-                    const invalidLevel = currentFootprintRes + 35; // Margen por encima del POC
+                    const invalidLevel = currentFootprintRes + 35;
                     dashInvalid.innerText = `$${invalidLevel.toFixed(2)}`;
 
                     if (lastClosePrice < currentFootprintRes) {
@@ -431,6 +463,7 @@
                         lineLevels.push({ price: avgSell, color: '#ff1744', title: '[ PROMEDIO VENTA BALLENAS ]', width: 3, style: LightweightCharts.LineStyle.Solid });
                     }
 
+                    // FOOTPRINT DE LA TEMPORALIDAD ACTUAL
                     const { footprintPOCs } = calculateFootprintLevels(currentFormattedData);
                     currentFootprintRes = null;
 
@@ -444,6 +477,29 @@
                             style: LightweightCharts.LineStyle.Dashed
                         });
                     });
+
+                    // LÓGICA DE DIBUJO MULTI-FOOTPRINT INCLUYENDO 1M Y 5M
+                    if (showMultiFootprint) {
+                        const [raw1mFP, raw5mFP, raw15mFP, raw1hFP, raw4hFP] = await Promise.all([
+                            fetchKlines('1m', 200),
+                            fetchKlines('5m', 200),
+                            fetchKlines('15m', 200),
+                            fetchKlines('1h', 200),
+                            fetchKlines('4h', 200)
+                        ]);
+
+                        const fp1m = calculateFootprintLevels(raw1mFP).footprintPOCs;
+                        const fp5m = calculateFootprintLevels(raw5mFP).footprintPOCs;
+                        const fp15m = calculateFootprintLevels(raw15mFP).footprintPOCs;
+                        const fp1h = calculateFootprintLevels(raw1hFP).footprintPOCs;
+                        const fp4h = calculateFootprintLevels(raw4hFP).footprintPOCs;
+
+                        fp1m.forEach(p => lineLevels.push({ price: p.price, color: '#ffeb3b', title: '👣 1M FP POC', width: 1, style: LightweightCharts.LineStyle.Dotted }));
+                        fp5m.forEach(p => lineLevels.push({ price: p.price, color: '#ff9800', title: '👣 5M FP POC', width: 1, style: LightweightCharts.LineStyle.Dashed }));
+                        fp15m.forEach(p => lineLevels.push({ price: p.price, color: '#e040fb', title: '👣 15M FP POC', width: 1, style: LightweightCharts.LineStyle.LargeDashed }));
+                        fp1h.forEach(p => lineLevels.push({ price: p.price, color: '#00e5ff', title: '👣 1H FP POC', width: 2, style: LightweightCharts.LineStyle.LargeDashed }));
+                        fp4h.forEach(p => lineLevels.push({ price: p.price, color: '#76ff03', title: '👣 4H FP POC', width: 2, style: LightweightCharts.LineStyle.Solid }));
+                    }
 
                     const stMarkers = getSupertrendMarkers(currentFormattedData, 10, 3.0);
                     const allMarkers = [...whaleMarkers, ...stMarkers].sort((a, b) => a.time - b.time);
@@ -524,6 +580,18 @@
                     statusEl.style.color = "#f23645";
                 }
             }
+
+            // EVENTO DE ACTIVACIÓN Y DESACTIVACIÓN DE MULTI-FOOTPRINT
+            toggleMultiFpBtn.addEventListener("click", async () => {
+                showMultiFootprint = !showMultiFootprint;
+                toggleMultiFpBtn.classList.toggle("active", showMultiFootprint);
+                
+                statusEl.style.display = "block";
+                statusEl.innerText = showMultiFootprint ? "Cargando Multi-Footprint (1M, 5M, 15M, 1H, 4H)..." : "Actualizando gráfico...";
+                
+                await renderSRVisuals(currentCandleData);
+                statusEl.style.display = "none";
+            });
 
             loadChartData(timeframeSelect.value);
 
