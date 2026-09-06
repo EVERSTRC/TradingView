@@ -82,12 +82,13 @@
             display: flex;
             flex-direction: column;
             gap: 8px;
-            min-width: 220px;
+            min-width: 240px;
             box-shadow: 0 4px 16px rgba(0,0,0,0.5);
         }
         .dash-row { display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 600; }
         .dash-label { color: #787b86; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px; }
         .dash-value { font-family: monospace; font-size: 13px; }
+        .dash-subvalue { font-family: monospace; font-size: 11px; opacity: 0.85; margin-left: 4px; }
         .dash-divider { height: 1px; background-color: #2a2e39; margin: 2px 0; }
         
         .progress-bar-bg {
@@ -147,6 +148,7 @@
         </div>
 
         <div id="chart-wrapper">
+            <!-- DASHBOARD COMPLETO EN TIEMPO REAL CON BALLENAS 1D, 1W, 1M -->
             <div id="candle-dashboard">
                 <div class="dash-row">
                     <span class="dash-label">Cierre de Vela</span>
@@ -170,6 +172,31 @@
                     <span class="dash-label">Invalidación</span>
                     <span id="dash-invalid" class="dash-value" style="color: #00e676;">--</span>
                 </div>
+
+                <!-- SECCIÓN DE BALLENAS INTEGRADA -->
+                <div class="dash-divider"></div>
+
+                <div class="dash-row">
+                    <span class="dash-label">Ballenas 1D</span>
+                    <div>
+                        <span id="dash-whale-1d-pct" class="dash-value">--</span>
+                        <span id="dash-whale-1d-net" class="dash-subvalue">(--)</span>
+                    </div>
+                </div>
+                <div class="dash-row">
+                    <span class="dash-label">Ballenas 1W</span>
+                    <div>
+                        <span id="dash-whale-1w-pct" class="dash-value">--</span>
+                        <span id="dash-whale-1w-net" class="dash-subvalue">(--)</span>
+                    </div>
+                </div>
+                <div class="dash-row">
+                    <span class="dash-label">Ballenas 1M</span>
+                    <div>
+                        <span id="dash-whale-1m-pct" class="dash-value">--</span>
+                        <span id="dash-whale-1m-net" class="dash-subvalue">(--)</span>
+                    </div>
+                </div>
             </div>
 
             <div id="chart"></div>
@@ -189,6 +216,14 @@
             const dashBias = document.getElementById("dash-bias");
             const dashTarget = document.getElementById("dash-target");
             const dashInvalid = document.getElementById("dash-invalid");
+
+            // Elementos DOM para Ballenas 1D, 1W, 1M
+            const dashWhale1dPct = document.getElementById("dash-whale-1d-pct");
+            const dashWhale1dNet = document.getElementById("dash-whale-1d-net");
+            const dashWhale1wPct = document.getElementById("dash-whale-1w-pct");
+            const dashWhale1wNet = document.getElementById("dash-whale-1w-net");
+            const dashWhale1mPct = document.getElementById("dash-whale-1m-pct");
+            const dashWhale1mNet = document.getElementById("dash-whale-1m-net");
 
             let activePriceLines = [];
             let wsConnection = null;
@@ -236,6 +271,77 @@
                     dashTarget.innerText = `$${currentWhaleBuyAvg.toFixed(2)}`;
                 } else {
                     dashTarget.innerText = "--";
+                }
+            }
+
+            // CÁLCULO DE VOLUMEN DE BALLENAS (% Y BTC NETO)
+            function calculateWhaleMetrics(candles) {
+                if (!candles || candles.length < 20) return { buyVol: 0, sellVol: 0 };
+
+                let buyVol = 0;
+                let sellVol = 0;
+                let rollingVolumeSum = 0;
+
+                for (let i = 0; i < 20; i++) rollingVolumeSum += (candles[i].volume || 1);
+
+                for (let i = 20; i < candles.length; i++) {
+                    const c = candles[i];
+                    const avgVol = rollingVolumeSum / 20;
+                    rollingVolumeSum += (c.volume || 1) - (candles[i - 20].volume || 1);
+
+                    if ((c.volume || 0) > (avgVol * 2.2)) {
+                        if (c.close > c.open) {
+                            buyVol += c.volume;
+                        } else if (c.close < c.open) {
+                            sellVol += c.volume;
+                        }
+                    }
+                }
+                return { buyVol, sellVol };
+            }
+
+            async function updateWhaleDashboard() {
+                try {
+                    const [raw1d, raw1w, raw1m] = await Promise.all([
+                        fetchKlines('1d', 100),
+                        fetchKlines('1w', 100),
+                        fetchKlines('1M', 60)
+                    ]);
+
+                    const periods = [
+                        { data: raw1d, elPct: dashWhale1dPct, elNet: dashWhale1dNet },
+                        { data: raw1w, elPct: dashWhale1wPct, elNet: dashWhale1wNet },
+                        { data: raw1m, elPct: dashWhale1mPct, elNet: dashWhale1mNet }
+                    ];
+
+                    periods.forEach(({ data, elPct, elNet }) => {
+                        const { buyVol, sellVol } = calculateWhaleMetrics(data);
+                        const total = buyVol + sellVol;
+                        const netBtc = buyVol - sellVol;
+
+                        if (total === 0) {
+                            elPct.innerText = "50%C/50%V";
+                            elPct.style.color = "#d1d4dc";
+                            elNet.innerText = "(0 BTC)";
+                            elNet.style.color = "#d1d4dc";
+                            return;
+                        }
+
+                        const buyPct = Math.round((buyVol / total) * 100);
+                        const sellPct = 100 - buyPct;
+
+                        elPct.innerText = `${buyPct}%C/${sellPct}%V`;
+                        elPct.style.color = buyPct >= 50 ? "#00e676" : "#ff5252";
+
+                        const formattedNet = netBtc >= 0 
+                            ? `(+${Math.round(netBtc)} BTC)` 
+                            : `(${Math.round(netBtc)} BTC)`;
+                        
+                        elNet.innerText = formattedNet;
+                        elNet.style.color = netBtc >= 0 ? "#00e676" : "#ff5252";
+                    });
+                } catch (e) {
+                    console.error("Error actualizando métricas de ballenas:", e);
                 }
             }
 
@@ -571,6 +677,7 @@
                     currentCandleData = await fetchKlines(interval, 400);
                     candlestickSeries.setData(currentCandleData);
                     await renderSRVisuals(currentCandleData);
+                    await updateWhaleDashboard();
                     
                     chart.timeScale().fitContent();
                     connectWebSocket(interval);
