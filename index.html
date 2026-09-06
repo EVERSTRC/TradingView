@@ -235,6 +235,7 @@
                 layout: { background: { type: 'solid', color: '#131722' }, textColor: '#d1d4dc' },
                 grid: { vertLines: { color: 'rgba(42, 46, 57, 0.5)' }, horzLines: { color: 'rgba(42, 46, 57, 0.5)' } },
                 timeScale: { borderColor: 'rgba(197, 203, 206, 0.8)', timeVisible: true, secondsVisible: true },
+                rightPriceScale: { autoScale: true } // AUTO-ESCALADO DE PRECIO ACTIVADO
             });
 
             const candlestickSeries = chart.addCandlestickSeries({
@@ -665,7 +666,10 @@
                     await renderSRVisuals(currentCandleData);
                     await updateWhaleDashboard();
                     
+                    // AUTO-AJUSTE AUTOMÁTICO DE VELAS Y ESCALA AL CAMBIAR DE TEMPORALIDAD
                     chart.timeScale().fitContent();
+                    chart.priceScale('right').applyOptions({ autoScale: true });
+
                     connectWebSocket(interval);
                     startCandleTimer(interval);
 
@@ -684,6 +688,11 @@
                 statusEl.innerText = showMultiFootprint ? "Cargando Multi-Footprint (1M, 5M, 15M, 1H, 4H)..." : "Actualizando gráfico...";
                 
                 await renderSRVisuals(currentCandleData);
+                
+                // AUTO-AJUSTE TRAS RENDERIZAR NIVELES DE MULTI-FOOTPRINT
+                chart.timeScale().fitContent();
+                chart.priceScale('right').applyOptions({ autoScale: true });
+
                 statusEl.style.display = "none";
             });
 
@@ -695,6 +704,7 @@
 
             window.addEventListener("resize", () => {
                 chart.applyOptions({ width: chartContainer.clientWidth, height: chartContainer.clientHeight });
+                chart.timeScale().fitContent();
             });
         });
     </script>
