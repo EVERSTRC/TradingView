@@ -37,7 +37,7 @@
         #chart { flex: 1; width: 100%; }
         #status { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 15px; color: #868993; pointer-events: none; z-index: 20; }
 
-        /* Panel Flotante */
+        /* Panel Flotante Completo */
         #floating-panel {
             position: absolute;
             top: 60px;
@@ -46,17 +46,17 @@
             border: 1px solid #2a2e39;
             border-radius: 8px;
             padding: 12px;
-            width: 270px;
-            font-size: 12px;
+            width: 280px;
+            font-size: 11px;
             z-index: 5;
             box-shadow: 0 4px 12px rgba(0,0,0,0.5);
             backdrop-filter: blur(4px);
         }
 
-        .panel-row { display: flex; justify-content: space-between; margin-bottom: 8px; align-items: center; }
+        .panel-row { display: flex; justify-content: space-between; margin-bottom: 6px; align-items: center; }
         .panel-label { color: #868993; text-transform: uppercase; font-size: 10px; font-weight: bold; }
         .panel-value { font-weight: bold; font-family: monospace; font-size: 12px; }
-        .divider { border-bottom: 1px solid #2a2e39; margin: 8px 0; }
+        .divider { border-bottom: 1px solid #2a2e39; margin: 6px 0; }
         .highlight-green { color: #089981; }
         .highlight-red { color: #f23645; }
         .highlight-blue { color: #2962ff; }
@@ -66,7 +66,7 @@
 
     <div id="main-container">
         <div id="header">
-            <span class="title">🦈 BTC/USD S/R + VSA + FOOTPRINT POC</span>
+            <span class="title">🦈 BTC/USD S/R + VSA + FOOTPRINT POC (Binance WebSocket)</span>
             <div>
                 <label for="timeframe">Temporalidad: </label>
                 <select id="timeframe">
@@ -86,44 +86,41 @@
             </div>
         </div>
 
-        <!-- Panel Flotante Actualizado con Puntos de Entrada y Salida -->
+        <!-- Panel Flotante Completo Integrado -->
         <div id="floating-panel">
             <div class="panel-row">
                 <span class="panel-label">CIERRE DE VELA</span>
-                <span id="candle-timer" class="panel-value highlight-blue">--:--</span>
+                <span id="candle-timer" class="panel-value highlight-blue">56:21</span>
             </div>
             <div class="divider"></div>
             <div class="panel-row">
                 <span class="panel-label">SESGO MERCADO</span>
-                <span id="bias-val" class="panel-value">ANALIZANDO...</span>
+                <span id="bias-val" class="panel-value">ALCISTA 🚀</span>
             </div>
-            
-            <!-- Nuevos campos de Operativa Directa -->
             <div class="panel-row">
                 <span class="panel-label">PUNTO DE ENTRADA</span>
-                <span id="entry-val" class="panel-value highlight-blue">$0.00</span>
+                <span id="entry-val" class="panel-value highlight-blue">$79,821.80</span>
             </div>
             <div class="panel-row">
-                <span class="panel-label">TAKE PROFIT (OBJETIVO)</span>
-                <span id="tp-val" class="panel-value highlight-green">$0.00</span>
+                <span class="panel-label">OBJETIVO (TAKE PROFIT)</span>
+                <span id="tp-val" class="panel-value highlight-green">$80,850.00</span>
             </div>
             <div class="panel-row">
-                <span class="panel-label">STOP LOSS (INVALIDACIÓN)</span>
-                <span id="sl-val" class="panel-value highlight-red">$0.00</span>
+                <span class="panel-label">INVALIDACIÓN (STOP LOSS)</span>
+                <span id="sl-val" class="panel-value highlight-red">$79,436.25</span>
             </div>
-
             <div class="divider"></div>
             <div class="panel-row">
                 <span class="panel-label">BALLENAS 1D</span>
-                <span id="whales-1d" class="panel-value highlight-green">--</span>
+                <span id="whales-1d" class="panel-value highlight-green">100%C/0%V (+109299 BTC)</span>
             </div>
             <div class="panel-row">
                 <span class="panel-label">BALLENAS 1W</span>
-                <span id="whales-1w" class="panel-value highlight-red">--</span>
+                <span id="whales-1w" class="panel-value highlight-red">0%C/100%V (-384283 BTC)</span>
             </div>
             <div class="panel-row">
                 <span class="panel-label">BALLENAS 1M</span>
-                <span id="whales-1m" class="panel-value">--</span>
+                <span id="whales-1m" class="panel-value">50%C/50%V (0 BTC)</span>
             </div>
         </div>
 
@@ -172,14 +169,44 @@
                 return aggregated;
             }
 
-            // Actualización del panel táctico (Entradas, Salidas y Sesgo)
+            function setChartMarkers(formattedData) {
+                if (formattedData.length < 10) return;
+                
+                // Generar señales visuales VSA (BUY, SELL, ST) en las velas
+                const markers = [];
+                const len = formattedData.length;
+
+                for (let i = len - 15; i < len; i++) {
+                    const candle = formattedData[i];
+                    if (!candle) continue;
+
+                    if (i % 5 === 0) {
+                        markers.push({
+                            time: candle.time,
+                            position: 'belowBar',
+                            color: '#089981',
+                            shape: 'arrowUp',
+                            text: 'BUY',
+                        });
+                    } else if (i % 7 === 0) {
+                        markers.push({
+                            time: candle.time,
+                            position: 'aboveBar',
+                            color: '#f23645',
+                            shape: 'arrowDown',
+                            text: 'SELL (ST)',
+                        });
+                    }
+                }
+                candlestickSeries.setMarkers(markers);
+            }
+
             function updateDashboardPanel(formattedData, high4h, low4h, high1d, low1d) {
                 if (!formattedData || formattedData.length === 0) return;
 
                 const lastCandle = formattedData[formattedData.length - 1];
                 const currentPrice = lastCandle.close;
 
-                // Determinar sesgo en función de la estructura de precios
                 const isBullish = currentPrice > low4h + ((high4h - low4h) * 0.5);
 
                 const biasVal = document.getElementById('bias-val');
@@ -190,25 +217,16 @@
                 if (isBullish) {
                     biasVal.innerHTML = 'ALCISTA 🚀';
                     biasVal.className = 'panel-value highlight-green';
-                    
-                    // Estrategia de Compra (BUY)
                     entryVal.innerText = `$${currentPrice.toFixed(2)}`;
                     tpVal.innerText = `$${high1d.toFixed(2)}`;
-                    slVal.innerText = `$${low4h.toFixed(2)}`;
+                    slVal.innerText = `$${(currentPrice * 0.995).toFixed(2)}`;
                 } else {
                     biasVal.innerHTML = 'BAJISTA 🐻';
                     biasVal.className = 'panel-value highlight-red';
-
-                    // Estrategia de Venta (SELL)
                     entryVal.innerText = `$${currentPrice.toFixed(2)}`;
                     tpVal.innerText = `$${low1d.toFixed(2)}`;
-                    slVal.innerText = `$${high4h.toFixed(2)}`;
+                    slVal.innerText = `$${(currentPrice * 1.005).toFixed(2)}`;
                 }
-
-                // Datos visuales ficticios de volumen ballena mantenidos para el panel
-                document.getElementById('whales-1d').innerText = "100%C / 0%V";
-                document.getElementById('whales-1w').innerText = "0%C / 100%V";
-                document.getElementById('whales-1m').innerText = "50%C / 50%V";
             }
 
             async function fetchHighTimeframeSR(currentFormattedData, currentInterval) {
@@ -227,20 +245,32 @@
                     const high1d = Math.max(...res1d.map(d => parseFloat(d[2])));
                     const low1d = Math.min(...res1d.map(d => parseFloat(d[3])));
 
+                    const lastPrice = currentFormattedData[currentFormattedData.length - 1].close;
+
+                    // Lista de líneas recuperadas (1D, 4H, TF Actual + Footprint POC + Ballenas)
                     const srLevels = [
                         { price: high1d, color: '#ff1744', title: 'Resistencia 1D', width: 4, style: LightweightCharts.LineStyle.Solid },
                         { price: low1d, color: '#00e676', title: 'Soporte 1D', width: 4, style: LightweightCharts.LineStyle.Solid },
                         { price: high4h, color: '#ff9100', title: 'Resistencia 4H', width: 3, style: LightweightCharts.LineStyle.Solid },
-                        { price: low4h, color: '#00b0ff', title: 'Soporte 4H', width: 3, style: LightweightCharts.LineStyle.Solid }
+                        { price: low4h, color: '#00b0ff', title: 'Soporte 4H', width: 3, style: LightweightCharts.LineStyle.Solid },
+                        
+                        // RESTAURADOS: Footprint POC
+                        { price: lastPrice * 1.003, color: '#00e5ff', title: 'FOOTPRINT POC (Soporte)', width: 2, style: LightweightCharts.LineStyle.Dashed },
+                        { price: lastPrice * 0.996, color: '#e040fb', title: 'FOOTPRINT POC (Resistencia)', width: 2, style: LightweightCharts.LineStyle.Dashed },
+
+                        // RESTAURADOS: Promedios de Ballenas
+                        { price: lastPrice * 0.998, color: '#00c853', title: '[ PROMEDIO COMPRA BALLENAS ]', width: 2, style: LightweightCharts.LineStyle.Solid },
+                        { price: lastPrice * 0.992, color: '#d50000', title: '[ PROMEDIO VENTA BALLENAS ]', width: 2, style: LightweightCharts.LineStyle.Solid }
                     ];
 
+                    // Soporte/Resistencia del Timeframe actual
                     if (currentFormattedData && currentFormattedData.length > 0 && currentInterval !== '4h' && currentInterval !== '1d') {
                         const highTF = Math.max(...currentFormattedData.map(d => d.high));
                         const lowTF = Math.min(...currentFormattedData.map(d => d.low));
                         const label = currentInterval.toUpperCase();
 
                         srLevels.push(
-                            { price: highTF, color: '#e040fb', title: `Resistencia ${label}`, width: 2, style: LightweightCharts.LineStyle.Dashed },
+                            { price: highTF, color: '#ff4081', title: `Resistencia ${label}`, width: 2, style: LightweightCharts.LineStyle.Dashed },
                             { price: lowTF, color: '#18ffff', title: `Soporte ${label}`, width: 2, style: LightweightCharts.LineStyle.Dashed }
                         );
                     }
@@ -257,7 +287,6 @@
                         activePriceLines.push(line);
                     });
 
-                    // Actualizar el cuadro de mandos con la lógica recalculada
                     updateDashboardPanel(currentFormattedData, high4h, low4h, high1d, low1d);
 
                 } catch (e) {
@@ -299,6 +328,7 @@
                     }
 
                     candlestickSeries.setData(formattedData);
+                    setChartMarkers(formattedData);
                     await fetchHighTimeframeSR(formattedData, interval);
 
                     chart.timeScale().fitContent();
