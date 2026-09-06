@@ -42,7 +42,6 @@
         }
         select:hover { border-color: #2962ff; }
 
-        /* BOTÓN MULTI-FOOTPRINT */
         .btn-fp {
             background-color: #2a2e39;
             color: #d1d4dc;
@@ -68,7 +67,6 @@
         #chart-wrapper { flex: 1; width: 100%; position: relative; }
         #chart { width: 100%; height: 100%; }
 
-        /* DASHBOARD FLOTANTE EN TIEMPO REAL */
         #candle-dashboard {
             position: absolute;
             top: 16px;
@@ -148,7 +146,6 @@
         </div>
 
         <div id="chart-wrapper">
-            <!-- DASHBOARD COMPLETO EN TIEMPO REAL CON BALLENAS 1D, 1W, 1M -->
             <div id="candle-dashboard">
                 <div class="dash-row">
                     <span class="dash-label">Cierre de Vela</span>
@@ -173,7 +170,6 @@
                     <span id="dash-invalid" class="dash-value" style="color: #00e676;">--</span>
                 </div>
 
-                <!-- SECCIÓN DE BALLENAS INTEGRADA -->
                 <div class="dash-divider"></div>
 
                 <div class="dash-row">
@@ -217,7 +213,6 @@
             const dashTarget = document.getElementById("dash-target");
             const dashInvalid = document.getElementById("dash-invalid");
 
-            // Elementos DOM para Ballenas 1D, 1W, 1M
             const dashWhale1dPct = document.getElementById("dash-whale-1d-pct");
             const dashWhale1dNet = document.getElementById("dash-whale-1d-net");
             const dashWhale1wPct = document.getElementById("dash-whale-1w-pct");
@@ -246,7 +241,6 @@
                 upColor: '#089981', downColor: '#f23645', borderVisible: false, wickUpColor: '#089981', wickDownColor: '#f23645'
             });
 
-            // ACTUALIZACIÓN DEL ANÁLISIS EN TIEMPO REAL
             function updateRealtimeAnalysis(lastClosePrice) {
                 if (!lastClosePrice) return;
 
@@ -274,7 +268,6 @@
                 }
             }
 
-            // CÁLCULO DE VOLUMEN DE BALLENAS (% Y BTC NETO)
             function calculateWhaleMetrics(candles) {
                 if (!candles || candles.length < 20) return { buyVol: 0, sellVol: 0 };
 
@@ -345,7 +338,6 @@
                 }
             }
 
-            // TEMPORIZADOR DE CIERRE DE VELA
             function getIntervalInSeconds(interval) {
                 const unit = interval.slice(-1);
                 const val = parseInt(interval);
@@ -388,7 +380,6 @@
                 timerInterval = setInterval(updateTimer, 1000);
             }
 
-            // CALCULADORA FOOTPRINT / IMBALANCE POC
             function calculateFootprintLevels(candles) {
                 if (!candles || candles.length < 20) return { footprintPOCs: [] };
 
@@ -416,7 +407,6 @@
                 return { footprintPOCs: footprintPOCs.slice(-2) };
             }
 
-            // SUPERTREND
             function getSupertrendMarkers(candles, period = 10, multiplier = 3.0) {
                 if (!candles || candles.length < period + 1) return [];
 
@@ -480,7 +470,6 @@
                 return stMarkers;
             }
 
-            // PIVOTS
             function calculatePivots(candles, leftBars = 15, rightBars = 15) {
                 let lastPivotHigh = null, lastPivotLow = null;
                 for (let i = leftBars; i < candles.length - rightBars; i++) {
@@ -496,7 +485,6 @@
                 return { pivotHigh: lastPivotHigh, pivotLow: lastPivotLow };
             }
 
-            // VSA / WHALE DETECTOR
             function processWhaleData(candles) {
                 const markers = [];
                 if (!candles || candles.length < 20) return { markers, buyPrices: [], sellPrices: [] };
@@ -571,7 +559,6 @@
                         lineLevels.push({ price: avgSell, color: '#ff1744', title: '[ PROMEDIO VENTA BALLENAS ]', width: 3, style: LightweightCharts.LineStyle.Solid });
                     }
 
-                    // FOOTPRINT DE LA TEMPORALIDAD ACTUAL
                     const { footprintPOCs } = calculateFootprintLevels(currentFormattedData);
                     currentFootprintRes = null;
 
@@ -586,7 +573,6 @@
                         });
                     });
 
-                    // LÓGICA DE DIBUJO MULTI-FOOTPRINT INCLUYENDO 1M Y 5M
                     if (showMultiFootprint) {
                         const [raw1mFP, raw5mFP, raw15mFP, raw1hFP, raw4hFP] = await Promise.all([
                             fetchKlines('1m', 200),
@@ -690,7 +676,6 @@
                 }
             }
 
-            // EVENTO DE ACTIVACIÓN Y DESACTIVACIÓN DE MULTI-FOOTPRINT
             toggleMultiFpBtn.addEventListener("click", async () => {
                 showMultiFootprint = !showMultiFootprint;
                 toggleMultiFpBtn.classList.toggle("active", showMultiFootprint);
