@@ -527,30 +527,6 @@
                 }));
             }
 
-            // UNIFICACIÓN Y FUSIÓN DE MARCADORES PARA EVITAR COLISIONES
-            function mergeMarkers(whaleMarkers, stMarkers) {
-                const map = new Map();
-
-                whaleMarkers.forEach(m => {
-                    map.set(`${m.time}_whale`, m);
-                });
-
-                stMarkers.forEach(m => {
-                    const key = `${m.time}_whale`;
-                    if (map.has(key)) {
-                        // Si coinciden en la misma vela, se combinan con offset visual
-                        const existing = map.get(key);
-                        existing.text = `${existing.text} | ${m.text}`;
-                        existing.shape = 'square';
-                        existing.color = '#e040fb';
-                    } else {
-                        map.set(`${m.time}_st`, m);
-                    }
-                });
-
-                return Array.from(map.values()).sort((a, b) => a.time - b.time);
-            }
-
             async function renderSRVisuals(currentFormattedData) {
                 try {
                     activePriceLines.forEach(line => candlestickSeries.removePriceLine(line));
@@ -621,10 +597,8 @@
                     }
 
                     const stMarkers = getSupertrendMarkers(currentFormattedData, 10, 3.0);
-                    
-                    // APLICACIÓN DE FUSIÓN CORRECTA DE MARCADORES (PUNTOS Y FLECHAS RE-ACTIVADOS)
-                    const unifiedMarkers = mergeMarkers(whaleMarkers, stMarkers);
-                    candlestickSeries.setMarkers(unifiedMarkers);
+                    const allMarkers = [...whaleMarkers, ...stMarkers].sort((a, b) => a.time - b.time);
+                    candlestickSeries.setMarkers(allMarkers);
 
                     lineLevels.forEach(level => {
                         const line = candlestickSeries.createPriceLine({
