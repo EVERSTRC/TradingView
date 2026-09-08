@@ -28,7 +28,7 @@
         
         @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
 
-        .controls-container { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+        .controls-container { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
         select {
             background-color: #2a2e39;
@@ -46,7 +46,7 @@
             background-color: #2a2e39;
             color: #d1d4dc;
             border: 1px solid #363c4e;
-            padding: 6px 14px;
+            padding: 6px 12px;
             border-radius: 4px;
             font-size: 12px;
             font-weight: 600;
@@ -54,7 +54,8 @@
             transition: all 0.2s ease;
             display: flex;
             align-items: center;
-            gap: 6px;
+            gap: 4px;
+            user-select: none;
         }
         .btn-fp:hover { border-color: #00e5ff; color: #00e5ff; }
         .btn-fp.active {
@@ -62,6 +63,13 @@
             border-color: #00e5ff;
             color: #00e5ff;
             box-shadow: 0 0 8px rgba(0, 229, 255, 0.3);
+        }
+
+        /* Estilos específicos cuando un botón de capa está inactivo */
+        .btn-fp.inactive {
+            opacity: 0.5;
+            border-color: #2a2e39;
+            color: #787b86;
         }
 
         #chart-wrapper { flex: 1; width: 100%; position: relative; }
@@ -123,13 +131,17 @@
 
     <div id="main-container">
         <div id="header">
-            <span class="title"><span class="live-dot"></span> 🦈 BTC/USD S/R + VSA + FOOTPRINT POC (Binance WebSocket)</span>
+            <span class="title"><span class="live-dot"></span> 🦈 BTC/USD S/R + VSA + FOOTPRINT POC</span>
+            
             <div class="controls-container">
-                <button id="toggle-multi-fp" class="btn-fp">
-                    <span>👣</span> Multi-Footprint
-                </button>
+                <!-- CONTROLES DE CAPAS DE INDICADORES -->
+                <button id="toggle-pivots" class="btn-fp active">📍 Pivotes S/R</button>
+                <button id="toggle-vsa" class="btn-fp active">🐋 VSA Ballenas</button>
+                <button id="toggle-supertrend" class="btn-fp active">📈 Supertrend</button>
+                <button id="toggle-footprint" class="btn-fp active">👣 Footprint POC</button>
+                <button id="toggle-multi-fp" class="btn-fp">🌐 Multi-FP</button>
+                
                 <div>
-                    <label for="timeframe">Temporalidad: </label>
                     <select id="timeframe">
                         <option value="1s">1 Segundo</option>
                         <option value="1m">1 Minuto</option>
@@ -162,7 +174,6 @@
                     <span id="dash-bias" class="dash-value">--</span>
                 </div>
                 
-                <!-- SECCIÓN PERSONALIZADA: ENTRADA, TP Y SL -->
                 <div class="dash-row">
                     <span class="dash-label">Punto de Entrada</span>
                     <span id="dash-entry" class="dash-value" style="color: #00e5ff;">--</span>
@@ -221,8 +232,21 @@
         document.addEventListener("DOMContentLoaded", function () {
             const statusEl = document.getElementById("status");
             const timeframeSelect = document.getElementById("timeframe");
-            const toggleMultiFpBtn = document.getElementById("toggle-multi-fp");
             const chartContainer = document.getElementById("chart");
+
+            // Botones de Capas de Indicadores
+            const btnPivots = document.getElementById("toggle-pivots");
+            const btnVsa = document.getElementById("toggle-vsa");
+            const btnSupertrend = document.getElementById("toggle-supertrend");
+            const btnFootprint = document.getElementById("toggle-footprint");
+            const btnMultiFp = document.getElementById("toggle-multi-fp");
+
+            // Variables de Estado para Visibilidad de Capas
+            let showPivots = true;
+            let showVsa = true;
+            let showSupertrend = true;
+            let showFootprint = true;
+            let showMultiFootprint = false;
 
             const timerDisplay = document.getElementById("timer-display");
             const timerProgress = document.getElementById("timer-progress");
@@ -249,7 +273,6 @@
             let currentFootprintRes = null;
             let currentWhaleBuyAvg = null;
             let currentMainTarget = null;
-            let showMultiFootprint = false;
 
             const chart = LightweightCharts.createChart(chartContainer, {
                 width: chartContainer.clientWidth,
@@ -269,7 +292,7 @@
 
                 let isBullish = false;
 
-                if (currentFootprintRes) {
+                if (currentFootprintRes && showFootprint) {
                     const invalidLevel = currentFootprintRes + 35;
                     dashInvalid.innerText = `$${invalidLevel.toFixed(2)}`;
 
@@ -288,19 +311,18 @@
                     dashInvalid.innerText = "--";
                 }
 
-                if (currentWhaleBuyAvg) {
+                if (currentWhaleBuyAvg && showVsa) {
                     dashTarget.innerText = `$${currentWhaleBuyAvg.toFixed(2)}`;
                 } else {
                     dashTarget.innerText = "--";
                 }
 
-                // CÁLCULO EN TIEMPO REAL: PUNTO DE ENTRADA (AZUL), TAKE PROFIT (VERDE), STOP LOSS (ROJO)
-                if (currentFootprintRes) {
+                if (currentFootprintRes && showFootprint) {
                     let entryPrice = lastClosePrice; 
                     let slPrice = isBullish ? currentFootprintRes * 0.997 : currentFootprintRes * 1.003; 
                     
                     let tpPrice;
-                    if (currentMainTarget && ((isBullish && currentMainTarget > entryPrice) || (!isBullish && currentMainTarget < entryPrice))) {
+                    if (currentMainTarget && showPivots && ((isBullish && currentMainTarget > entryPrice) || (!isBullish && currentMainTarget < entryPrice))) {
                         tpPrice = currentMainTarget;
                     } else {
                         let risk = Math.abs(entryPrice - slPrice);
@@ -580,60 +602,71 @@
                     activePriceLines.forEach(line => candlestickSeries.removePriceLine(line));
                     activePriceLines = [];
 
-                    const [raw4h, raw1d] = await Promise.all([
-                        fetchKlines('4h', 200),
-                        fetchKlines('1d', 200)
-                    ]);
-
-                    const pivots4h = calculatePivots(raw4h, 15, 15);
-                    const pivots1d = calculatePivots(raw1d, 15, 15);
                     const lineLevels = [];
-
-                    if (pivots1d.pivotHigh) {
-                        lineLevels.push({ price: pivots1d.pivotHigh.high, color: '#ff1744', title: '[ 1D RESISTENCIA ]', width: 3, style: LightweightCharts.LineStyle.Solid });
-                        currentMainTarget = pivots1d.pivotHigh.high;
-                    }
-                    if (pivots1d.pivotLow) lineLevels.push({ price: pivots1d.pivotLow.low, color: '#00e676', title: '[ 1D SOPORTE ]', width: 3, style: LightweightCharts.LineStyle.Solid });
-                    if (pivots4h.pivotHigh) lineLevels.push({ price: pivots4h.pivotHigh.high, color: '#ff9100', title: '[ 4H RESISTENCIA ]', width: 2, style: LightweightCharts.LineStyle.Dashed });
-                    if (pivots4h.pivotLow) lineLevels.push({ price: pivots4h.pivotLow.low, color: '#2962ff', title: '[ 4H SOPORTE ]', width: 2, style: LightweightCharts.LineStyle.Dashed });
-
-                    const { markers: whaleMarkers, buyPrices, sellPrices } = processWhaleData(currentFormattedData);
-
-                    if (buyPrices.length > 0) {
-                        currentWhaleBuyAvg = buyPrices.reduce((a, b) => a + b, 0) / buyPrices.length;
-                        lineLevels.push({ price: currentWhaleBuyAvg, color: '#00e676', title: '[ PROMEDIO COMPRA BALLENAS ]', width: 3, style: LightweightCharts.LineStyle.Solid });
-                    } else {
-                        currentWhaleBuyAvg = null;
-                    }
-
-                    if (sellPrices.length > 0) {
-                        const avgSell = sellPrices.reduce((a, b) => a + b, 0) / sellPrices.length;
-                        lineLevels.push({ price: avgSell, color: '#ff1744', title: '[ PROMEDIO VENTA BALLENAS ]', width: 3, style: LightweightCharts.LineStyle.Solid });
-                    }
-
-                    const { footprintPOCs } = calculateFootprintLevels(currentFormattedData);
+                    currentMainTarget = null;
+                    currentWhaleBuyAvg = null;
                     currentFootprintRes = null;
 
-                    footprintPOCs.forEach(poc => {
-                        if (!poc.isBullish) currentFootprintRes = poc.price;
-                        lineLevels.push({
-                            price: poc.price,
-                            color: poc.isBullish ? '#00f0ff' : '#ff007f',
-                            title: poc.isBullish ? '👣 FOOTPRINT POC (Soporte)' : '👣 FOOTPRINT POC (Resistencia)',
-                            width: 2,
-                            style: LightweightCharts.LineStyle.Dashed
-                        });
-                    });
+                    // 1. CAPA: PIVOTES (4H Y 1D)
+                    if (showPivots) {
+                        const [raw4h, raw1d] = await Promise.all([
+                            fetchKlines('4h', 200),
+                            fetchKlines('1d', 200)
+                        ]);
 
-                    // DIBUJO DIRECTO EN EL GRÁFICO: ENTRADA (AZUL), TAKE PROFIT (VERDE), STOP LOSS (ROJO)
-                    if (currentFootprintRes && currentFormattedData.length > 0) {
+                        const pivots4h = calculatePivots(raw4h, 15, 15);
+                        const pivots1d = calculatePivots(raw1d, 15, 15);
+
+                        if (pivots1d.pivotHigh) {
+                            lineLevels.push({ price: pivots1d.pivotHigh.high, color: '#ff1744', title: '[ 1D RESISTENCIA ]', width: 3, style: LightweightCharts.LineStyle.Solid });
+                            currentMainTarget = pivots1d.pivotHigh.high;
+                        }
+                        if (pivots1d.pivotLow) lineLevels.push({ price: pivots1d.pivotLow.low, color: '#00e676', title: '[ 1D SOPORTE ]', width: 3, style: LightweightCharts.LineStyle.Solid });
+                        if (pivots4h.pivotHigh) lineLevels.push({ price: pivots4h.pivotHigh.high, color: '#ff9100', title: '[ 4H RESISTENCIA ]', width: 2, style: LightweightCharts.LineStyle.Dashed });
+                        if (pivots4h.pivotLow) lineLevels.push({ price: pivots4h.pivotLow.low, color: '#2962ff', title: '[ 4H SOPORTE ]', width: 2, style: LightweightCharts.LineStyle.Dashed });
+                    }
+
+                    // 2. CAPA: VSA / BALLENAS
+                    let whaleMarkers = [];
+                    if (showVsa) {
+                        const vsaResult = processWhaleData(currentFormattedData);
+                        whaleMarkers = vsaResult.markers;
+                        
+                        if (vsaResult.buyPrices.length > 0) {
+                            currentWhaleBuyAvg = vsaResult.buyPrices.reduce((a, b) => a + b, 0) / vsaResult.buyPrices.length;
+                            lineLevels.push({ price: currentWhaleBuyAvg, color: '#00e676', title: '[ PROMEDIO COMPRA BALLENAS ]', width: 3, style: LightweightCharts.LineStyle.Solid });
+                        }
+
+                        if (vsaResult.sellPrices.length > 0) {
+                            const avgSell = vsaResult.sellPrices.reduce((a, b) => a + b, 0) / vsaResult.sellPrices.length;
+                            lineLevels.push({ price: avgSell, color: '#ff1744', title: '[ PROMEDIO VENTA BALLENAS ]', width: 3, style: LightweightCharts.LineStyle.Solid });
+                        }
+                    }
+
+                    // 3. CAPA: FOOTPRINT POC
+                    if (showFootprint) {
+                        const { footprintPOCs } = calculateFootprintLevels(currentFormattedData);
+                        footprintPOCs.forEach(poc => {
+                            if (!poc.isBullish) currentFootprintRes = poc.price;
+                            lineLevels.push({
+                                price: poc.price,
+                                color: poc.isBullish ? '#00f0ff' : '#ff007f',
+                                title: poc.isBullish ? '👣 FOOTPRINT POC (Soporte)' : '👣 FOOTPRINT POC (Resistencia)',
+                                width: 2,
+                                style: LightweightCharts.LineStyle.Dashed
+                            });
+                        });
+                    }
+
+                    // DIBUJO DE ENTRADA / TP / SL
+                    if (currentFootprintRes && showFootprint && currentFormattedData.length > 0) {
                         const lastClose = currentFormattedData[currentFormattedData.length - 1].close;
                         const isBull = lastClose >= currentFootprintRes;
                         const entry = lastClose;
                         const sl = isBull ? currentFootprintRes * 0.997 : currentFootprintRes * 1.003;
                         
                         let tp;
-                        if (currentMainTarget && ((isBull && currentMainTarget > entry) || (!isBull && currentMainTarget < entry))) {
+                        if (currentMainTarget && showPivots && ((isBull && currentMainTarget > entry) || (!isBull && currentMainTarget < entry))) {
                             tp = currentMainTarget;
                         } else {
                             let risk = Math.abs(entry - sl);
@@ -645,6 +678,7 @@
                         lineLevels.push({ price: sl, color: '#ff5252', title: '🔴 STOP LOSS (INVALIDACIÓN)', width: 2, style: LightweightCharts.LineStyle.Solid });
                     }
 
+                    // MULTI-FOOTPRINT
                     if (showMultiFootprint) {
                         const [raw1mFP, raw5mFP, raw15mFP, raw1hFP, raw4hFP] = await Promise.all([
                             fetchKlines('1m', 200),
@@ -667,10 +701,17 @@
                         fp4h.forEach(p => lineLevels.push({ price: p.price, color: '#76ff03', title: '👣 4H FP POC', width: 2, style: LightweightCharts.LineStyle.Solid }));
                     }
 
-                    const stMarkers = getSupertrendMarkers(currentFormattedData, 10, 3.0);
+                    // 4. CAPA: SUPERTREND
+                    let stMarkers = [];
+                    if (showSupertrend) {
+                        stMarkers = getSupertrendMarkers(currentFormattedData, 10, 3.0);
+                    }
+
+                    // Combinar marcadores
                     const allMarkers = [...whaleMarkers, ...stMarkers].sort((a, b) => a.time - b.time);
                     candlestickSeries.setMarkers(allMarkers);
 
+                    // Renderizar líneas
                     lineLevels.forEach(level => {
                         const line = candlestickSeries.createPriceLine({
                             price: level.price, color: level.color, lineWidth: level.width, lineStyle: level.style, axisLabelVisible: true, title: level.title
@@ -750,9 +791,26 @@
                 }
             }
 
-            toggleMultiFpBtn.addEventListener("click", async () => {
+            // --- EVENT LISTENERS PARA CONTROLAR CAPAS ---
+            
+            function setupToggle(buttonEl, getState, setState) {
+                buttonEl.addEventListener("click", async () => {
+                    const newState = !getState();
+                    setState(newState);
+                    buttonEl.classList.toggle("active", newState);
+                    buttonEl.classList.toggle("inactive", !newState);
+                    await renderSRVisuals(currentCandleData);
+                });
+            }
+
+            setupToggle(btnPivots, () => showPivots, val => showPivots = val);
+            setupToggle(btnVsa, () => showVsa, val => showVsa = val);
+            setupToggle(btnSupertrend, () => showSupertrend, val => showSupertrend = val);
+            setupToggle(btnFootprint, () => showFootprint, val => showFootprint = val);
+
+            btnMultiFp.addEventListener("click", async () => {
                 showMultiFootprint = !showMultiFootprint;
-                toggleMultiFpBtn.classList.toggle("active", showMultiFootprint);
+                btnMultiFp.classList.toggle("active", showMultiFootprint);
                 
                 statusEl.style.display = "block";
                 statusEl.innerText = showMultiFootprint ? "Cargando Multi-Footprint (1M, 5M, 15M, 1H, 4H)..." : "Actualizando gráfico...";
