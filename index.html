@@ -141,7 +141,8 @@
             <span class="title"><span class="live-dot"></span> 🦈 BTC/USD S/R + VSA + FOOTPRINT POC</span>
             
             <div class="controls-container">
-                <button id="toggle-pivots" class="btn-fp active">📍 Pivotes S/R</button>
+                <button id="toggle-pivots" class="btn-fp active">📍 Pivotes Multi-TF</button>
+                <button id="toggle-pivots-tf" class="btn-fp active">📍 Pivotes Dinámicos TF</button>
                 <button id="toggle-vsa" class="btn-fp active">🐋 VSA Ballenas</button>
                 <button id="toggle-supertrend" class="btn-fp active">📈 Supertrend</button>
                 <button id="toggle-footprint" class="btn-fp active">👣 Footprint POC</button>
@@ -199,12 +200,25 @@
                     </div>
                 </div>
 
-                <!-- MÓDULO PIVOTES S/R (Objetivo Abajo/Arriba) -->
+                <!-- MÓDULO PIVOTES MULTI-TF (Objetivo Abajo/Arriba) -->
                 <div id="dash-module-pivots" class="dash-module">
                     <div class="dash-divider"></div>
                     <div class="dash-row">
-                        <span class="dash-label">Objetivo S/R</span>
+                        <span class="dash-label">Objetivo Multi-TF</span>
                         <span id="dash-target" class="dash-value" style="color: #ff9100;">--</span>
+                    </div>
+                </div>
+
+                <!-- MÓDULO PIVOTES DINÁMICOS TF ACTUAL -->
+                <div id="dash-module-pivots-tf" class="dash-module">
+                    <div class="dash-divider"></div>
+                    <div class="dash-row">
+                        <span id="dash-pivot-tf-res-label" class="dash-label">Resistencia TF</span>
+                        <span id="dash-pivot-tf-res" class="dash-value" style="color: #ff5252;">--</span>
+                    </div>
+                    <div class="dash-row">
+                        <span id="dash-pivot-tf-sup-label" class="dash-label">Soporte TF</span>
+                        <span id="dash-pivot-tf-sup" class="dash-value" style="color: #00e676;">--</span>
                     </div>
                 </div>
 
@@ -248,6 +262,7 @@
 
             // Botones de Capas
             const btnPivots = document.getElementById("toggle-pivots");
+            const btnPivotsTf = document.getElementById("toggle-pivots-tf");
             const btnVsa = document.getElementById("toggle-vsa");
             const btnSupertrend = document.getElementById("toggle-supertrend");
             const btnFootprint = document.getElementById("toggle-footprint");
@@ -256,10 +271,12 @@
             // Módulos Visibles del Dashboard
             const modFootprint = document.getElementById("dash-module-footprint");
             const modPivots = document.getElementById("dash-module-pivots");
+            const modPivotsTf = document.getElementById("dash-module-pivots-tf");
             const modVsa = document.getElementById("dash-module-vsa");
 
             // Estados de Capas
             let showPivots = true;
+            let showPivotsTf = true;
             let showVsa = true;
             let showSupertrend = true;
             let showFootprint = true;
@@ -270,6 +287,11 @@
             const dashBias = document.getElementById("dash-bias");
             const dashTarget = document.getElementById("dash-target");
             const dashInvalid = document.getElementById("dash-invalid");
+
+            const dashPivotTfResLabel = document.getElementById("dash-pivot-tf-res-label");
+            const dashPivotTfSupLabel = document.getElementById("dash-pivot-tf-sup-label");
+            const dashPivotTfRes = document.getElementById("dash-pivot-tf-res");
+            const dashPivotTfSup = document.getElementById("dash-pivot-tf-sup");
 
             const dashEntry = document.getElementById("dash-entry");
             const dashTp = document.getElementById("dash-tp");
@@ -307,6 +329,7 @@
             function updateDashboardModulesVisibility() {
                 modFootprint.style.display = showFootprint ? "flex" : "none";
                 modPivots.style.display = showPivots ? "flex" : "none";
+                modPivotsTf.style.display = showPivotsTf ? "flex" : "none";
                 modVsa.style.display = showVsa ? "flex" : "none";
             }
 
@@ -632,7 +655,7 @@
 
                     updateDashboardModulesVisibility();
 
-                    // 1. PIVOTES S/R
+                    // 1. PIVOTES MULTI-TF (ESTÁTICOS 4H Y 1D)
                     if (showPivots) {
                         const [raw4h, raw1d] = await Promise.all([
                             fetchKlines('4h', 200),
@@ -649,6 +672,41 @@
                         if (pivots1d.pivotLow) lineLevels.push({ price: pivots1d.pivotLow.low, color: '#00e676', title: '[ 1D SOPORTE ]', width: 3, style: LightweightCharts.LineStyle.Solid });
                         if (pivots4h.pivotHigh) lineLevels.push({ price: pivots4h.pivotHigh.high, color: '#ff9100', title: '[ 4H RESISTENCIA ]', width: 2, style: LightweightCharts.LineStyle.Dashed });
                         if (pivots4h.pivotLow) lineLevels.push({ price: pivots4h.pivotLow.low, color: '#2962ff', title: '[ 4H SOPORTE ]', width: 2, style: LightweightCharts.LineStyle.Dashed });
+                    }
+
+                    // 1.B PIVOTES DINÁMICOS TF ACTUAL
+                    if (showPivotsTf && currentFormattedData.length > 0) {
+                        const currentTfLabel = timeframeSelect.value.toUpperCase();
+                        const currentTfPivots = calculatePivots(currentFormattedData, 10, 10);
+
+                        dashPivotTfResLabel.innerText = `RESISTENCIA (${currentTfLabel})`;
+                        dashPivotTfSupLabel.innerText = `SOPORTE (${currentTfLabel})`;
+
+                        if (currentTfPivots.pivotHigh) {
+                            lineLevels.push({ 
+                                price: currentTfPivots.pivotHigh.high, 
+                                color: '#e040fb', 
+                                title: `[ ${currentTfLabel} RESISTENCIA ]`, 
+                                width: 2, 
+                                style: LightweightCharts.LineStyle.LargeDashed 
+                            });
+                            dashPivotTfRes.innerText = `$${currentTfPivots.pivotHigh.high.toFixed(2)}`;
+                        } else {
+                            dashPivotTfRes.innerText = "--";
+                        }
+
+                        if (currentTfPivots.pivotLow) {
+                            lineLevels.push({ 
+                                price: currentTfPivots.pivotLow.low, 
+                                color: '#00e5ff', 
+                                title: `[ ${currentTfLabel} SOPORTE ]`, 
+                                width: 2, 
+                                style: LightweightCharts.LineStyle.LargeDashed 
+                            });
+                            dashPivotTfSup.innerText = `$${currentTfPivots.pivotLow.low.toFixed(2)}`;
+                        } else {
+                            dashPivotTfSup.innerText = "--";
+                        }
                     }
 
                     // 2. VSA / BALLENAS
@@ -825,6 +883,7 @@
             }
 
             setupToggle(btnPivots, () => showPivots, val => showPivots = val);
+            setupToggle(btnPivotsTf, () => showPivotsTf, val => showPivotsTf = val);
             setupToggle(btnVsa, () => showVsa, val => showVsa = val);
             setupToggle(btnSupertrend, () => showSupertrend, val => showSupertrend = val);
             setupToggle(btnFootprint, () => showFootprint, val => showFootprint = val);
