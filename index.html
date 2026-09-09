@@ -64,6 +64,15 @@
             color: #00e5ff;
             box-shadow: 0 0 8px rgba(0, 229, 255, 0.3);
         }
+        .btn-fp.action-btn {
+            background-color: #2962ff;
+            color: #fff;
+            border-color: #2962ff;
+        }
+        .btn-fp.action-btn:hover {
+            background-color: #1e54e4;
+            border-color: #00e5ff;
+        }
 
         .btn-fp.inactive {
             opacity: 0.5;
@@ -74,7 +83,6 @@
         #chart-wrapper { flex: 1; width: 100%; position: relative; }
         #chart { width: 100%; height: 100%; }
 
-        /* DASHBOARD PRINCIPAL Y SUS MÓDULOS DINÁMICOS */
         #candle-dashboard {
             position: absolute;
             top: 16px;
@@ -92,31 +100,15 @@
             box-shadow: 0 4px 16px rgba(0,0,0,0.5);
         }
         
-        .dash-module {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-
+        .dash-module { display: flex; flex-direction: column; gap: 8px; }
         .dash-row { display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 600; }
         .dash-label { color: #787b86; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px; }
         .dash-value { font-family: monospace; font-size: 13px; }
         .dash-subvalue { font-family: monospace; font-size: 11px; opacity: 0.85; margin-left: 4px; }
         .dash-divider { height: 1px; background-color: #2a2e39; margin: 2px 0; }
         
-        .progress-bar-bg {
-            width: 100%;
-            height: 4px;
-            background-color: #2a2e39;
-            border-radius: 2px;
-            overflow: hidden;
-        }
-        .progress-bar-fill {
-            height: 100%;
-            width: 0%;
-            background: linear-gradient(90deg, #2962ff, #00e5ff);
-            transition: width 0.3s ease;
-        }
+        .progress-bar-bg { width: 100%; height: 4px; background-color: #2a2e39; border-radius: 2px; overflow: hidden; }
+        .progress-bar-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #2962ff, #00e5ff); transition: width 0.3s ease; }
 
         #status { 
             position: absolute; 
@@ -141,6 +133,8 @@
             <span class="title"><span class="live-dot"></span> 🦈 BTC/USD S/R + VSA + FOOTPRINT POC</span>
             
             <div class="controls-container">
+                <button id="btn-vsa-analysis" class="btn-fp action-btn">🔍 Analizar VSA (3M)</button>
+                <button id="toggle-ema200" class="btn-fp active">🌊 EMA 200</button>
                 <button id="toggle-pivots" class="btn-fp active">📍 Pivotes Multi-TF</button>
                 <button id="toggle-pivots-tf" class="btn-fp active">📍 Pivotes Dinámicos TF</button>
                 <button id="toggle-vsa" class="btn-fp active">🐋 VSA Ballenas</button>
@@ -255,6 +249,8 @@
             const timeframeSelect = document.getElementById("timeframe");
             const chartContainer = document.getElementById("chart");
 
+            const btnEma200 = document.getElementById("toggle-ema200");
+            const btnVsaAnalysis = document.getElementById("btn-vsa-analysis");
             const btnPivots = document.getElementById("toggle-pivots");
             const btnPivotsTf = document.getElementById("toggle-pivots-tf");
             const btnVsa = document.getElementById("toggle-vsa");
@@ -267,6 +263,7 @@
             const modPivotsTf = document.getElementById("dash-module-pivots-tf");
             const modVsa = document.getElementById("dash-module-vsa");
 
+            let showEma200 = true;
             let showPivots = true;
             let showPivotsTf = true;
             let showVsa = true;
@@ -317,6 +314,29 @@
             const candlestickSeries = chart.addCandlestickSeries({
                 upColor: '#089981', downColor: '#f23645', borderVisible: false, wickUpColor: '#089981', wickDownColor: '#f23645'
             });
+
+            const ema200Series = chart.addLineSeries({
+                color: '#ffeb3b',
+                lineWidth: 2,
+                title: 'EMA 200'
+            });
+
+            function calculateEMA(candles, period = 200) {
+                if (!candles || candles.length < period) return [];
+                const k = 2 / (period + 1);
+                let emaData = [];
+                
+                let sum = 0;
+                for (let i = 0; i < period; i++) sum += candles[i].close;
+                let ema = sum / period;
+                emaData.push({ time: candles[period - 1].time, value: ema });
+
+                for (let i = period; i < candles.length; i++) {
+                    ema = (candles[i].close * k) + (ema * (1 - k));
+                    emaData.push({ time: candles[i].time, value: ema });
+                }
+                return emaData;
+            }
 
             function updateDashboardModulesVisibility() {
                 modFootprint.style.display = showFootprint ? "flex" : "none";
@@ -713,6 +733,13 @@
 
                     updateDashboardModulesVisibility();
 
+                    if (showEma200) {
+                        const emaData = calculateEMA(currentFormattedData, 200);
+                        ema200Series.setData(emaData);
+                    } else {
+                        ema200Series.setData([]);
+                    }
+
                     if (showPivots) {
                         const [raw4h, raw1d] = await Promise.all([
                             fetchKlines('4h', 200),
@@ -870,6 +897,11 @@
                         }
                     }
 
+                    if (showEma200) {
+                        const emaData = calculateEMA(currentCandleData, 200);
+                        ema200Series.setData(emaData);
+                    }
+
                     updateRealtimeAnalysis(candle.close);
                 };
 
@@ -908,6 +940,18 @@
             // EVENT LISTENERS DE CONTROLES
             timeframeSelect.addEventListener("change", (e) => {
                 loadChartData(e.target.value);
+            });
+
+            btnVsaAnalysis.addEventListener("click", () => {
+                timeframeSelect.value = "3m";
+                loadChartData("3m");
+            });
+
+            btnEma200.addEventListener("click", () => {
+                showEma200 = !showEma200;
+                btnEma200.classList.toggle("active", showEma200);
+                btnEma200.classList.toggle("inactive", !showEma200);
+                renderSRVisuals(currentCandleData);
             });
 
             btnPivots.addEventListener("click", () => {
