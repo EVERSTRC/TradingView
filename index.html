@@ -64,15 +64,6 @@
             color: #00e5ff;
             box-shadow: 0 0 8px rgba(0, 229, 255, 0.3);
         }
-        .btn-fp.action-btn {
-            background-color: #2962ff;
-            color: #fff;
-            border-color: #2962ff;
-        }
-        .btn-fp.action-btn:hover {
-            background-color: #1e54e4;
-            border-color: #00e5ff;
-        }
 
         .btn-fp.inactive {
             opacity: 0.5;
@@ -83,6 +74,7 @@
         #chart-wrapper { flex: 1; width: 100%; position: relative; }
         #chart { width: 100%; height: 100%; }
 
+        /* DASHBOARD PRINCIPAL Y SUS MÓDULOS DINÁMICOS */
         #candle-dashboard {
             position: absolute;
             top: 16px;
@@ -100,15 +92,31 @@
             box-shadow: 0 4px 16px rgba(0,0,0,0.5);
         }
         
-        .dash-module { display: flex; flex-direction: column; gap: 8px; }
+        .dash-module {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
         .dash-row { display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 600; }
         .dash-label { color: #787b86; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px; }
         .dash-value { font-family: monospace; font-size: 13px; }
         .dash-subvalue { font-family: monospace; font-size: 11px; opacity: 0.85; margin-left: 4px; }
         .dash-divider { height: 1px; background-color: #2a2e39; margin: 2px 0; }
         
-        .progress-bar-bg { width: 100%; height: 4px; background-color: #2a2e39; border-radius: 2px; overflow: hidden; }
-        .progress-bar-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #2962ff, #00e5ff); transition: width 0.3s ease; }
+        .progress-bar-bg {
+            width: 100%;
+            height: 4px;
+            background-color: #2a2e39;
+            border-radius: 2px;
+            overflow: hidden;
+        }
+        .progress-bar-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #2962ff, #00e5ff);
+            transition: width 0.3s ease;
+        }
 
         #status { 
             position: absolute; 
@@ -133,8 +141,6 @@
             <span class="title"><span class="live-dot"></span> 🦈 BTC/USD S/R + VSA + FOOTPRINT POC</span>
             
             <div class="controls-container">
-                <button id="btn-vsa-analysis" class="btn-fp action-btn">🔍 Analizar VSA (3M)</button>
-                <button id="toggle-ema200" class="btn-fp active">🌊 EMA 200</button>
                 <button id="toggle-pivots" class="btn-fp active">📍 Pivotes Multi-TF</button>
                 <button id="toggle-pivots-tf" class="btn-fp active">📍 Pivotes Dinámicos TF</button>
                 <button id="toggle-vsa" class="btn-fp active">🐋 VSA Ballenas</button>
@@ -249,8 +255,6 @@
             const timeframeSelect = document.getElementById("timeframe");
             const chartContainer = document.getElementById("chart");
 
-            const btnEma200 = document.getElementById("toggle-ema200");
-            const btnVsaAnalysis = document.getElementById("btn-vsa-analysis");
             const btnPivots = document.getElementById("toggle-pivots");
             const btnPivotsTf = document.getElementById("toggle-pivots-tf");
             const btnVsa = document.getElementById("toggle-vsa");
@@ -263,7 +267,6 @@
             const modPivotsTf = document.getElementById("dash-module-pivots-tf");
             const modVsa = document.getElementById("dash-module-vsa");
 
-            let showEma200 = true;
             let showPivots = true;
             let showPivotsTf = true;
             let showVsa = true;
@@ -314,29 +317,6 @@
             const candlestickSeries = chart.addCandlestickSeries({
                 upColor: '#089981', downColor: '#f23645', borderVisible: false, wickUpColor: '#089981', wickDownColor: '#f23645'
             });
-
-            const ema200Series = chart.addLineSeries({
-                color: '#ffeb3b',
-                lineWidth: 2,
-                title: 'EMA 200'
-            });
-
-            function calculateEMA(candles, period = 200) {
-                if (!candles || candles.length < period) return [];
-                const k = 2 / (period + 1);
-                let emaData = [];
-                
-                let sum = 0;
-                for (let i = 0; i < period; i++) sum += candles[i].close;
-                let ema = sum / period;
-                emaData.push({ time: candles[period - 1].time, value: ema });
-
-                for (let i = period; i < candles.length; i++) {
-                    ema = (candles[i].close * k) + (ema * (1 - k));
-                    emaData.push({ time: candles[i].time, value: ema });
-                }
-                return emaData;
-            }
 
             function updateDashboardModulesVisibility() {
                 modFootprint.style.display = showFootprint ? "flex" : "none";
@@ -546,12 +526,14 @@
                 return { footprintPOCs: footprintPOCs.slice(-2) };
             }
 
+            // FUNCIÓN SUPERTREND CORREGIDA: Réplica exacta del indicador UAlgo (Method 1: ta.atr, pos state)
             function getSupertrendMarkers(candles, atrPeriods = 14, multiplier = 2.0, stopLossVal = 2.0) {
                 if (!candles || candles.length < atrPeriods + 1) return [];
 
                 const len = candles.length;
                 const tr = new Float64Array(len);
                 
+                // 1. Cálculo del True Range
                 tr[0] = candles[0].high - candles[0].low;
                 for (let i = 1; i < len; i++) {
                     const hL = candles[i].high - candles[i].low;
@@ -560,6 +542,7 @@
                     tr[i] = Math.max(hL, hC, lC);
                 }
 
+                // 2. Cálculo de ATR (Method 1: RMA / ta.atr en TradingView)
                 const atr = new Float64Array(len);
                 let sumTR = 0;
                 for (let i = 0; i < atrPeriods; i++) sumTR += tr[i];
@@ -608,6 +591,7 @@
                     trend[i] = currentTrend;
                 }
 
+                // 3. Control de Estado de Posición (pos) para réplica idéntica de UAlgo
                 const stMarkers = [];
                 let pos = 0;
                 let entryOfLong = 0;
@@ -733,13 +717,6 @@
 
                     updateDashboardModulesVisibility();
 
-                    if (showEma200) {
-                        const emaData = calculateEMA(currentFormattedData, 200);
-                        ema200Series.setData(emaData);
-                    } else {
-                        ema200Series.setData([]);
-                    }
-
                     if (showPivots) {
                         const [raw4h, raw1d] = await Promise.all([
                             fetchKlines('4h', 200),
@@ -762,249 +739,235 @@
                         const currentTfLabel = timeframeSelect.value.toUpperCase();
                         const currentTfPivots = calculatePivots(currentFormattedData, 10, 10);
 
-                        dashPivotTfResLabel.innerText = `RESISTENCIA ${currentTfLabel}`;
-                        dashPivotTfSupLabel.innerText = `SOPORTE ${currentTfLabel}`;
+                        dashPivotTfResLabel.innerText = `RESISTENCIA (${currentTfLabel})`;
+                        dashPivotTfSupLabel.innerText = `SOPORTE (${currentTfLabel})`;
 
                         if (currentTfPivots.pivotHigh) {
-                            lineLevels.push({ price: currentTfPivots.pivotHigh.high, color: '#e040fb', title: `[ ${currentTfLabel} RESISTENCIA ]`, width: 2, style: LightweightCharts.LineStyle.LargeDashed });
+                            lineLevels.push({ 
+                                price: currentTfPivots.pivotHigh.high, 
+                                color: '#e040fb', 
+                                title: `[ ${currentTfLabel} RESISTENCIA ]`, 
+                                width: 2, 
+                                style: LightweightCharts.LineStyle.LargeDashed 
+                            });
                             dashPivotTfRes.innerText = `$${currentTfPivots.pivotHigh.high.toFixed(2)}`;
                         } else {
                             dashPivotTfRes.innerText = "--";
                         }
 
                         if (currentTfPivots.pivotLow) {
-                            lineLevels.push({ price: currentTfPivots.pivotLow.low, color: '#00e5ff', title: `[ ${currentTfLabel} SOPORTE ]`, width: 2, style: LightweightCharts.LineStyle.LargeDashed });
+                            lineLevels.push({ 
+                                price: currentTfPivots.pivotLow.low, 
+                                color: '#00e5ff', 
+                                title: `[ ${currentTfLabel} SOPORTE ]`, 
+                                width: 2, 
+                                style: LightweightCharts.LineStyle.LargeDashed 
+                            });
                             dashPivotTfSup.innerText = `$${currentTfPivots.pivotLow.low.toFixed(2)}`;
                         } else {
                             dashPivotTfSup.innerText = "--";
                         }
-                    } else {
-                        dashPivotTfRes.innerText = "--";
-                        dashPivotTfSup.innerText = "--";
                     }
 
-                    let markersToSet = [];
-
-                    if (showSupertrend) {
-                        const supertrendMarkers = getSupertrendMarkers(currentFormattedData);
-                        markersToSet = markersToSet.concat(supertrendMarkers);
-                    }
-
+                    let whaleMarkers = [];
                     if (showVsa) {
-                        const { markers: vsaMarkers, buyPrices } = processWhaleData(currentFormattedData);
-                        markersToSet = markersToSet.concat(vsaMarkers);
+                        const vsaResult = processWhaleData(currentFormattedData);
+                        whaleMarkers = vsaResult.markers;
+                        
+                        if (vsaResult.buyPrices.length > 0) {
+                            currentWhaleBuyAvg = vsaResult.buyPrices.reduce((a, b) => a + b, 0) / vsaResult.buyPrices.length;
+                            lineLevels.push({ price: currentWhaleBuyAvg, color: '#00e676', title: '[ PROMEDIO COMPRA BALLENAS ]', width: 3, style: LightweightCharts.LineStyle.Solid });
+                        }
 
-                        if (buyPrices.length > 0) {
-                            const avgBuyPrice = buyPrices.reduce((a, b) => a + b, 0) / buyPrices.length;
-                            currentWhaleBuyAvg = avgBuyPrice;
-                            lineLevels.push({ price: avgBuyPrice, color: '#00b0ff', title: '[ AVG ACUMULACIÓN BALLENAS ]', width: 2, style: LightweightCharts.LineStyle.Solid });
+                        if (vsaResult.sellPrices.length > 0) {
+                            const avgSell = vsaResult.sellPrices.reduce((a, b) => a + b, 0) / vsaResult.sellPrices.length;
+                            lineLevels.push({ price: avgSell, color: '#ff1744', title: '[ PROMEDIO VENTA BALLENAS ]', width: 3, style: LightweightCharts.LineStyle.Solid });
                         }
                     }
 
                     if (showFootprint) {
                         const { footprintPOCs } = calculateFootprintLevels(currentFormattedData);
-                        footprintPOCs.forEach((poc, idx) => {
+                        footprintPOCs.forEach(poc => {
+                            if (!poc.isBullish) currentFootprintRes = poc.price;
                             lineLevels.push({
                                 price: poc.price,
-                                color: poc.isBullish ? '#00e676' : '#ff1744',
-                                title: `[ FOOTPRINT POC ${idx + 1} ]`,
+                                color: poc.isBullish ? '#00f0ff' : '#ff007f',
+                                title: poc.isBullish ? '👣 FOOTPRINT POC (Soporte)' : '👣 FOOTPRINT POC (Resistencia)',
                                 width: 2,
-                                style: LightweightCharts.LineStyle.Dotted
+                                style: LightweightCharts.LineStyle.Dashed
                             });
-                            currentFootprintRes = poc.price;
                         });
+                    }
+
+                    if (currentFootprintRes && showFootprint && currentFormattedData.length > 0) {
+                        const lastClose = currentFormattedData[currentFormattedData.length - 1].close;
+                        const isBull = lastClose >= currentFootprintRes;
+                        const entry = lastClose;
+                        const sl = isBull ? currentFootprintRes * 0.997 : currentFootprintRes * 1.003;
+                        
+                        let tp;
+                        if (currentMainTarget && showPivots && ((isBull && currentMainTarget > entry) || (!isBull && currentMainTarget < entry))) {
+                            tp = currentMainTarget;
+                        } else {
+                            let risk = Math.abs(entry - sl);
+                            tp = isBull ? entry + (risk * 2) : entry - (risk * 2);
+                        }
+
+                        lineLevels.push({ price: entry, color: '#00e5ff', title: '🔵 PUNTO DE ENTRADA', width: 2, style: LightweightCharts.LineStyle.Solid });
+                        lineLevels.push({ price: tp, color: '#00e676', title: '🟢 TAKE PROFIT (OBJETIVO)', width: 2, style: LightweightCharts.LineStyle.Solid });
+                        lineLevels.push({ price: sl, color: '#ff5252', title: '🔴 STOP LOSS (INVALIDACIÓN)', width: 2, style: LightweightCharts.LineStyle.Solid });
                     }
 
                     if (showMultiFootprint) {
-                        const tfs = ['1m', '5m', '15m', '1h', '4h'];
-                        const multiKlines = await Promise.all(tfs.map(tf => fetchKlines(tf, 100)));
-                        
-                        tfs.forEach((tf, index) => {
-                            const data = multiKlines[index];
-                            const { footprintPOCs } = calculateFootprintLevels(data);
-                            if (footprintPOCs.length > 0) {
-                                const lastPoc = footprintPOCs[footprintPOCs.length - 1];
-                                lineLevels.push({
-                                    price: lastPoc.price,
-                                    color: '#e040fb',
-                                    title: `[ FP MULTI-${tf.toUpperCase()} ]`,
-                                    width: 1,
-                                    style: LightweightCharts.LineStyle.Dashed
-                                });
-                            }
-                        });
+                        const [raw1mFP, raw5mFP, raw15mFP, raw1hFP, raw4hFP] = await Promise.all([
+                            fetchKlines('1m', 200),
+                            fetchKlines('5m', 200),
+                            fetchKlines('15m', 200),
+                            fetchKlines('1h', 200),
+                            fetchKlines('4h', 200)
+                        ]);
+
+                        const fp1m = calculateFootprintLevels(raw1mFP).footprintPOCs;
+                        const fp5m = calculateFootprintLevels(raw5mFP).footprintPOCs;
+                        const fp15m = calculateFootprintLevels(raw15mFP).footprintPOCs;
+                        const fp1h = calculateFootprintLevels(raw1hFP).footprintPOCs;
+                        const fp4h = calculateFootprintLevels(raw4hFP).footprintPOCs;
+
+                        fp1m.forEach(p => lineLevels.push({ price: p.price, color: '#ffeb3b', title: '👣 1M FP POC', width: 1, style: LightweightCharts.LineStyle.Dotted }));
+                        fp5m.forEach(p => lineLevels.push({ price: p.price, color: '#ff9800', title: '👣 5M FP POC', width: 1, style: LightweightCharts.LineStyle.Dashed }));
+                        fp15m.forEach(p => lineLevels.push({ price: p.price, color: '#e040fb', title: '👣 15M FP POC', width: 1, style: LightweightCharts.LineStyle.LargeDashed }));
+                        fp1h.forEach(p => lineLevels.push({ price: p.price, color: '#00e5ff', title: '👣 1H FP POC', width: 2, style: LightweightCharts.LineStyle.LargeDashed }));
+                        fp4h.forEach(p => lineLevels.push({ price: p.price, color: '#76ff03', title: '👣 4H FP POC', width: 2, style: LightweightCharts.LineStyle.Solid }));
                     }
 
-                    markersToSet.sort((a, b) => a.time - b.time);
-                    candlestickSeries.setMarkers(markersToSet);
+                    let stMarkers = [];
+                    if (showSupertrend) {
+                        stMarkers = getSupertrendMarkers(currentFormattedData, 14, 2.0, 2.0);
+                    }
 
-                    lineLevels.forEach(lvl => {
-                        const priceLine = candlestickSeries.createPriceLine({
-                            price: lvl.price,
-                            color: lvl.color,
-                            lineWidth: lvl.width,
-                            lineStyle: lvl.style,
-                            axisLabelVisible: true,
-                            title: lvl.title
+                    const allMarkers = [...whaleMarkers, ...stMarkers].sort((a, b) => a.time - b.time);
+                    candlestickSeries.setMarkers(allMarkers);
+
+                    lineLevels.forEach(level => {
+                        const line = candlestickSeries.createPriceLine({
+                            price: level.price, color: level.color, lineWidth: level.width, lineStyle: level.style, axisLabelVisible: true, title: level.title
                         });
-                        activePriceLines.push(priceLine);
+                        activePriceLines.push(line);
                     });
 
                     if (currentFormattedData.length > 0) {
                         updateRealtimeAnalysis(currentFormattedData[currentFormattedData.length - 1].close);
                     }
 
-                } catch (err) {
-                    console.error("Error al renderizar análisis visual:", err);
-                }
+                } catch (e) { console.error("Error en visuales:", e); }
             }
 
-            function connectWebSocket(timeframe) {
-                if (wsConnection) {
-                    wsConnection.close();
-                }
+            function connectWebSocket(interval) {
+                if (wsConnection) wsConnection.close();
 
-                const streamName = timeframe === '1s' ? 'btcusdt@kline_1s' : `btcusdt@kline_${timeframe}`;
-                wsConnection = new WebSocket(`wss://stream.binance.com:9443/ws/${streamName}`);
+                const streamInterval = interval.toLowerCase();
+                const wsUrl = `wss://stream.binance.com:9443/ws/btcusdt@kline_${streamInterval}`;
+                wsConnection = new WebSocket(wsUrl);
 
-                wsConnection.onopen = () => {
-                    statusEl.innerText = `WebSocket Conectado (${timeframe.toUpperCase()})`;
-                    setTimeout(() => { statusEl.style.display = 'none'; }, 2000);
-                };
+                wsConnection.onopen = () => { statusEl.style.display = "none"; };
 
                 wsConnection.onmessage = (event) => {
                     const message = JSON.parse(event.data);
-                    const kline = message.k;
-                    if (!kline) return;
+                    const k = message.k;
 
-                    const candle = {
-                        time: Math.floor(kline.t / 1000),
-                        open: parseFloat(kline.o),
-                        high: parseFloat(kline.h),
-                        low: parseFloat(kline.l),
-                        close: parseFloat(kline.c),
-                        volume: parseFloat(kline.v)
+                    const updatedCandle = {
+                        time: Math.floor(k.t / 1000),
+                        open: parseFloat(k.o),
+                        high: parseFloat(k.h),
+                        low: parseFloat(k.l),
+                        close: parseFloat(k.c),
+                        volume: parseFloat(k.v)
                     };
 
-                    candlestickSeries.update(candle);
+                    candlestickSeries.update(updatedCandle);
+                    updateRealtimeAnalysis(updatedCandle.close);
 
                     if (currentCandleData.length > 0) {
                         const lastIndex = currentCandleData.length - 1;
-                        if (currentCandleData[lastIndex].time === candle.time) {
-                            currentCandleData[lastIndex] = candle;
+                        if (currentCandleData[lastIndex].time === updatedCandle.time) {
+                            currentCandleData[lastIndex] = updatedCandle;
                         } else {
-                            currentCandleData.push(candle);
+                            currentCandleData.push(updatedCandle);
                         }
                     }
-
-                    if (showEma200) {
-                        const emaData = calculateEMA(currentCandleData, 200);
-                        ema200Series.setData(emaData);
-                    }
-
-                    updateRealtimeAnalysis(candle.close);
                 };
 
                 wsConnection.onerror = (err) => {
                     console.error("Error WebSocket:", err);
-                    statusEl.innerText = "Error de conexión WebSocket";
-                    statusEl.style.display = 'block';
-                };
-
-                wsConnection.onclose = () => {
-                    statusEl.innerText = "Conexión WebSocket cerrada";
-                    statusEl.style.display = 'block';
+                    statusEl.innerText = "Error en WebSocket Tiempo Real";
+                    statusEl.style.display = "block";
                 };
             }
 
-            async function loadChartData(timeframe) {
+            async function loadChartData(interval) {
+                statusEl.style.display = "block";
+                statusEl.innerText = "Cargando datos BTC/USD...";
+
                 try {
-                    statusEl.style.display = 'block';
-                    statusEl.innerText = `Cargando datos (${timeframe.toUpperCase()})...`;
+                    currentCandleData = await fetchKlines(interval, 500);
+                    candlestickSeries.setData(currentCandleData);
+                    await renderSRVisuals(currentCandleData);
+                    await updateWhaleDashboard();
+                    
+                    chart.timeScale().fitContent();
+                    chart.priceScale('right').applyOptions({ autoScale: true });
 
-                    const data = await fetchKlines(timeframe, 500);
-                    currentCandleData = data;
+                    connectWebSocket(interval);
+                    startCandleTimer(interval);
 
-                    candlestickSeries.setData(data);
-                    await renderSRVisuals(data);
-                    startCandleTimer(timeframe);
-                    updateWhaleDashboard();
-                    connectWebSocket(timeframe);
-
-                } catch (e) {
-                    console.error("Error cargando datos del gráfico:", e);
-                    statusEl.innerText = "Error cargando datos históricos";
+                } catch (err) {
+                    console.error(err);
+                    statusEl.innerText = "Error cargando datos de BTC/USD";
+                    statusEl.style.color = "#f23645";
                 }
             }
 
-            // EVENT LISTENERS DE CONTROLES
+            function setupToggle(buttonEl, getState, setState) {
+                buttonEl.addEventListener("click", async () => {
+                    const newState = !getState();
+                    setState(newState);
+                    buttonEl.classList.toggle("active", newState);
+                    buttonEl.classList.toggle("inactive", !newState);
+                    await renderSRVisuals(currentCandleData);
+                });
+            }
+
+            setupToggle(btnPivots, () => showPivots, val => showPivots = val);
+            setupToggle(btnPivotsTf, () => showPivotsTf, val => showPivotsTf = val);
+            setupToggle(btnVsa, () => showVsa, val => showVsa = val);
+            setupToggle(btnSupertrend, () => showSupertrend, val => showSupertrend = val);
+            setupToggle(btnFootprint, () => showFootprint, val => showFootprint = val);
+
+            btnMultiFp.addEventListener("click", async () => {
+                showMultiFootprint = !showMultiFootprint;
+                btnMultiFp.classList.toggle("active", showMultiFootprint);
+                
+                statusEl.style.display = "block";
+                statusEl.innerText = showMultiFootprint ? "Cargando Multi-Footprint (1M, 5M, 15M, 1H, 4H)..." : "Actualizando gráfico...";
+                
+                await renderSRVisuals(currentCandleData);
+                
+                chart.timeScale().fitContent();
+                chart.priceScale('right').applyOptions({ autoScale: true });
+
+                statusEl.style.display = "none";
+            });
+
+            loadChartData(timeframeSelect.value);
+
             timeframeSelect.addEventListener("change", (e) => {
                 loadChartData(e.target.value);
             });
 
-            btnVsaAnalysis.addEventListener("click", () => {
-                timeframeSelect.value = "3m";
-                loadChartData("3m");
-            });
-
-            btnEma200.addEventListener("click", () => {
-                showEma200 = !showEma200;
-                btnEma200.classList.toggle("active", showEma200);
-                btnEma200.classList.toggle("inactive", !showEma200);
-                renderSRVisuals(currentCandleData);
-            });
-
-            btnPivots.addEventListener("click", () => {
-                showPivots = !showPivots;
-                btnPivots.classList.toggle("active", showPivots);
-                btnPivots.classList.toggle("inactive", !showPivots);
-                renderSRVisuals(currentCandleData);
-            });
-
-            btnPivotsTf.addEventListener("click", () => {
-                showPivotsTf = !showPivotsTf;
-                btnPivotsTf.classList.toggle("active", showPivotsTf);
-                btnPivotsTf.classList.toggle("inactive", !showPivotsTf);
-                renderSRVisuals(currentCandleData);
-            });
-
-            btnVsa.addEventListener("click", () => {
-                showVsa = !showVsa;
-                btnVsa.classList.toggle("active", showVsa);
-                btnVsa.classList.toggle("inactive", !showVsa);
-                renderSRVisuals(currentCandleData);
-            });
-
-            btnSupertrend.addEventListener("click", () => {
-                showSupertrend = !showSupertrend;
-                btnSupertrend.classList.toggle("active", showSupertrend);
-                btnSupertrend.classList.toggle("inactive", !showSupertrend);
-                renderSRVisuals(currentCandleData);
-            });
-
-            btnFootprint.addEventListener("click", () => {
-                showFootprint = !showFootprint;
-                btnFootprint.classList.toggle("active", showFootprint);
-                btnFootprint.classList.toggle("inactive", !showFootprint);
-                renderSRVisuals(currentCandleData);
-            });
-
-            btnMultiFp.addEventListener("click", () => {
-                showMultiFootprint = !showMultiFootprint;
-                btnMultiFp.classList.toggle("active", showMultiFootprint);
-                btnMultiFp.classList.toggle("inactive", !showMultiFootprint);
-                renderSRVisuals(currentCandleData);
-            });
-
             window.addEventListener("resize", () => {
-                chart.applyOptions({
-                    width: chartContainer.clientWidth,
-                    height: chartContainer.clientHeight
-                });
+                chart.applyOptions({ width: chartContainer.clientWidth, height: chartContainer.clientHeight });
+                chart.timeScale().fitContent();
             });
-
-            // INICIALIZACIÓN
-            loadChartData(timeframeSelect.value);
         });
     </script>
 </body>
