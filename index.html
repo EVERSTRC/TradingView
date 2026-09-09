@@ -71,6 +71,52 @@
             color: #787b86;
         }
 
+        /* ESTILOS BOTONES TRADE METAQUOTES WEB API CON SELECCIÓN DE BROKER */
+        .trade-controls {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-left: 10px;
+            padding-left: 10px;
+            border-left: 1px solid #2a2e39;
+        }
+        .btn-buy {
+            background-color: #00e676;
+            color: #131722;
+            border: none;
+            padding: 6px 14px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 800;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .btn-buy:hover { background-color: #00b0ff; color: #fff; box-shadow: 0 0 10px rgba(0,230,118,0.5); }
+        .btn-sell {
+            background-color: #ff5252;
+            color: #ffffff;
+            border: none;
+            padding: 6px 14px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 800;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .btn-sell:hover { background-color: #ff1744; box-shadow: 0 0 10px rgba(255,82,82,0.5); }
+        .input-lots {
+            width: 65px;
+            background-color: #2a2e39;
+            color: #00e5ff;
+            border: 1px solid #363c4e;
+            padding: 5px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            text-align: center;
+            outline: none;
+        }
+
         #chart-wrapper { flex: 1; width: 100%; position: relative; }
         #chart { width: 100%; height: 100%; }
 
@@ -160,6 +206,19 @@
                         <option value="1d">1 Día</option>
                         <option value="1w">1 Semana</option>
                     </select>
+                </div>
+
+                <!-- CONTROLES METAQUOTES WEB API CON SELECTOR DE BROKER -->
+                <div class="trade-controls">
+                    <select id="broker-select" title="Seleccionar Broker MT5">
+                        <option value="icmarkets">IC Markets MT5</option>
+                        <option value="exness">Exness MT5</option>
+                        <option value="fpmarkets">FP Markets MT5</option>
+                        <option value="custom">Servidor Privado MT5</option>
+                    </select>
+                    <input type="number" id="trade-lots" class="input-lots" value="0.01" step="0.01" min="0.01" title="Lotes / Volumen MT5">
+                    <button id="btn-trade-buy" class="btn-buy">▲ COMPRAR</button>
+                    <button id="btn-trade-sell" class="btn-sell">▼ VENDER</button>
                 </div>
             </div>
         </div>
@@ -261,6 +320,12 @@
             const btnSupertrend = document.getElementById("toggle-supertrend");
             const btnFootprint = document.getElementById("toggle-footprint");
             const btnMultiFp = document.getElementById("toggle-multi-fp");
+
+            // Elementos MetaQuotes API
+            const brokerSelect = document.getElementById("broker-select");
+            const btnTradeBuy = document.getElementById("btn-trade-buy");
+            const btnTradeSell = document.getElementById("btn-trade-sell");
+            const inputTradeLots = document.getElementById("trade-lots");
 
             const modFootprint = document.getElementById("dash-module-footprint");
             const modPivots = document.getElementById("dash-module-pivots");
@@ -526,14 +591,12 @@
                 return { footprintPOCs: footprintPOCs.slice(-2) };
             }
 
-            // FUNCIÓN SUPERTREND CORREGIDA: Réplica exacta del indicador UAlgo (Method 1: ta.atr, pos state)
             function getSupertrendMarkers(candles, atrPeriods = 14, multiplier = 2.0, stopLossVal = 2.0) {
                 if (!candles || candles.length < atrPeriods + 1) return [];
 
                 const len = candles.length;
                 const tr = new Float64Array(len);
                 
-                // 1. Cálculo del True Range
                 tr[0] = candles[0].high - candles[0].low;
                 for (let i = 1; i < len; i++) {
                     const hL = candles[i].high - candles[i].low;
@@ -542,7 +605,6 @@
                     tr[i] = Math.max(hL, hC, lC);
                 }
 
-                // 2. Cálculo de ATR (Method 1: RMA / ta.atr en TradingView)
                 const atr = new Float64Array(len);
                 let sumTR = 0;
                 for (let i = 0; i < atrPeriods; i++) sumTR += tr[i];
@@ -591,7 +653,6 @@
                     trend[i] = currentTrend;
                 }
 
-                // 3. Control de Estado de Posición (pos) para réplica idéntica de UAlgo
                 const stMarkers = [];
                 let pos = 0;
                 let entryOfLong = 0;
@@ -957,6 +1018,60 @@
 
                 statusEl.style.display = "none";
             });
+
+            // LÓGICA DE EJECUCIÓN METAQUOTES WEB API REST CON SELECCIÓN DE BROKER
+            async function sendMetaQuotesOrder(action) {
+                const selectedBroker = brokerSelect.value;
+                const entryPrice = parseFloat(dashEntry.innerText.replace('$', '')) || 0;
+                const tpPrice = parseFloat(dashTp.innerText.replace('$', '')) || 0;
+                const slPrice = parseFloat(dashSl.innerText.replace('$', '')) || 0;
+                const volume = parseFloat(inputTradeLots.value) || 0.01;
+
+                if (!entryPrice) {
+                    alert("No hay un precio de entrada válido disponible.");
+                    return;
+                }
+
+                const payload = {
+                    broker: selectedBroker, // Envía la clave del Broker seleccionado
+                    action: action,         // 'BUY' o 'SELL'
+                    symbol: 'BTCUSD',
+                    volume: volume,
+                    price: entryPrice,
+                    tp: tpPrice,
+                    sl: slPrice
+                };
+
+                statusEl.style.display = "block";
+                statusEl.style.color = "#00e5ff";
+                statusEl.innerText = `Enviando orden ${action} a [${selectedBroker.toUpperCase()}] vía MetaQuotes Web API...`;
+
+                try {
+                    const response = await fetch('http://localhost:3000/api/trade', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    const result = await response.json();
+
+                    if (result.success) {
+                        statusEl.innerText = `✅ Orden ${action} en ${selectedBroker.toUpperCase()} ejecutada con éxito. Retcode: ${result.result.retcode || 'OK'}`;
+                        statusEl.style.color = "#00e676";
+                    } else {
+                        statusEl.innerText = `❌ Error en ejecución (${selectedBroker}): ${result.error}`;
+                        statusEl.style.color = "#ff5252";
+                    }
+                } catch (error) {
+                    statusEl.innerText = "❌ No se pudo conectar con el Middleware Node.js (http://localhost:3000)";
+                    statusEl.style.color = "#ff5252";
+                }
+
+                setTimeout(() => { statusEl.style.display = "none"; }, 5000);
+            }
+
+            btnTradeBuy.addEventListener("click", () => sendMetaQuotesOrder("BUY"));
+            btnTradeSell.addEventListener("click", () => sendMetaQuotesOrder("SELL"));
 
             loadChartData(timeframeSelect.value);
 
