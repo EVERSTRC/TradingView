@@ -212,6 +212,7 @@
                 <div class="trade-controls">
                     <select id="broker-select" title="Seleccionar Broker MT5">
                         <option value="icmarkets">IC Markets MT5</option>
+                        <option value="pepperstone">Pepperstone MT5</option>
                         <option value="exness">Exness MT5</option>
                         <option value="fpmarkets">FP Markets MT5</option>
                         <option value="custom">Servidor Privado MT5</option>
@@ -339,6 +340,9 @@
             let showFootprint = true;
             let showMultiFootprint = false;
 
+            // Variable global para mantener siempre el precio actual
+            window.ultimoPrecioValido = null;
+
             const timerDisplay = document.getElementById("timer-display");
             const timerProgress = document.getElementById("timer-progress");
             const dashBias = document.getElementById("dash-bias");
@@ -392,6 +396,9 @@
 
             function updateRealtimeAnalysis(lastClosePrice) {
                 if (!lastClosePrice) return;
+
+                // Mantiene el precio global actualizado siempre
+                window.ultimoPrecioValido = parseFloat(lastClosePrice);
 
                 let isBullish = false;
 
@@ -500,7 +507,7 @@
                         const buyPct = Math.round((buyVol / total) * 100);
                         const sellPct = 100 - buyPct;
 
-                        elPct.innerText = `${buyPct}%C/${sellPct}%V`;
+                        elPct.innerText = `${buyPct}\%C/${sellPct}%V`;
                         
                         if (buyPct > 50) {
                             elPct.style.color = "#00e676";
@@ -551,7 +558,7 @@
                     } else if (mins >= 60) {
                         const hrs = Math.floor(mins / 60);
                         const remMins = mins % 60;
-                        timerDisplay.innerText = `${hrs}h ${remMins.toString().padStart(2, '0')}m`;
+                        timerDisplay.innerText = `${hrs}h${remMins.toString().padStart(2, '0')}m`;
                     } else {
                         timerDisplay.innerText = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
                     }
@@ -1019,16 +1026,41 @@
                 statusEl.style.display = "none";
             });
 
+            // Función de obtención con múltiples niveles de respaldo
+            function obtenerPrecioEntrada() {
+                let precio = null;
+
+                // 1. Intentar extraer del dashboard visual
+                if (dashEntry && dashEntry.innerText) {
+                    const parsed = parseFloat(dashEntry.innerText.replace(/[^0-9.]/g, ''));
+                    if (!isNaN(parsed) && parsed > 0) {
+                        precio = parsed;
+                    }
+                }
+
+                // 2. Fallback: usar el precio global en memoria actualizado en tiempo real
+                if (!precio && window.ultimoPrecioValido && window.ultimoPrecioValido > 0) {
+                    precio = window.ultimoPrecioValido;
+                }
+
+                // 3. Fallback: usar el cierre de la última vela disponible en el array del gráfico
+                if (!precio && currentCandleData.length > 0) {
+                    precio = currentCandleData[currentCandleData.length - 1].close;
+                }
+
+                return precio;
+            }
+
             // LÓGICA DE EJECUCIÓN METAQUOTES WEB API REST CON SELECCIÓN DE BROKER
             async function sendMetaQuotesOrder(action) {
                 const selectedBroker = brokerSelect.value;
-                const entryPrice = parseFloat(dashEntry.innerText.replace('$', '')) || 0;
-                const tpPrice = parseFloat(dashTp.innerText.replace('$', '')) || 0;
-                const slPrice = parseFloat(dashSl.innerText.replace('$', '')) || 0;
+                const entryPrice = obtenerPrecioEntrada();
+                const tpPrice = parseFloat(dashTp.innerText.replace(/[^0-9.]/g, '')) || 0;
+                const slPrice = parseFloat(dashSl.innerText.replace(/[^0-9.]/g, '')) || 0;
                 const volume = parseFloat(inputTradeLots.value) || 0.01;
 
-                if (!entryPrice) {
-                    alert("No hay un precio de entrada válido disponible.");
+                if (!entryPrice || entryPrice <= 0) {
+                    alert("No hay un precio de entrada válido disponible. Revisa la conexión con el gráfico.");
                     return;
                 }
 
@@ -1044,7 +1076,7 @@
 
                 statusEl.style.display = "block";
                 statusEl.style.color = "#00e5ff";
-                statusEl.innerText = `Enviando orden ${action} a [${selectedBroker.toUpperCase()}] vía MetaQuotes Web API...`;
+                statusEl.innerText = `Enviando orden ${action} a [${selectedBroker.toUpperCase()}] a$${entryPrice.toFixed(2)} vía MetaQuotes Web API...`;
 
                 try {
                     const response = await fetch('http://localhost:3000/api/trade', {
@@ -1059,7 +1091,7 @@
                         statusEl.innerText = `✅ Orden ${action} en ${selectedBroker.toUpperCase()} ejecutada con éxito. Retcode: ${result.result.retcode || 'OK'}`;
                         statusEl.style.color = "#00e676";
                     } else {
-                        statusEl.innerText = `❌ Error en ejecución (${selectedBroker}): ${result.error}`;
+                        statusEl.innerText = `❌ Error en ejecución (${selectedBroker}):${result.error}`;
                         statusEl.style.color = "#ff5252";
                     }
                 } catch (error) {
