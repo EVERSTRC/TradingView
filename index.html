@@ -3,1105 +3,236 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>S/R + VSA + Footprint + CRL Time Frames - BTC/USD</title>
-    <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
-
+    <title>CRL :) Time Frames</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        html, body { width: 100%; height: 100%; background-color: #131722; color: #d1d4dc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; overflow: hidden; }
-        #main-container { width: 100vw; height: 100vh; display: flex; flex-direction: column; }
-        
-        #header {
-            min-height: 48px;
-            background-color: #1e222d;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 8px 16px;
-            border-bottom: 1px solid #2a2e39;
-            z-index: 10;
-            flex-wrap: wrap;
-            gap: 10px;
-        }
-        .title { font-size: 14px; font-weight: 700; color: #2962ff; letter-spacing: 0.5px; display: flex; align-items: center; gap: 8px; }
-        .live-dot { width: 8px; height: 8px; background-color: #00e676; border-radius: 50%; box-shadow: 0 0 8px #00e676; animation: blink 1.5s infinite; }
-        
-        @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
-
-        .controls-container { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-
-        select {
-            background-color: #2a2e39;
-            color: #d1d4dc;
-            border: 1px solid #363c4e;
-            padding: 6px 12px;
-            border-radius: 4px;
-            font-size: 13px;
-            outline: none;
-            cursor: pointer;
-        }
-        select:hover { border-color: #2962ff; }
-
-        .btn-fp {
-            background-color: #2a2e39;
-            color: #d1d4dc;
-            border: 1px solid #363c4e;
-            padding: 6px 12px;
-            border-radius: 4px;
-            font-size: 12px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            user-select: none;
-        }
-        .btn-fp:hover { border-color: #00e5ff; color: #00e5ff; }
-        .btn-fp.active {
-            background-color: rgba(0, 229, 255, 0.15);
-            border-color: #00e5ff;
-            color: #00e5ff;
-            box-shadow: 0 0 8px rgba(0, 229, 255, 0.3);
-        }
-
-        .btn-fp.inactive {
-            opacity: 0.5;
-            border-color: #2a2e39;
-            color: #787b86;
-        }
-
-        #chart-wrapper { flex: 1; width: 100%; position: relative; }
-        #chart { width: 100%; height: 100%; }
-
-        /* DASHBOARD PRINCIPAL Y SUS MÓDULOS DINÁMICOS */
-        #candle-dashboard {
-            position: absolute;
-            top: 16px;
-            left: 16px;
-            z-index: 8;
-            background: rgba(26, 30, 41, 0.90);
-            backdrop-filter: blur(8px);
-            border: 1px solid #2a2e39;
-            border-radius: 8px;
-            padding: 12px 16px;
+        body {
+            background-color: #f7f9fa;
+            color: #000;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
             display: flex;
             flex-direction: column;
-            gap: 8px;
-            min-width: 270px;
-            box-shadow: 0 4px 16px rgba(0,0,0,0.5);
-            max-height: calc(100vh - 80px);
-            overflow-y: auto;
-        }
-        
-        .dash-module {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
+            align-items: center;
+            padding: 20px 10px;
         }
 
-        .dash-row { display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 600; }
-        .dash-label { color: #787b86; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px; }
-        .dash-value { font-family: monospace; font-size: 13px; }
-        .dash-subvalue { font-family: monospace; font-size: 11px; opacity: 0.85; margin-left: 4px; }
-        .dash-divider { height: 1px; background-color: #2a2e39; margin: 2px 0; }
-        
-        .progress-bar-bg {
-            width: 100%;
-            height: 4px;
-            background-color: #2a2e39;
-            border-radius: 2px;
-            overflow: hidden;
-        }
-        .progress-bar-fill {
-            height: 100%;
-            width: 0%;
-            background: linear-gradient(90deg, #2962ff, #00e5ff);
-            transition: width 0.3s ease;
-        }
-
-        #status { 
-            position: absolute; 
-            top: 50%; 
-            left: 50%; 
-            transform: translate(-50%, -50%); 
-            font-size: 14px; 
-            color: #868993; 
-            pointer-events: none; 
-            background: rgba(19, 23, 34, 0.85);
-            padding: 8px 16px;
-            border-radius: 4px;
-            z-index: 5;
+        h1 {
+            font-size: 26px;
+            font-weight: 800;
+            margin-bottom: 20px;
             text-align: center;
+            letter-spacing: -0.5px;
         }
+        h1 span { color: #d00000; }
+
+        .grid-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            max-width: 800px;
+            width: 100%;
+            background-color: #888;
+            padding: 2px;
+            border: 2px solid #333;
+        }
+
+        .grid-item {
+            background-color: #ffffff;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+        }
+
+        .item-header {
+            width: 100%;
+            display: flex;
+            justify-content: space-around;
+            font-weight: 700;
+            font-size: 13px;
+            margin-bottom: 10px;
+        }
+
+        .diagram-container {
+            display: flex;
+            width: 100%;
+            height: 240px;
+            border-top: 1px dashed #ccc;
+            padding-top: 10px;
+        }
+
+        .htf-pane, .ltf-pane {
+            flex: 1;
+            height: 100%;
+            position: relative;
+        }
+
+        .htf-pane { border-right: 1px dashed #ccc; }
+
+        /* Estilos CSS para dibujo exacto tipo SVG */
+        svg { width: 100%; height: 100%; overflow: visible; }
+
+        /* Estilo de velas HTF */
+        .candle-body-blue { fill: #2b6cb0; stroke: #2b6cb0; }
+        .candle-body-black { fill: #1a202c; stroke: #1a202c; }
+        .wick { stroke: #000000; stroke-width: 1.5; }
+
+        /* Líneas de niveles CRL */
+        .crl-line { stroke: #666; stroke-width: 1; stroke-dasharray: 2,2; }
+        .crl-text { font-size: 9px; fill: #333; font-weight: bold; }
+
+        /* Zonas LTF */
+        .zone-target { fill: #cbe6ff; opacity: 0.7; }
+        .zone-sweep { fill: #e2e8f0; stroke: #cbd5e0; stroke-width: 1; }
+        .ltf-path { fill: none; stroke: #1a202c; stroke-width: 1.8; stroke-linejoin: round; }
     </style>
 </head>
 <body>
 
-    <div id="main-container">
-        <div id="header">
-            <span class="title"><span class="live-dot"></span> 🦈 BTC/USD S/R + VSA + FOOTPRINT + CRL</span>
-            
-            <div class="controls-container">
-                <button id="toggle-crl" class="btn-fp active">📊 CRL Liquidez (HTF)</button>
-                <button id="toggle-pivots" class="btn-fp active">📍 Pivotes Multi-TF</button>
-                <button id="toggle-pivots-tf" class="btn-fp active">📍 Pivotes Dinámicos TF</button>
-                <button id="toggle-vsa" class="btn-fp active">🐋 VSA Ballenas</button>
-                <button id="toggle-supertrend" class="btn-fp active">📈 Supertrend</button>
-                <button id="toggle-footprint" class="btn-fp active">👣 Footprint POC</button>
-                <button id="toggle-shark" class="btn-fp active">🦈 Tiburón VSA</button>
-                <button id="toggle-multi-fp" class="btn-fp">🌐 Multi-FP</button>
-                
-                <div>
-                    <select id="timeframe">
-                        <option value="1s">1 Segundo</option>
-                        <option value="1m">1 Minuto</option>
-                        <option value="3m">3 Minutos</option>
-                        <option value="5m">5 Minutos</option>
-                        <option value="15m">15 Minutos</option>
-                        <option value="1h">1 Hora</option>
-                        <option value="4h" selected>4 Horas</option>
-                        <option value="1d">1 Día</option>
-                        <option value="1w">1 Semana</option>
-                    </select>
+    <h1>CRL :) Time Frames</h1>
+
+    <div class="grid-container">
+        
+        <!-- CUADRO 1: 1 hour HTF / 1 min LTF (Alcista a Bajista Sweep) -->
+        <div class="grid-item">
+            <div class="item-header">
+                <span>1 hour - HTF</span>
+                <span>1 min - LTF</span>
+            </div>
+            <div class="diagram-container">
+                <div class="htf-pane">
+                    <svg viewBox="0 0 100 200">
+                        <!-- Vela Anterior -->
+                        <line x1="30" y1="30" x2="30" y2="170" class="wick" />
+                        <rect x="20" y="50" width="20" height="100" class="candle-body-blue" />
+                        
+                        <!-- Vela Actual (Sweep Superior) -->
+                        <line x1="65" y1="20" x2="65" y2="180" class="wick" />
+                        <rect x="55" y="50" width="20" height="100" class="candle-body-black" />
+
+                        <!-- Líneas CRL -->
+                        <line x1="10" y1="30" x2="90" y2="30" class="crl-line" />
+                        <text x="75" y="25" class="crl-text">BSL</text>
+
+                        <line x1="10" y1="100" x2="90" y2="100" class="crl-line" />
+                        <text x="75" y="97" class="crl-text">50%</text>
+
+                        <line x1="10" y1="170" x2="90" y2="170" class="crl-line" />
+                        <text x="75" y="182" class="crl-text">SSL</text>
+                    </svg>
+                </div>
+                <div class="ltf-pane">
+                    <svg viewBox="0 0 100 200">
+                        <!-- Zonas -->
+                        <rect x="10" y="20" width="80" height="30" class="zone-sweep" />
+                        <text x="25" y="38" class="crl-text">Turtle Soup / CHoCH</text>
+                        
+                        <rect x="10" y="100" width="80" height="70" class="zone-target" />
+                        
+                        <!-- Estructura de Línea LTF -->
+                        <path d="M 15 120 L 25 80 L 35 100 L 45 25 L 55 50 L 65 40 L 85 170" class="ltf-path" />
+                    </svg>
                 </div>
             </div>
         </div>
 
-        <div id="chart-wrapper">
-            <div id="candle-dashboard">
-                <div class="dash-row">
-                    <span class="dash-label">Cierre de Vela</span>
-                    <span id="timer-display" class="dash-value" style="color: #00e5ff;">00:00</span>
-                </div>
-                <div class="progress-bar-bg">
-                    <div id="timer-progress" class="progress-bar-fill"></div>
-                </div>
+        <!-- CUADRO 2: 4 hour HTF / 5 min LTF (Bajista a Alcista) -->
+        <div class="grid-item">
+            <div class="item-header">
+                <span>4 hour - HTF</span>
+                <span>5 min - LTF</span>
+            </div>
+            <div class="diagram-container">
+                <div class="htf-pane">
+                    <svg viewBox="0 0 100 200">
+                        <!-- Vela HTF Azul/Negra -->
+                        <line x1="30" y1="40" x2="30" y2="170" class="wick" />
+                        <rect x="20" y="70" width="20" height="80" class="candle-body-blue" />
 
-                <!-- NUEVO MÓDULO: CRL (Candle Range Liquidity) -->
-                <div id="dash-module-crl" class="dash-module">
-                    <div class="dash-divider"></div>
-                    <div class="dash-row">
-                        <span id="dash-crl-tf-label" class="dash-label">CRL HTF (1H/4H)</span>
-                        <span id="dash-crl-state" class="dash-value" style="color: #e040fb;">RANGO</span>
-                    </div>
-                    <div class="dash-row">
-                        <span class="dash-label">BSL (Alto HTF)</span>
-                        <span id="dash-crl-bsl" class="dash-value" style="color: #ff5252;">--</span>
-                    </div>
-                    <div class="dash-row">
-                        <span class="dash-label">EQ 50% (Medio HTF)</span>
-                        <span id="dash-crl-eq" class="dash-value" style="color: #ffb300;">--</span>
-                    </div>
-                    <div class="dash-row">
-                        <span class="dash-label">SSL (Bajo HTF)</span>
-                        <span id="dash-crl-ssl" class="dash-value" style="color: #00e676;">--</span>
-                    </div>
-                </div>
+                        <line x1="65" y1="30" x2="65" y2="185" class="wick" />
+                        <rect x="55" y="50" width="20" height="100" class="candle-body-black" />
 
-                <div id="dash-module-footprint" class="dash-module">
-                    <div class="dash-divider"></div>
-                    <div class="dash-row">
-                        <span class="dash-label">Sesgo Mercado</span>
-                        <span id="dash-bias" class="dash-value">--</span>
-                    </div>
-                    <div class="dash-row">
-                        <span class="dash-label">Punto de Entrada</span>
-                        <span id="dash-entry" class="dash-value" style="color: #00e5ff;">--</span>
-                    </div>
-                    <div class="dash-row">
-                        <span class="dash-label">Take Profit (Objetivo)</span>
-                        <span id="dash-tp" class="dash-value" style="color: #00e676;">--</span>
-                    </div>
-                    <div class="dash-row">
-                        <span class="dash-label">Stop Loss (Invalidación)</span>
-                        <span id="dash-sl" class="dash-value" style="color: #ff5252;">--</span>
-                    </div>
-                    <div class="dash-row">
-                        <span class="dash-label">Invalidación Metodología</span>
-                        <span id="dash-invalid" class="dash-value" style="color: #e040fb;">--</span>
-                    </div>
+                        <line x1="10" y1="40" x2="90" y2="40" class="crl-line" />
+                        <line x1="10" y1="110" x2="90" y2="110" class="crl-line" />
+                        <text x="75" y="107" class="crl-text">50%</text>
+                        <line x1="10" y1="185" x2="90" y2="185" class="crl-line" />
+                    </svg>
                 </div>
-
-                <div id="dash-module-shark" class="dash-module">
-                    <div class="dash-divider"></div>
-                    <div class="dash-row">
-                        <span class="dash-label">🦈 Zona Liquidez Shark</span>
-                        <span id="dash-shark-zone" class="dash-value" style="color: #00e5ff;">--</span>
-                    </div>
-                    <div class="dash-row">
-                        <span class="dash-label">🦈 Presión Volumen</span>
-                        <span id="dash-shark-pressure" class="dash-value">--</span>
-                    </div>
-                </div>
-
-                <div id="dash-module-pivots" class="dash-module">
-                    <div class="dash-divider"></div>
-                    <div class="dash-row">
-                        <span class="dash-label">Objetivo Multi-TF</span>
-                        <span id="dash-target" class="dash-value" style="color: #ff9100;">--</span>
-                    </div>
-                </div>
-
-                <div id="dash-module-pivots-tf" class="dash-module">
-                    <div class="dash-divider"></div>
-                    <div class="dash-row">
-                        <span id="dash-pivot-tf-res-label" class="dash-label">Resistencia TF</span>
-                        <span id="dash-pivot-tf-res" class="dash-value" style="color: #ff5252;">--</span>
-                    </div>
-                    <div class="dash-row">
-                        <span id="dash-pivot-tf-sup-label" class="dash-label">Soporte TF</span>
-                        <span id="dash-pivot-tf-sup" class="dash-value" style="color: #00e676;">--</span>
-                    </div>
-                </div>
-
-                <div id="dash-module-vsa" class="dash-module">
-                    <div class="dash-divider"></div>
-                    <div class="dash-row">
-                        <span class="dash-label">Ballenas 1D</span>
-                        <div>
-                            <span id="dash-whale-1d-pct" class="dash-value">--</span>
-                            <span id="dash-whale-1d-net" class="dash-subvalue">(--)</span>
-                        </div>
-                    </div>
-                    <div class="dash-row">
-                        <span class="dash-label">Ballenas 1W</span>
-                        <div>
-                            <span id="dash-whale-1w-pct" class="dash-value">--</span>
-                            <span id="dash-whale-1w-net" class="dash-subvalue">(--)</span>
-                        </div>
-                    </div>
-                    <div class="dash-row">
-                        <span class="dash-label">Ballenas 1M</span>
-                        <div>
-                            <span id="dash-whale-1m-pct" class="dash-value">--</span>
-                            <span id="dash-whale-1m-net" class="dash-subvalue">(--)</span>
-                        </div>
-                    </div>
+                <div class="ltf-pane">
+                    <svg viewBox="0 0 100 200">
+                        <rect x="10" y="160" width="80" height="30" class="zone-sweep" />
+                        <rect x="10" y="30" width="80" height="80" class="zone-target" />
+                        
+                        <path d="M 15 60 L 25 120 L 35 100 L 45 180 L 55 140 L 65 150 L 85 30" class="ltf-path" />
+                    </svg>
                 </div>
             </div>
-
-            <div id="chart"></div>
         </div>
+
+        <!-- CUADRO 3: 4 hour HTF / 5 min LTF (Alcista Expansión) -->
+        <div class="grid-item">
+            <div class="item-header">
+                <span>4 hour - HTF</span>
+                <span>5 min - LTF</span>
+            </div>
+            <div class="diagram-container">
+                <div class="htf-pane">
+                    <svg viewBox="0 0 100 200">
+                        <line x1="30" y1="40" x2="30" y2="170" class="wick" />
+                        <rect x="20" y="80" width="20" height="80" class="candle-body-blue" />
+
+                        <line x1="65" y1="20" x2="65" y2="180" class="wick" />
+                        <rect x="55" y="40" width="20" height="130" class="candle-body-black" />
+
+                        <line x1="10" y1="20" x2="90" y2="20" class="crl-line" />
+                        <line x1="10" y1="100" x2="90" y2="100" class="crl-line" />
+                        <line x1="10" y1="180" x2="90" y2="180" class="crl-line" />
+                    </svg>
+                </div>
+                <div class="ltf-pane">
+                    <svg viewBox="0 0 100 200">
+                        <rect x="10" y="150" width="80" height="30" class="zone-sweep" />
+                        <rect x="10" y="20" width="80" height="80" class="zone-target" />
+
+                        <path d="M 15 110 L 25 140 L 35 120 L 45 170 L 60 90 L 70 105 L 85 20" class="ltf-path" />
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <!-- CUADRO 4: 1 hour HTF / 1 min LTF (Breaker / CHoCH Bajista) -->
+        <div class="grid-item">
+            <div class="item-header">
+                <span>1 hour - HTF</span>
+                <span>1 min - LTF</span>
+            </div>
+            <div class="diagram-container">
+                <div class="htf-pane">
+                    <svg viewBox="0 0 100 200">
+                        <line x1="30" y1="30" x2="30" y2="160" class="wick" />
+                        <rect x="20" y="50" width="20" height="90" class="candle-body-blue" />
+
+                        <line x1="65" y1="20" x2="65" y2="180" class="wick" />
+                        <rect x="55" y="50" width="20" height="110" class="candle-body-black" />
+
+                        <line x1="10" y1="20" x2="90" y2="20" class="crl-line" />
+                        <line x1="10" y1="90" x2="90" y2="90" class="crl-line" />
+                        <line x1="10" y1="180" x2="90" y2="180" class="crl-line" />
+                    </svg>
+                </div>
+                <div class="ltf-pane">
+                    <svg viewBox="0 0 100 200">
+                        <rect x="10" y="20" width="80" height="30" class="zone-sweep" />
+                        <rect x="10" y="110" width="80" height="70" class="zone-target" />
+
+                        <path d="M 15 90 L 25 60 L 35 75 L 45 20 L 55 50 L 65 35 L 85 180" class="ltf-path" />
+                    </svg>
+                </div>
+            </div>
+        </div>
+
     </div>
-    <div id="status">Conectando a Binance WebSocket...</div>
 
-    <script>
-        document.addEventListener("DOMContentLoaded", function () {
-            const statusEl = document.getElementById("status");
-            const timeframeSelect = document.getElementById("timeframe");
-            const chartContainer = document.getElementById("chart");
-
-            const btnCrl = document.getElementById("toggle-crl");
-            const btnPivots = document.getElementById("toggle-pivots");
-            const btnPivotsTf = document.getElementById("toggle-pivots-tf");
-            const btnVsa = document.getElementById("toggle-vsa");
-            const btnSupertrend = document.getElementById("toggle-supertrend");
-            const btnFootprint = document.getElementById("toggle-footprint");
-            const btnShark = document.getElementById("toggle-shark");
-            const btnMultiFp = document.getElementById("toggle-multi-fp");
-
-            const modCrl = document.getElementById("dash-module-crl");
-            const modFootprint = document.getElementById("dash-module-footprint");
-            const modShark = document.getElementById("dash-module-shark");
-            const modPivots = document.getElementById("dash-module-pivots");
-            const modPivotsTf = document.getElementById("dash-module-pivots-tf");
-            const modVsa = document.getElementById("dash-module-vsa");
-
-            let showCrl = true;
-            let showPivots = true;
-            let showPivotsTf = true;
-            let showVsa = true;
-            let showSupertrend = true;
-            let showFootprint = true;
-            let showShark = true;
-            let showMultiFootprint = false;
-
-            const timerDisplay = document.getElementById("timer-display");
-            const timerProgress = document.getElementById("timer-progress");
-            const dashBias = document.getElementById("dash-bias");
-            const dashTarget = document.getElementById("dash-target");
-            const dashInvalid = document.getElementById("dash-invalid");
-
-            const dashCrlTfLabel = document.getElementById("dash-crl-tf-label");
-            const dashCrlState = document.getElementById("dash-crl-state");
-            const dashCrlBsl = document.getElementById("dash-crl-bsl");
-            const dashCrlEq = document.getElementById("dash-crl-eq");
-            const dashCrlSsl = document.getElementById("dash-crl-ssl");
-
-            const dashPivotTfResLabel = document.getElementById("dash-pivot-tf-res-label");
-            const dashPivotTfSupLabel = document.getElementById("dash-pivot-tf-sup-label");
-            const dashPivotTfRes = document.getElementById("dash-pivot-tf-res");
-            const dashPivotTfSup = document.getElementById("dash-pivot-tf-sup");
-
-            const dashEntry = document.getElementById("dash-entry");
-            const dashTp = document.getElementById("dash-tp");
-            const dashSl = document.getElementById("dash-sl");
-
-            const dashWhale1dPct = document.getElementById("dash-whale-1d-pct");
-            const dashWhale1dNet = document.getElementById("dash-whale-1d-net");
-            const dashWhale1wPct = document.getElementById("dash-whale-1w-pct");
-            const dashWhale1wNet = document.getElementById("dash-whale-1w-net");
-            const dashWhale1mPct = document.getElementById("dash-whale-1m-pct");
-            const dashWhale1mNet = document.getElementById("dash-whale-1m-net");
-
-            const dashSharkZone = document.getElementById("dash-shark-zone");
-            const dashSharkPressure = document.getElementById("dash-shark-pressure");
-
-            let activePriceLines = [];
-            let wsConnection = null;
-            let currentCandleData = [];
-            let timerInterval = null;
-
-            let currentFootprintRes = null;
-            let currentWhaleBuyAvg = null;
-            let currentMainTarget = null;
-
-            const chart = LightweightCharts.createChart(chartContainer, {
-                width: chartContainer.clientWidth,
-                height: chartContainer.clientHeight,
-                layout: { background: { type: 'solid', color: '#131722' }, textColor: '#d1d4dc' },
-                grid: { vertLines: { color: 'rgba(42, 46, 57, 0.5)' }, horzLines: { color: 'rgba(42, 46, 57, 0.5)' } },
-                timeScale: { borderColor: 'rgba(197, 203, 206, 0.8)', timeVisible: true, secondsVisible: true },
-                rightPriceScale: { autoScale: true }
-            });
-
-            const candlestickSeries = chart.addCandlestickSeries({
-                upColor: '#089981', downColor: '#f23645', borderVisible: false, wickUpColor: '#089981', wickDownColor: '#f23645'
-            });
-
-            function updateDashboardModulesVisibility() {
-                modCrl.style.display = showCrl ? "flex" : "none";
-                modFootprint.style.display = showFootprint ? "flex" : "none";
-                modShark.style.display = showShark ? "flex" : "none";
-                modPivots.style.display = showPivots ? "flex" : "none";
-                modPivotsTf.style.display = showPivotsTf ? "flex" : "none";
-                modVsa.style.display = showVsa ? "flex" : "none";
-            }
-
-            function toggleButton(btn, stateVar, updateFn) {
-                btn.addEventListener('click', () => {
-                    stateVar = !stateVar;
-                    if(stateVar) {
-                        btn.classList.add('active');
-                        btn.classList.remove('inactive');
-                    } else {
-                        btn.classList.remove('active');
-                        btn.classList.add('inactive');
-                    }
-                    updateFn(stateVar);
-                    renderSRVisuals(currentCandleData);
-                });
-            }
-
-            toggleButton(btnCrl, showCrl, (v) => showCrl = v);
-            toggleButton(btnPivots, showPivots, (v) => showPivots = v);
-            toggleButton(btnPivotsTf, showPivotsTf, (v) => showPivotsTf = v);
-            toggleButton(btnVsa, showVsa, (v) => showVsa = v);
-            toggleButton(btnSupertrend, showSupertrend, (v) => showSupertrend = v);
-            toggleButton(btnFootprint, showFootprint, (v) => showFootprint = v);
-            toggleButton(btnShark, showShark, (v) => showShark = v);
-
-            btnMultiFp.addEventListener('click', () => {
-                showMultiFootprint = !showMultiFootprint;
-                btnMultiFp.classList.toggle('active', showMultiFootprint);
-                btnMultiFp.classList.toggle('inactive', !showMultiFootprint);
-                renderSRVisuals(currentCandleData);
-            });
-
-            // --- INDICADOR NUEVO: CRL (CANDLE RANGE LIQUIDITY / CRT) ---
-            async function calculateCRLData(currentTf) {
-                let htf = '1h';
-                if (['1s', '1m', '3m', '5m', '15m'].includes(currentTf)) {
-                    htf = '1h';
-                } else if (['1h', '4h'].includes(currentTf)) {
-                    htf = '4h';
-                } else {
-                    htf = '1d';
-                }
-
-                try {
-                    const htfCandles = await fetchKlines(htf, 5);
-                    if (!htfCandles || htfCandles.length < 2) return null;
-
-                    // Tomamos la vela anterior de HTF para definir el Rango / Liquidez
-                    const prevCandle = htfCandles[htfCandles.length - 2];
-                    const highBSL = prevCandle.high;
-                    const lowSSL = prevCandle.low;
-                    const eq50 = lowSSL + (highBSL - lowSSL) * 0.5;
-
-                    return { htfLabel: htf.toUpperCase(), highBSL, lowSSL, eq50 };
-                } catch (e) {
-                    console.error("Error obteniendo datos CRL HTF:", e);
-                    return null;
-                }
-            }
-
-            function updateRealtimeAnalysis(lastClosePrice) {
-                if (!lastClosePrice) return;
-
-                let isBullish = false;
-
-                if (currentFootprintRes && showFootprint) {
-                    const invalidLevel = currentFootprintRes + 35;
-                    dashInvalid.innerText = `$${invalidLevel.toFixed(2)}`;
-
-                    if (lastClosePrice < currentFootprintRes) {
-                        dashBias.innerText = "BAJISTA 🐻";
-                        dashBias.style.color = "#ff5252";
-                        isBullish = false;
-                    } else {
-                        dashBias.innerText = "ALCISTA 🚀";
-                        dashBias.style.color = "#00e676";
-                        isBullish = true;
-                    }
-                } else {
-                    dashBias.innerText = "NEUTRO";
-                    dashBias.style.color = "#d1d4dc";
-                    dashInvalid.innerText = "--";
-                }
-
-                if (currentMainTarget && showPivots) {
-                    dashTarget.innerText = `$${currentMainTarget.toFixed(2)}`;
-                } else {
-                    dashTarget.innerText = "--";
-                }
-
-                if (currentFootprintRes && showFootprint) {
-                    let entryPrice = lastClosePrice; 
-                    let slPrice = isBullish ? currentFootprintRes * 0.997 : currentFootprintRes * 1.003; 
-                    
-                    let tpPrice;
-                    if (currentMainTarget && showPivots && ((isBullish && currentMainTarget > entryPrice) || (!isBullish && currentMainTarget < entryPrice))) {
-                        tpPrice = currentMainTarget;
-                    } else {
-                        let risk = Math.abs(entryPrice - slPrice);
-                        tpPrice = isBullish ? entryPrice + (risk * 2) : entryPrice - (risk * 2);
-                    }
-
-                    dashEntry.innerText = `$${entryPrice.toFixed(2)}`;
-                    dashTp.innerText = `$${tpPrice.toFixed(2)}`;
-                    dashSl.innerText = `$${slPrice.toFixed(2)}`;
-                } else {
-                    dashEntry.innerText = "--";
-                    dashTp.innerText = "--";
-                    dashSl.innerText = "--";
-                }
-            }
-
-            function calculateSharkVSA(candles) {
-                if (!candles || candles.length < 20) return { markers: [], lineLevel: null, pressureText: "--", pressureColor: "#d1d4dc" };
-
-                let markers = [];
-                let highVolLevel = null;
-                let buyVolSum = 0;
-                let sellVolSum = 0;
-
-                const recentCandles = candles.slice(-20);
-                let avgVol = recentCandles.reduce((a, b) => a + (b.volume || 0), 0) / 20;
-
-                for (let i = candles.length - 15; i < candles.length; i++) {
-                    let c = candles[i];
-                    if (!c) continue;
-
-                    if (c.close >= c.open) buyVolSum += c.volume;
-                    else sellVolSum += c.volume;
-
-                    if (c.volume > avgVol * 2.5) {
-                        highVolLevel = c.close >= c.open ? c.low : c.high;
-                        markers.push({
-                            time: c.time,
-                            position: c.close >= c.open ? 'belowBar' : 'aboveBar',
-                            color: c.close >= c.open ? '#00e5ff' : '#ff0055',
-                            shape: 'square',
-                            text: '🦈 VSA'
-                        });
-                    }
-                }
-
-                let total = buyVolSum + sellVolSum;
-                let buyRatio = total > 0 ? (buyVolSum / total) * 100 : 50;
-                let pressureText = `${buyRatio.toFixed(0)}% Alcista`;
-                let pressureColor = buyRatio > 52 ? '#00e676' : (buyRatio < 48 ? '#ff5252' : '#d1d4dc');
-
-                return { markers, lineLevel: highVolLevel, pressureText, pressureColor };
-            }
-
-            function calculateWhaleMetrics(candles, thresholdMultiplier = 1.5) {
-                if (!candles || candles.length < 20) return { buyVol: 0, sellVol: 0 };
-
-                let buyVol = 0;
-                let sellVol = 0;
-                let rollingVolumeSum = 0;
-
-                for (let i = 0; i < 20; i++) rollingVolumeSum += (candles[i].volume || 1);
-
-                for (let i = 20; i < candles.length; i++) {
-                    const c = candles[i];
-                    const avgVol = rollingVolumeSum / 20;
-                    rollingVolumeSum += (c.volume || 1) - (candles[i - 20].volume || 1);
-
-                    if ((c.volume || 0) > (avgVol * thresholdMultiplier)) {
-                        if (c.close > c.open) {
-                            buyVol += c.volume;
-                        } else if (c.close < c.open) {
-                            sellVol += c.volume;
-                        } else {
-                            buyVol += c.volume / 2;
-                            sellVol += c.volume / 2;
-                        }
-                    }
-                }
-                return { buyVol, sellVol };
-            }
-
-            async function updateWhaleDashboard() {
-                try {
-                    const [raw1d, raw1w, raw1m] = await Promise.all([
-                        fetchKlines('1d', 100),
-                        fetchKlines('1w', 100),
-                        fetchKlines('1M', 60)
-                    ]);
-
-                    const periods = [
-                        { data: raw1d, elPct: dashWhale1dPct, elNet: dashWhale1dNet, multiplier: 1.4 },
-                        { data: raw1w, elPct: dashWhale1wPct, elNet: dashWhale1wNet, multiplier: 1.3 },
-                        { data: raw1m, elPct: dashWhale1mPct, elNet: dashWhale1mNet, multiplier: 1.2 }
-                    ];
-
-                    periods.forEach(({ data, elPct, elNet, multiplier }) => {
-                        const { buyVol, sellVol } = calculateWhaleMetrics(data, multiplier);
-                        const total = buyVol + sellVol;
-                        const netBtc = buyVol - sellVol;
-
-                        if (total === 0) {
-                            elPct.innerText = "50%C/50%V";
-                            elPct.style.color = "#d1d4dc";
-                            elNet.innerText = "(0 BTC)";
-                            elNet.style.color = "#d1d4dc";
-                            return;
-                        }
-
-                        const buyPct = Math.round((buyVol / total) * 100);
-                        const sellPct = 100 - buyPct;
-
-                        elPct.innerText = `${buyPct}%C/${sellPct}%V`;
-                        
-                        if (buyPct > 50) {
-                            elPct.style.color = "#00e676";
-                        } else if (buyPct < 50) {
-                            elPct.style.color = "#ff5252";
-                        } else {
-                            elPct.style.color = "#d1d4dc";
-                        }
-
-                        const formattedNet = netBtc >= 0 
-                            ? `(+${Math.round(netBtc)} BTC)` 
-                            : `(${Math.round(netBtc)} BTC)`;
-                        
-                        elNet.innerText = formattedNet;
-                        elNet.style.color = netBtc >= 0 ? "#00e676" : "#ff5252";
-                    });
-                } catch (e) {
-                    console.error("Error actualizando métricas de ballenas:", e);
-                }
-            }
-
-            function getIntervalInSeconds(interval) {
-                const unit = interval.slice(-1);
-                const val = parseInt(interval);
-                if (unit === 's') return val;
-                if (unit === 'm') return val * 60;
-                if (unit === 'h') return val * 3600;
-                if (unit === 'd') return val * 86400;
-                if (unit === 'w') return val * 604800;
-                return 60;
-            }
-
-            function startCandleTimer(interval) {
-                if (timerInterval) clearInterval(timerInterval);
-
-                const intervalSecs = getIntervalInSeconds(interval);
-
-                function updateTimer() {
-                    const nowSecs = Math.floor(Date.now() / 1000);
-                    const elapsed = nowSecs % intervalSecs;
-                    const remaining = intervalSecs - elapsed;
-
-                    const mins = Math.floor(remaining / 60);
-                    const secs = remaining % 60;
-
-                    if (intervalSecs < 60) {
-                        timerDisplay.innerText = `${remaining}s`;
-                    } else if (mins >= 60) {
-                        const hrs = Math.floor(mins / 60);
-                        const remMins = mins % 60;
-                        timerDisplay.innerText = `${hrs}h ${remMins.toString().padStart(2, '0')}m`;
-                    } else {
-                        timerDisplay.innerText = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-                    }
-
-                    const pct = (elapsed / intervalSecs) * 100;
-                    timerProgress.style.width = `${pct}%`;
-                }
-
-                updateTimer();
-                timerInterval = setInterval(updateTimer, 1000);
-            }
-
-            function calculateFootprintLevels(candles) {
-                if (!candles || candles.length < 20) return { footprintPOCs: [] };
-
-                const footprintPOCs = [];
-                let rollingVolumeSum = 0;
-                for (let i = 0; i < 20; i++) rollingVolumeSum += (candles[i].volume || 1);
-
-                for (let i = 20; i < candles.length; i++) {
-                    const c = candles[i];
-                    const avgVol = rollingVolumeSum / 20;
-                    rollingVolumeSum += (c.volume || 1) - (candles[i - 20].volume || 1);
-
-                    if ((c.volume || 0) > (avgVol * 2.2)) {
-                        const footprintPOC = c.open < c.close 
-                            ? c.open + ((c.close - c.open) * 0.70)
-                            : c.open - ((c.open - c.close) * 0.70);
-
-                        footprintPOCs.push({
-                            price: footprintPOC,
-                            isBullish: c.close > c.open,
-                            time: c.time
-                        });
-                    }
-                }
-                return { footprintPOCs: footprintPOCs.slice(-2) };
-            }
-
-            function getSupertrendMarkers(candles, atrPeriods = 14, multiplier = 2.0, stopLossVal = 2.0) {
-                if (!candles || candles.length < atrPeriods + 1) return [];
-
-                const len = candles.length;
-                const tr = new Float64Array(len);
-                
-                tr[0] = candles[0].high - candles[0].low;
-                for (let i = 1; i < len; i++) {
-                    const hL = candles[i].high - candles[i].low;
-                    const hC = Math.abs(candles[i].high - candles[i - 1].close);
-                    const lC = Math.abs(candles[i].low - candles[i - 1].close);
-                    tr[i] = Math.max(hL, hC, lC);
-                }
-
-                const atr = new Float64Array(len);
-                let sumTR = 0;
-                for (let i = 0; i < atrPeriods; i++) sumTR += tr[i];
-                atr[atrPeriods - 1] = sumTR / atrPeriods;
-
-                for (let i = atrPeriods; i < len; i++) {
-                    atr[i] = (atr[i - 1] * (atrPeriods - 1) + tr[i]) / atrPeriods;
-                }
-
-                const up = new Float64Array(len);
-                const dn = new Float64Array(len);
-                const trend = new Int32Array(len);
-                
-                let currentTrend = 1;
-
-                for (let i = 0; i < len; i++) {
-                    const src = (candles[i].high + candles[i].low) / 2;
-                    const currentAtr = atr[i];
-
-                    let basicUp = src - (multiplier * currentAtr);
-                    let basicDn = src + (multiplier * currentAtr);
-
-                    if (i === 0) {
-                        up[i] = basicUp;
-                        dn[i] = basicDn;
-                        trend[i] = 1;
-                        continue;
-                    }
-
-                    const prevUp = up[i - 1];
-                    const prevDn = dn[i - 1];
-                    const prevClose = candles[i - 1].close;
-
-                    up[i] = prevClose > prevUp ? Math.max(basicUp, prevUp) : basicUp;
-                    dn[i] = prevClose < prevDn ? Math.min(basicDn, prevDn) : basicDn;
-
-                    const prevTrend = trend[i - 1];
-                    if (prevTrend === -1 && candles[i].close > prevDn) {
-                        currentTrend = 1;
-                    } else if (prevTrend === 1 && candles[i].close < prevUp) {
-                        currentTrend = -1;
-                    } else {
-                        currentTrend = prevTrend;
-                    }
-                    
-                    trend[i] = currentTrend;
-                }
-
-                const stMarkers = [];
-                let pos = 0;
-                let entryOfLong = 0;
-                let entryOfShort = 0;
-
-                const sl = stopLossVal > 0 ? stopLossVal / 100 : 99999;
-
-                for (let i = 1; i < len; i++) {
-                    const buySignal = trend[i] === 1 && trend[i - 1] === -1;
-                    const sellSignal = trend[i] === -1 && trend[i - 1] === 1;
-
-                    let prevPos = pos;
-                    if (buySignal) pos = 1;
-                    else if (sellSignal) pos = -1;
-
-                    const longCond = buySignal && prevPos !== 1;
-                    const shortCond = sellSignal && prevPos !== -1;
-
-                    if (longCond) entryOfLong = candles[i].close;
-                    if (shortCond) entryOfShort = candles[i].close;
-
-                    const stopLossForLong = entryOfLong * (1 - sl);
-                    const stopLossForShort = entryOfShort * (1 + sl);
-                    const tp3Long = entryOfLong * (1 + sl * 3);
-                    const tp3Short = entryOfShort * (1 - sl * 3);
-
-                    const longSL = candles[i].low < stopLossForLong && prevPos === 1;
-                    const shortSL = candles[i].high > stopLossForShort && prevPos === -1;
-                    const tpLongFinal = candles[i].high > tp3Long && prevPos === 1;
-                    const tpShortFinal = candles[i].low < tp3Short && prevPos === -1;
-
-                    if (longSL || shortSL || tpLongFinal || tpShortFinal) {
-                        pos = 0;
-                    }
-
-                    if (longCond) {
-                        stMarkers.push({
-                            time: candles[i].time,
-                            position: 'belowBar',
-                            color: '#00e676',
-                            shape: 'arrowUp',
-                            text: 'Buy'
-                        });
-                    } else if (shortCond) {
-                        stMarkers.push({
-                            time: candles[i].time,
-                            position: 'aboveBar',
-                            color: '#ff1744',
-                            shape: 'arrowDown',
-                            text: 'Sell'
-                        });
-                    }
-                }
-
-                return stMarkers;
-            }
-
-            function calculatePivots(candles, leftBars = 15, rightBars = 15) {
-                let lastPivotHigh = null, lastPivotLow = null;
-                for (let i = leftBars; i < candles.length - rightBars; i++) {
-                    let isHighPivot = true, isLowPivot = true;
-                    for (let j = i - leftBars; j <= i + rightBars; j++) {
-                        if (j === i) continue;
-                        if (candles[j].high >= candles[i].high) isHighPivot = false;
-                        if (candles[j].low <= candles[i].low) isLowPivot = false;
-                    }
-                    if (isHighPivot) lastPivotHigh = candles[i];
-                    if (isLowPivot) lastPivotLow = candles[i];
-                }
-                return { pivotHigh: lastPivotHigh, pivotLow: lastPivotLow };
-            }
-
-            function processWhaleData(candles) {
-                const markers = [];
-                if (!candles || candles.length < 20) return { markers, buyPrices: [], sellPrices: [] };
-
-                const buyPrices = [], sellPrices = [];
-                let rollingVolumeSum = 0;
-                for (let i = 0; i < 20; i++) rollingVolumeSum += (candles[i].volume || 1);
-
-                for (let i = 20; i < candles.length; i++) {
-                    const currentCandle = candles[i];
-                    const avgVol = rollingVolumeSum / 20;
-                    const isHighVolume = (currentCandle.volume || 0) > (avgVol * 2.2);
-
-                    rollingVolumeSum += (currentCandle.volume || 1) - (candles[i - 20].volume || 1);
-
-                    if (isHighVolume) {
-                        if (currentCandle.close > currentCandle.open) {
-                            buyPrices.push(currentCandle.close);
-                            markers.push({ time: currentCandle.time, position: 'belowBar', color: '#00b0ff', shape: 'circle', text: 'BUY' });
-                        } else if (currentCandle.close < currentCandle.open) {
-                            sellPrices.push(currentCandle.close);
-                            markers.push({ time: currentCandle.time, position: 'aboveBar', color: '#ff4081', shape: 'circle', text: 'SELL' });
-                        }
-                    }
-                }
-                return { markers, buyPrices, sellPrices };
-            }
-
-            async function fetchKlines(interval, limit = 500) {
-                const is1s = interval === "1s";
-                const endpoint = is1s ? 'uiKlines' : 'klines';
-                const apiInterval = is1s ? '1s' : interval;
-                
-                const res = await fetch(`https://api.binance.com/api/v3/${endpoint}?symbol=BTCUSDT&interval=${apiInterval}&limit=${limit}`);
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                const data = await res.json();
-                return data.map(d => ({
-                    time: Math.floor(d[0] / 1000), open: parseFloat(d[1]), high: parseFloat(d[2]), low: parseFloat(d[3]), close: parseFloat(d[4]), volume: parseFloat(d[5])
-                }));
-            }
-
-            async function renderSRVisuals(currentFormattedData) {
-                try {
-                    activePriceLines.forEach(line => candlestickSeries.removePriceLine(line));
-                    activePriceLines = [];
-
-                    const lineLevels = [];
-                    currentMainTarget = null;
-                    currentWhaleBuyAvg = null;
-                    currentFootprintRes = null;
-
-                    updateDashboardModulesVisibility();
-
-                    // MÓDULOS DE LÍNEAS CRL (CANDLE RANGE LIQUIDITY)
-                    if (showCrl) {
-                        const crlData = await calculateCRLData(timeframeSelect.value);
-                        if (crlData) {
-                            dashCrlTfLabel.innerText = `CRL HTF (${crlData.htfLabel})`;
-                            dashCrlBsl.innerText = `$${crlData.highBSL.toFixed(2)}`;
-                            dashCrlEq.innerText = `$${crlData.eq50.toFixed(2)}`;
-                            dashCrlSsl.innerText = `$${crlData.lowSSL.toFixed(2)}`;
-
-                            const lastClose = currentFormattedData.length > 0 ? currentFormattedData[currentFormattedData.length - 1].close : null;
-                            if (lastClose) {
-                                if (lastClose > crlData.highBSL) {
-                                    dashCrlState.innerText = "BSL SWEEP 🚀";
-                                    dashCrlState.style.color = "#ff5252";
-                                } else if (lastClose < crlData.lowSSL) {
-                                    dashCrlState.innerText = "SSL SWEEP 🐻";
-                                    dashCrlState.style.color = "#00e676";
-                                } else {
-                                    dashCrlState.innerText = "EN RANGO";
-                                    dashCrlState.style.color = "#e040fb";
-                                }
-                            }
-
-                            lineLevels.push({ price: crlData.highBSL, color: '#ff5252', title: `[ BSL CRL ${crlData.htfLabel} ]`, width: 2, style: LightweightCharts.LineStyle.Solid });
-                            lineLevels.push({ price: crlData.eq50, color: '#ffb300', title: `[ EQ 50% ${crlData.htfLabel} ]`, width: 1, style: LightweightCharts.LineStyle.Dashed });
-                            lineLevels.push({ price: crlData.lowSSL, color: '#00e676', title: `[ SSL CRL ${crlData.htfLabel} ]`, width: 2, style: LightweightCharts.LineStyle.Solid });
-                        }
-                    }
-
-                    if (showPivots) {
-                        const [raw4h, raw1d] = await Promise.all([
-                            fetchKlines('4h', 200),
-                            fetchKlines('1d', 200)
-                        ]);
-
-                        const pivots4h = calculatePivots(raw4h, 15, 15);
-                        const pivots1d = calculatePivots(raw1d, 15, 15);
-
-                        if (pivots1d.pivotHigh) {
-                            lineLevels.push({ price: pivots1d.pivotHigh.high, color: '#ff1744', title: '[ 1D RESISTENCIA ]', width: 3, style: LightweightCharts.LineStyle.Solid });
-                            currentMainTarget = pivots1d.pivotHigh.high;
-                        }
-                        if (pivots1d.pivotLow) lineLevels.push({ price: pivots1d.pivotLow.low, color: '#00e676', title: '[ 1D SOPORTE ]', width: 3, style: LightweightCharts.LineStyle.Solid });
-                        if (pivots4h.pivotHigh) lineLevels.push({ price: pivots4h.pivotHigh.high, color: '#ff9100', title: '[ 4H RESISTENCIA ]', width: 2, style: LightweightCharts.LineStyle.Dashed });
-                        if (pivots4h.pivotLow) lineLevels.push({ price: pivots4h.pivotLow.low, color: '#2962ff', title: '[ 4H SOPORTE ]', width: 2, style: LightweightCharts.LineStyle.Dashed });
-                    }
-
-                    if (showPivotsTf && currentFormattedData.length > 0) {
-                        const currentTfLabel = timeframeSelect.value.toUpperCase();
-                        const currentTfPivots = calculatePivots(currentFormattedData, 10, 10);
-
-                        dashPivotTfResLabel.innerText = `RESISTENCIA (${currentTfLabel})`;
-                        dashPivotTfSupLabel.innerText = `SOPORTE (${currentTfLabel})`;
-
-                        if (currentTfPivots.pivotHigh) {
-                            lineLevels.push({ 
-                                price: currentTfPivots.pivotHigh.high, 
-                                color: '#e040fb', 
-                                title: `[ ${currentTfLabel} RESISTENCIA ]`, 
-                                width: 2, 
-                                style: LightweightCharts.LineStyle.LargeDashed 
-                            });
-                            dashPivotTfRes.innerText = `$${currentTfPivots.pivotHigh.high.toFixed(2)}`;
-                        } else {
-                            dashPivotTfRes.innerText = "--";
-                        }
-
-                        if (currentTfPivots.pivotLow) {
-                            lineLevels.push({ 
-                                price: currentTfPivots.pivotLow.low, 
-                                color: '#00e5ff', 
-                                title: `[ ${currentTfLabel} SOPORTE ]`, 
-                                width: 2, 
-                                style: LightweightCharts.LineStyle.LargeDashed 
-                            });
-                            dashPivotTfSup.innerText = `$${currentTfPivots.pivotLow.low.toFixed(2)}`;
-                        } else {
-                            dashPivotTfSup.innerText = "--";
-                        }
-                    }
-
-                    let allMarkers = [];
-
-                    if (showSupertrend && currentFormattedData.length > 0) {
-                        const stMarkers = getSupertrendMarkers(currentFormattedData, 14, 2.0, 2.0);
-                        allMarkers = allMarkers.concat(stMarkers);
-                    }
-
-                    if (showVsa && currentFormattedData.length > 0) {
-                        const vsaData = processWhaleData(currentFormattedData);
-                        allMarkers = allMarkers.concat(vsaData.markers);
-
-                        if (vsaData.buyPrices.length > 0) {
-                            const avgBuy = vsaData.buyPrices.reduce((a, b) => a + b, 0) / vsaData.buyPrices.length;
-                            lineLevels.push({ price: avgBuy, color: '#00b0ff', title: '[ PROMEDIO COMPRA BALLENA ]', width: 2, style: LightweightCharts.LineStyle.Dotted });
-                            currentWhaleBuyAvg = avgBuy;
-                        }
-                    }
-
-                    if (showFootprint && currentFormattedData.length > 0) {
-                        const fpData = calculateFootprintLevels(currentFormattedData);
-                        fpData.footprintPOCs.forEach((poc, index) => {
-                            const color = poc.isBullish ? '#00e676' : '#ff5252';
-                            lineLevels.push({
-                                price: poc.price,
-                                color: color,
-                                title: `[ FOOTPRINT POC ${index + 1} ]`,
-                                width: 2,
-                                style: LightweightCharts.LineStyle.Solid
-                            });
-                            if (index === fpData.footprintPOCs.length - 1) {
-                                currentFootprintRes = poc.price;
-                            }
-                        });
-                    }
-
-                    if (showShark && currentFormattedData.length > 0) {
-                        const sharkData = calculateSharkVSA(currentFormattedData);
-                        allMarkers = allMarkers.concat(sharkData.markers);
-
-                        dashSharkPressure.innerText = sharkData.pressureText;
-                        dashSharkPressure.style.color = sharkData.pressureColor;
-
-                        if (sharkData.lineLevel) {
-                            dashSharkZone.innerText = `$${sharkData.lineLevel.toFixed(2)}`;
-                            lineLevels.push({
-                                price: sharkData.lineLevel,
-                                color: '#00e5ff',
-                                title: '[ 🦈 LIQUIDEZ TIBURÓN ]',
-                                width: 2,
-                                style: LightweightCharts.LineStyle.Dotted
-                            });
-                        } else {
-                            dashSharkZone.innerText = "--";
-                        }
-                    }
-
-                    allMarkers.sort((a, b) => a.time - b.time);
-                    candlestickSeries.setMarkers(allMarkers);
-
-                    lineLevels.forEach(lvl => {
-                        const pLine = candlestickSeries.createPriceLine({
-                            price: lvl.price,
-                            color: lvl.color,
-                            lineWidth: lvl.width,
-                            lineStyle: lvl.style,
-                            axisLabelVisible: true,
-                            title: lvl.title,
-                        });
-                        activePriceLines.push(pLine);
-                    });
-
-                    if (currentFormattedData.length > 0) {
-                        updateRealtimeAnalysis(currentFormattedData[currentFormattedData.length - 1].close);
-                    }
-
-                } catch (e) {
-                    console.error("Error al renderizar análisis visual:", e);
-                }
-            }
-
-            async function loadChartData(interval) {
-                try {
-                    statusEl.innerText = "Cargando datos...";
-                    statusEl.style.display = "block";
-
-                    startCandleTimer(interval);
-                    const klines = await fetchKlines(interval, 500);
-                    currentCandleData = klines;
-
-                    candlestickSeries.setData(klines);
-                    await renderSRVisuals(klines);
-                    await updateWhaleDashboard();
-
-                    statusEl.style.display = "none";
-                    connectWebSocket(interval);
-
-                } catch (e) {
-                    console.error(e);
-                    statusEl.innerText = "Error cargando datos. Reintentando...";
-                }
-            }
-
-            function connectWebSocket(interval) {
-                if (wsConnection) {
-                    wsConnection.close();
-                }
-
-                const streamInterval = interval === "1s" ? "1s" : interval;
-                const wsUrl = `wss://stream.binance.com:9443/ws/btcusdt@kline_${streamInterval}`;
-                wsConnection = new WebSocket(wsUrl);
-
-                wsConnection.onmessage = (event) => {
-                    const message = JSON.parse(event.data);
-                    const k = message.k;
-
-                    const candle = {
-                        time: Math.floor(k.t / 1000),
-                        open: parseFloat(k.o),
-                        high: parseFloat(k.h),
-                        low: parseFloat(k.l),
-                        close: parseFloat(k.c),
-                        volume: parseFloat(k.v)
-                    };
-
-                    candlestickSeries.update(candle);
-
-                    if (currentCandleData.length > 0) {
-                        const lastIdx = currentCandleData.length - 1;
-                        if (currentCandleData[lastIdx].time === candle.time) {
-                            currentCandleData[lastIdx] = candle;
-                        } else {
-                            currentCandleData.push(candle);
-                        }
-                    }
-
-                    updateRealtimeAnalysis(candle.close);
-                };
-
-                wsConnection.onerror = () => {
-                    statusEl.innerText = "Error WebSocket. Intentando reconectar...";
-                    statusEl.style.display = "block";
-                };
-            }
-
-            timeframeSelect.addEventListener("change", (e) => {
-                loadChartData(e.target.value);
-            });
-
-            window.addEventListener("resize", () => {
-                chart.applyOptions({
-                    width: chartContainer.clientWidth,
-                    height: chartContainer.clientHeight
-                });
-            });
-
-            // Carga Inicial
-            loadChartData(timeframeSelect.value);
-        });
-    </script>
 </body>
 </html>
