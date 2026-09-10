@@ -182,6 +182,7 @@
                     <option value="1h" selected>HTF: 1 Hora</option>
                     <option value="4h">HTF: 4 Horas</option>
                     <option value="1d">HTF: 1 Día</option>
+                    <option value="1M">HTF: 1 Mes</option>
                 </select>
 
                 <select id="tf-ltf">
@@ -374,6 +375,13 @@
                 upColor: '#26a69a', downColor: '#ef5350', borderVisible: false, wickUpColor: '#26a69a', wickDownColor: '#ef5350'
             });
 
+            // LÍNEA DE PROMEDIO (SMA 20) RESTAURADA
+            const smaLineSeries = chart.addLineSeries({
+                color: '#2962ff',
+                lineWidth: 2,
+                title: 'SMA 20'
+            });
+
             function updateDashboardModulesVisibility() {
                 htfPanel.style.display = showCrl ? "flex" : "none";
                 boxDecision.style.display = showCrl ? "block" : "none";
@@ -416,18 +424,32 @@
                 drawLine(currentLow, '#00e676', 'SSL (HTF Low)', 2, 2);
             }
 
-            // OBTENER MARCADORES DE VSA (CÍRCULOS/ESFERAS DE BALLENAS)
-            function getVSAMarkers(candles) {
-                if (!showVsa || !candles || candles.length < 20) return [];
-                const markers = [];
+            // DIBUJAR PROMEDIO SMA 20
+            function updateSMA(candles, period = 20) {
+                if (!candles || candles.length < period) return;
+                const smaData = [];
+                for (let i = period - 1; i < candles.length; i++) {
+                    let sum = 0;
+                    for (let j = 0; j < period; j++) {
+                        sum += candles[i - j].close;
+                    }
+                    smaData.push({ time: candles[i].time, value: sum / period });
+                }
+                smaLineSeries.setData(smaData);
+            }
 
+            // OBTENER MARCADORES DE VSA Y ZONA DE COMPRA DE BALLENAS
+            function getVSAMarkersAndZones(candles) {
+                if (!showVsa || !candles || candles.length < 20) return { markers: [], whaleZones: [] };
+                const markers = [];
                 let sumVol = 0;
                 for (let i = 0; i < candles.length; i++) sumVol += (candles[i].volume || 0);
                 const avgVol = sumVol / candles.length;
 
+                let lastWhaleBuyZone = null;
+
                 for (let i = 20; i < candles.length; i++) {
                     const c = candles[i];
-                    // Si el volumen supera 2.2x el promedio lo consideramos actividad institucional / ballenas
                     if (c.volume > avgVol * 2.2) {
                         const isBull = c.close >= c.open;
                         markers.push({
@@ -437,12 +459,22 @@
                             shape: 'circle',
                             text: isBull ? '🐋 Compra Ballena' : '🐋 Venta Ballena'
                         });
+
+                        // RESTAURADA ZONA DE COMPRA DE BALLENAS
+                        if (isBull) {
+                            lastWhaleBuyZone = { high: c.high, low: c.low };
+                        }
                     }
                 }
+
+                if (lastWhaleBuyZone) {
+                    drawLine(lastWhaleBuyZone.high, '#00e676', '🐋 Zona Compra Ballena Max', 3, 1);
+                    drawLine(lastWhaleBuyZone.low, '#00e676', '🐋 Zona Compra Ballena Min', 3, 1);
+                }
+
                 return markers;
             }
 
-            // CALCULAR MÉTRICAS VSA PARA EL DASHBOARD (1D Y 1W)
             async function calculateVSADashboard() {
                 if (!showVsa) return;
                 try {
@@ -506,9 +538,8 @@
                 }
 
                 const supertrendMarkers = showSupertrend ? getSupertrendMarkers(ltfData) : [];
-                const vsaMarkers = showVsa ? getVSAMarkers(ltfData) : [];
+                const vsaMarkers = showVsa ? getVSAMarkersAndZones(ltfData) : [];
 
-                // Fusionar todos los marcadores activos
                 const allMarkers = [...crlMarkers, ...supertrendMarkers, ...vsaMarkers];
                 allMarkers.sort((a, b) => a.time - b.time);
 
@@ -528,13 +559,17 @@
                 activePriceLines.push(line);
             }
 
+            // MANEJO MEJORADO DE TIMEFRAMES DE 1M Y 1m
             function getIntervalInSeconds(interval) {
+                if (interval === '1m') return 60;
+                if (interval === '1M') return 2592000;
                 const unit = interval.slice(-1);
                 const val = parseInt(interval);
                 if (unit === 's') return val;
                 if (unit === 'm') return val * 60;
                 if (unit === 'h') return val * 3600;
                 if (unit === 'd') return val * 86400;
+                if (unit === 'w') return val * 604800;
                 return 300;
             }
 
@@ -690,6 +725,8 @@
                     currentCandleData = candles;
                     candlestickSeries.setData(candles);
 
+                    updateSMA(candles, 20);
+
                     const lastClose = candles[candles.length - 1].close;
 
                     await updateHTFLevels();
@@ -778,6 +815,7 @@
 
                         if (currentCandleData.length > 0) {
                             currentCandleData[currentCandleData.length - 1] = candle;
+                            updateSMA(currentCandleData, 20);
                         }
 
                         evaluateAutomatedTrade(currentCandleData);
