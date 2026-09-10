@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>S/R + VSA + Footprint Tiburon - BTC/USD</title>
     <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
+
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         html, body { width: 100%; height: 100%; background-color: #131722; color: #d1d4dc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; overflow: hidden; }
@@ -73,6 +74,7 @@
         #chart-wrapper { flex: 1; width: 100%; position: relative; }
         #chart { width: 100%; height: 100%; }
 
+        /* DASHBOARD PRINCIPAL Y SUS MÓDULOS DINÁMICOS */
         #candle-dashboard {
             position: absolute;
             top: 16px;
@@ -316,10 +318,6 @@
                 upColor: '#089981', downColor: '#f23645', borderVisible: false, wickUpColor: '#089981', wickDownColor: '#f23645'
             });
 
-            window.addEventListener('resize', () => {
-                chart.applyOptions({ width: chartContainer.clientWidth, height: chartContainer.clientHeight });
-            });
-
             function updateDashboardModulesVisibility() {
                 modFootprint.style.display = showFootprint ? "flex" : "none";
                 modPivots.style.display = showPivots ? "flex" : "none";
@@ -405,26 +403,6 @@
                     }
                 }
                 return { buyVol, sellVol };
-            }
-
-            async function fetchKlines(symbolOrInterval, limit = 100, intervalParam = null) {
-                let interval = intervalParam || symbolOrInterval;
-                let symbol = intervalParam ? symbolOrInterval : 'BTCUSDT';
-                try {
-                    const res = await fetch(`https://api.binance.com/api/3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`);
-                    const data = await res.json();
-                    return data.map(d => ({
-                        time: Math.floor(d[0] / 1000),
-                        open: parseFloat(d[1]),
-                        high: parseFloat(d[2]),
-                        low: parseFloat(d[3]),
-                        close: parseFloat(d[4]),
-                        volume: parseFloat(d[5])
-                    }));
-                } catch (e) {
-                    console.error("Fetch Error:", e);
-                    return [];
-                }
             }
 
             async function updateWhaleDashboard() {
@@ -548,12 +526,14 @@
                 return { footprintPOCs: footprintPOCs.slice(-2) };
             }
 
+            // FUNCIÓN SUPERTREND CORREGIDA: Réplica exacta del indicador UAlgo (Method 1: ta.atr, pos state)
             function getSupertrendMarkers(candles, atrPeriods = 14, multiplier = 2.0, stopLossVal = 2.0) {
                 if (!candles || candles.length < atrPeriods + 1) return [];
 
                 const len = candles.length;
                 const tr = new Float64Array(len);
                 
+                // 1. Cálculo del True Range
                 tr[0] = candles[0].high - candles[0].low;
                 for (let i = 1; i < len; i++) {
                     const hL = candles[i].high - candles[i].low;
@@ -562,6 +542,7 @@
                     tr[i] = Math.max(hL, hC, lC);
                 }
 
+                // 2. Cálculo de ATR (Method 1: RMA / ta.atr en TradingView)
                 const atr = new Float64Array(len);
                 let sumTR = 0;
                 for (let i = 0; i < atrPeriods; i++) sumTR += tr[i];
@@ -610,6 +591,7 @@
                     trend[i] = currentTrend;
                 }
 
+                // 3. Control de Estado de Posición (pos) para réplica idéntica de UAlgo
                 const stMarkers = [];
                 let pos = 0;
                 let entryOfLong = 0;
@@ -633,9 +615,17 @@
 
                     const stopLossForLong = entryOfLong * (1 - sl);
                     const stopLossForShort = entryOfShort * (1 + sl);
+                    const tp3Long = entryOfLong * (1 + sl * 3);
+                    const tp3Short = entryOfShort * (1 - sl * 3);
 
                     const longSL = candles[i].low < stopLossForLong && prevPos === 1;
                     const shortSL = candles[i].high > stopLossForShort && prevPos === -1;
+                    const tpLongFinal = candles[i].high > tp3Long && prevPos === 1;
+                    const tpShortFinal = candles[i].low < tp3Short && prevPos === -1;
+
+                    if (longSL || shortSL || tpLongFinal || tpShortFinal) {
+                        pos = 0;
+                    }
 
                     if (longCond) {
                         stMarkers.push({
@@ -643,35 +633,15 @@
                             position: 'belowBar',
                             color: '#00e676',
                             shape: 'arrowUp',
-                            text: 'ST COMPRA 🚀'
+                            text: 'Buy'
                         });
                     } else if (shortCond) {
                         stMarkers.push({
                             time: candles[i].time,
                             position: 'aboveBar',
-                            color: '#ff5252',
+                            color: '#ff1744',
                             shape: 'arrowDown',
-                            text: 'ST VENTA 🐻'
-                        });
-                    }
-
-                    if (longSL && prevPos === 1) {
-                        pos = 0;
-                        stMarkers.push({
-                            time: candles[i].time,
-                            position: 'aboveBar',
-                            color: '#ff9100',
-                            shape: 'circle',
-                            text: 'ST SL LONG ⚠️'
-                        });
-                    } else if (shortSL && prevPos === -1) {
-                        pos = 0;
-                        stMarkers.push({
-                            time: candles[i].time,
-                            position: 'belowBar',
-                            color: '#ff9100',
-                            shape: 'circle',
-                            text: 'ST SL SHORT ⚠️'
+                            text: 'Sell'
                         });
                     }
                 }
@@ -679,207 +649,325 @@
                 return stMarkers;
             }
 
-            function clearPriceLines() {
-                activePriceLines.forEach(line => candlestickSeries.removePriceLine(line));
-                activePriceLines = [];
+            function calculatePivots(candles, leftBars = 15, rightBars = 15) {
+                let lastPivotHigh = null, lastPivotLow = null;
+                for (let i = leftBars; i < candles.length - rightBars; i++) {
+                    let isHighPivot = true, isLowPivot = true;
+                    for (let j = i - leftBars; j <= i + rightBars; j++) {
+                        if (j === i) continue;
+                        if (candles[j].high >= candles[i].high) isHighPivot = false;
+                        if (candles[j].low <= candles[i].low) isLowPivot = false;
+                    }
+                    if (isHighPivot) lastPivotHigh = candles[i];
+                    if (isLowPivot) lastPivotLow = candles[i];
+                }
+                return { pivotHigh: lastPivotHigh, pivotLow: lastPivotLow };
             }
 
-            function updateOverlayLevels() {
-                clearPriceLines();
+            function processWhaleData(candles) {
+                const markers = [];
+                if (!candles || candles.length < 20) return { markers, buyPrices: [], sellPrices: [] };
 
-                if (!currentCandleData || currentCandleData.length < 20) return;
+                const buyPrices = [], sellPrices = [];
+                let rollingVolumeSum = 0;
+                for (let i = 0; i < 20; i++) rollingVolumeSum += (candles[i].volume || 1);
 
-                const lastCandle = currentCandleData[currentCandleData.length - 1];
-                let allMarkers = [];
+                for (let i = 20; i < candles.length; i++) {
+                    const currentCandle = candles[i];
+                    const avgVol = rollingVolumeSum / 20;
+                    const isHighVolume = (currentCandle.volume || 0) > (avgVol * 2.2);
 
-                if (showSupertrend) {
-                    const stMarkers = getSupertrendMarkers(currentCandleData);
-                    allMarkers = allMarkers.concat(stMarkers);
+                    rollingVolumeSum += (currentCandle.volume || 1) - (candles[i - 20].volume || 1);
+
+                    if (isHighVolume) {
+                        if (currentCandle.close > currentCandle.open) {
+                            buyPrices.push(currentCandle.close);
+                            markers.push({ time: currentCandle.time, position: 'belowBar', color: '#00b0ff', shape: 'circle', text: 'BUY' });
+                        } else if (currentCandle.close < currentCandle.open) {
+                            sellPrices.push(currentCandle.close);
+                            markers.push({ time: currentCandle.time, position: 'aboveBar', color: '#ff4081', shape: 'circle', text: 'SELL' });
+                        }
+                    }
                 }
+                return { markers, buyPrices, sellPrices };
+            }
 
-                if (showFootprint) {
-                    const { footprintPOCs } = calculateFootprintLevels(currentCandleData);
-                    footprintPOCs.forEach((poc, idx) => {
-                        if (idx === footprintPOCs.length - 1) {
-                            currentFootprintRes = poc.price;
+            async function fetchKlines(interval, limit = 500) {
+                const is1s = interval === "1s";
+                const endpoint = is1s ? 'uiKlines' : 'klines';
+                const apiInterval = is1s ? '1s' : interval;
+                
+                const res = await fetch(`https://api.binance.com/api/v3/${endpoint}?symbol=BTCUSDT&interval=${apiInterval}&limit=${limit}`);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                return data.map(d => ({
+                    time: Math.floor(d[0] / 1000), open: parseFloat(d[1]), high: parseFloat(d[2]), low: parseFloat(d[3]), close: parseFloat(d[4]), volume: parseFloat(d[5])
+                }));
+            }
+
+            async function renderSRVisuals(currentFormattedData) {
+                try {
+                    activePriceLines.forEach(line => candlestickSeries.removePriceLine(line));
+                    activePriceLines = [];
+
+                    const lineLevels = [];
+                    currentMainTarget = null;
+                    currentWhaleBuyAvg = null;
+                    currentFootprintRes = null;
+
+                    updateDashboardModulesVisibility();
+
+                    if (showPivots) {
+                        const [raw4h, raw1d] = await Promise.all([
+                            fetchKlines('4h', 200),
+                            fetchKlines('1d', 200)
+                        ]);
+
+                        const pivots4h = calculatePivots(raw4h, 15, 15);
+                        const pivots1d = calculatePivots(raw1d, 15, 15);
+
+                        if (pivots1d.pivotHigh) {
+                            lineLevels.push({ price: pivots1d.pivotHigh.high, color: '#ff1744', title: '[ 1D RESISTENCIA ]', width: 3, style: LightweightCharts.LineStyle.Solid });
+                            currentMainTarget = pivots1d.pivotHigh.high;
+                        }
+                        if (pivots1d.pivotLow) lineLevels.push({ price: pivots1d.pivotLow.low, color: '#00e676', title: '[ 1D SOPORTE ]', width: 3, style: LightweightCharts.LineStyle.Solid });
+                        if (pivots4h.pivotHigh) lineLevels.push({ price: pivots4h.pivotHigh.high, color: '#ff9100', title: '[ 4H RESISTENCIA ]', width: 2, style: LightweightCharts.LineStyle.Dashed });
+                        if (pivots4h.pivotLow) lineLevels.push({ price: pivots4h.pivotLow.low, color: '#2962ff', title: '[ 4H SOPORTE ]', width: 2, style: LightweightCharts.LineStyle.Dashed });
+                    }
+
+                    if (showPivotsTf && currentFormattedData.length > 0) {
+                        const currentTfLabel = timeframeSelect.value.toUpperCase();
+                        const currentTfPivots = calculatePivots(currentFormattedData, 10, 10);
+
+                        dashPivotTfResLabel.innerText = `RESISTENCIA (${currentTfLabel})`;
+                        dashPivotTfSupLabel.innerText = `SOPORTE (${currentTfLabel})`;
+
+                        if (currentTfPivots.pivotHigh) {
+                            lineLevels.push({ 
+                                price: currentTfPivots.pivotHigh.high, 
+                                color: '#e040fb', 
+                                title: `[ ${currentTfLabel} RESISTENCIA ]`, 
+                                width: 2, 
+                                style: LightweightCharts.LineStyle.LargeDashed 
+                            });
+                            dashPivotTfRes.innerText = `$${currentTfPivots.pivotHigh.high.toFixed(2)}`;
+                        } else {
+                            dashPivotTfRes.innerText = "--";
                         }
 
+                        if (currentTfPivots.pivotLow) {
+                            lineLevels.push({ 
+                                price: currentTfPivots.pivotLow.low, 
+                                color: '#00e5ff', 
+                                title: `[ ${currentTfLabel} SOPORTE ]`, 
+                                width: 2, 
+                                style: LightweightCharts.LineStyle.LargeDashed 
+                            });
+                            dashPivotTfSup.innerText = `$${currentTfPivots.pivotLow.low.toFixed(2)}`;
+                        } else {
+                            dashPivotTfSup.innerText = "--";
+                        }
+                    }
+
+                    let whaleMarkers = [];
+                    if (showVsa) {
+                        const vsaResult = processWhaleData(currentFormattedData);
+                        whaleMarkers = vsaResult.markers;
+                        
+                        if (vsaResult.buyPrices.length > 0) {
+                            currentWhaleBuyAvg = vsaResult.buyPrices.reduce((a, b) => a + b, 0) / vsaResult.buyPrices.length;
+                            lineLevels.push({ price: currentWhaleBuyAvg, color: '#00e676', title: '[ PROMEDIO COMPRA BALLENAS ]', width: 3, style: LightweightCharts.LineStyle.Solid });
+                        }
+
+                        if (vsaResult.sellPrices.length > 0) {
+                            const avgSell = vsaResult.sellPrices.reduce((a, b) => a + b, 0) / vsaResult.sellPrices.length;
+                            lineLevels.push({ price: avgSell, color: '#ff1744', title: '[ PROMEDIO VENTA BALLENAS ]', width: 3, style: LightweightCharts.LineStyle.Solid });
+                        }
+                    }
+
+                    if (showFootprint) {
+                        const { footprintPOCs } = calculateFootprintLevels(currentFormattedData);
+                        footprintPOCs.forEach(poc => {
+                            if (!poc.isBullish) currentFootprintRes = poc.price;
+                            lineLevels.push({
+                                price: poc.price,
+                                color: poc.isBullish ? '#00f0ff' : '#ff007f',
+                                title: poc.isBullish ? '👣 FOOTPRINT POC (Soporte)' : '👣 FOOTPRINT POC (Resistencia)',
+                                width: 2,
+                                style: LightweightCharts.LineStyle.Dashed
+                            });
+                        });
+                    }
+
+                    if (currentFootprintRes && showFootprint && currentFormattedData.length > 0) {
+                        const lastClose = currentFormattedData[currentFormattedData.length - 1].close;
+                        const isBull = lastClose >= currentFootprintRes;
+                        const entry = lastClose;
+                        const sl = isBull ? currentFootprintRes * 0.997 : currentFootprintRes * 1.003;
+                        
+                        let tp;
+                        if (currentMainTarget && showPivots && ((isBull && currentMainTarget > entry) || (!isBull && currentMainTarget < entry))) {
+                            tp = currentMainTarget;
+                        } else {
+                            let risk = Math.abs(entry - sl);
+                            tp = isBull ? entry + (risk * 2) : entry - (risk * 2);
+                        }
+
+                        lineLevels.push({ price: entry, color: '#00e5ff', title: '🔵 PUNTO DE ENTRADA', width: 2, style: LightweightCharts.LineStyle.Solid });
+                        lineLevels.push({ price: tp, color: '#00e676', title: '🟢 TAKE PROFIT (OBJETIVO)', width: 2, style: LightweightCharts.LineStyle.Solid });
+                        lineLevels.push({ price: sl, color: '#ff5252', title: '🔴 STOP LOSS (INVALIDACIÓN)', width: 2, style: LightweightCharts.LineStyle.Solid });
+                    }
+
+                    if (showMultiFootprint) {
+                        const [raw1mFP, raw5mFP, raw15mFP, raw1hFP, raw4hFP] = await Promise.all([
+                            fetchKlines('1m', 200),
+                            fetchKlines('5m', 200),
+                            fetchKlines('15m', 200),
+                            fetchKlines('1h', 200),
+                            fetchKlines('4h', 200)
+                        ]);
+
+                        const fp1m = calculateFootprintLevels(raw1mFP).footprintPOCs;
+                        const fp5m = calculateFootprintLevels(raw5mFP).footprintPOCs;
+                        const fp15m = calculateFootprintLevels(raw15mFP).footprintPOCs;
+                        const fp1h = calculateFootprintLevels(raw1hFP).footprintPOCs;
+                        const fp4h = calculateFootprintLevels(raw4hFP).footprintPOCs;
+
+                        fp1m.forEach(p => lineLevels.push({ price: p.price, color: '#ffeb3b', title: '👣 1M FP POC', width: 1, style: LightweightCharts.LineStyle.Dotted }));
+                        fp5m.forEach(p => lineLevels.push({ price: p.price, color: '#ff9800', title: '👣 5M FP POC', width: 1, style: LightweightCharts.LineStyle.Dashed }));
+                        fp15m.forEach(p => lineLevels.push({ price: p.price, color: '#e040fb', title: '👣 15M FP POC', width: 1, style: LightweightCharts.LineStyle.LargeDashed }));
+                        fp1h.forEach(p => lineLevels.push({ price: p.price, color: '#00e5ff', title: '👣 1H FP POC', width: 2, style: LightweightCharts.LineStyle.LargeDashed }));
+                        fp4h.forEach(p => lineLevels.push({ price: p.price, color: '#76ff03', title: '👣 4H FP POC', width: 2, style: LightweightCharts.LineStyle.Solid }));
+                    }
+
+                    let stMarkers = [];
+                    if (showSupertrend) {
+                        stMarkers = getSupertrendMarkers(currentFormattedData, 14, 2.0, 2.0);
+                    }
+
+                    const allMarkers = [...whaleMarkers, ...stMarkers].sort((a, b) => a.time - b.time);
+                    candlestickSeries.setMarkers(allMarkers);
+
+                    lineLevels.forEach(level => {
                         const line = candlestickSeries.createPriceLine({
-                            price: poc.price,
-                            color: poc.isBullish ? '#00e5ff' : '#e040fb',
-                            lineWidth: 2,
-                            lineStyle: LightweightCharts.LineStyle.Solid,
-                            axisLabelVisible: true,
-                            title: `FP POC ${poc.isBullish ? 'BULL' : 'BEAR'}`
+                            price: level.price, color: level.color, lineWidth: level.width, lineStyle: level.style, axisLabelVisible: true, title: level.title
                         });
                         activePriceLines.push(line);
-
-                        allMarkers.push({
-                            time: poc.time,
-                            position: poc.isBullish ? 'belowBar' : 'aboveBar',
-                            color: poc.isBullish ? '#00e5ff' : '#e040fb',
-                            shape: poc.isBullish ? 'square' : 'square',
-                            text: `POC $${poc.price.toFixed(1)}`
-                        });
                     });
-                } else {
-                    currentFootprintRes = null;
-                }
 
-                if (showPivots) {
-                    const high20 = Math.max(...currentCandleData.slice(-20).map(c => c.high));
-                    const low20 = Math.min(...currentCandleData.slice(-20).map(c => c.low));
-                    
-                    currentMainTarget = high20;
+                    if (currentFormattedData.length > 0) {
+                        updateRealtimeAnalysis(currentFormattedData[currentFormattedData.length - 1].close);
+                    }
 
-                    const resLine = candlestickSeries.createPriceLine({
-                        price: high20,
-                        color: '#ff5252',
-                        lineWidth: 1,
-                        lineStyle: LightweightCharts.LineStyle.Dashed,
-                        axisLabelVisible: true,
-                        title: 'Resistencia 20P'
-                    });
-                    const supLine = candlestickSeries.createPriceLine({
-                        price: low20,
-                        color: '#00e676',
-                        lineWidth: 1,
-                        lineStyle: LightweightCharts.LineStyle.Dashed,
-                        axisLabelVisible: true,
-                        title: 'Soporte 20P'
-                    });
-                    activePriceLines.push(resLine, supLine);
-                } else {
-                    currentMainTarget = null;
-                }
+                } catch (e) { console.error("Error en visuales:", e); }
+            }
 
-                if (showPivotsTf) {
-                    const high5 = Math.max(...currentCandleData.slice(-5).map(c => c.high));
-                    const low5 = Math.min(...currentCandleData.slice(-5).map(c => c.low));
+            function connectWebSocket(interval) {
+                if (wsConnection) wsConnection.close();
 
-                    dashPivotTfRes.innerText = `$${high5.toFixed(2)}`;
-                    dashPivotTfSup.innerText = `$${low5.toFixed(2)}`;
+                const streamInterval = interval.toLowerCase();
+                const wsUrl = `wss://stream.binance.com:9443/ws/btcusdt@kline_${streamInterval}`;
+                wsConnection = new WebSocket(wsUrl);
 
-                    const resTfLine = candlestickSeries.createPriceLine({
-                        price: high5,
-                        color: '#ff80ab',
-                        lineWidth: 1,
-                        lineStyle: LightweightCharts.LineStyle.Dotted,
-                        axisLabelVisible: true,
-                        title: 'Res TF Local'
-                    });
-                    const supTfLine = candlestickSeries.createPriceLine({
-                        price: low5,
-                        color: '#b9f6ca',
-                        lineWidth: 1,
-                        lineStyle: LightweightCharts.LineStyle.Dotted,
-                        axisLabelVisible: true,
-                        title: 'Sop TF Local'
-                    });
-                    activePriceLines.push(resTfLine, supTfLine);
-                } else {
-                    dashPivotTfRes.innerText = "--";
-                    dashPivotTfSup.innerText = "--";
-                }
+                wsConnection.onopen = () => { statusEl.style.display = "none"; };
 
-                allMarkers.sort((a, b) => a.time - b.time);
-                candlestickSeries.setMarkers(allMarkers);
+                wsConnection.onmessage = (event) => {
+                    const message = JSON.parse(event.data);
+                    const k = message.k;
 
-                updateRealtimeAnalysis(lastCandle ? lastCandle.close : null);
+                    const updatedCandle = {
+                        time: Math.floor(k.t / 1000),
+                        open: parseFloat(k.o),
+                        high: parseFloat(k.h),
+                        low: parseFloat(k.l),
+                        close: parseFloat(k.c),
+                        volume: parseFloat(k.v)
+                    };
+
+                    candlestickSeries.update(updatedCandle);
+                    updateRealtimeAnalysis(updatedCandle.close);
+
+                    if (currentCandleData.length > 0) {
+                        const lastIndex = currentCandleData.length - 1;
+                        if (currentCandleData[lastIndex].time === updatedCandle.time) {
+                            currentCandleData[lastIndex] = updatedCandle;
+                        } else {
+                            currentCandleData.push(updatedCandle);
+                        }
+                    }
+                };
+
+                wsConnection.onerror = (err) => {
+                    console.error("Error WebSocket:", err);
+                    statusEl.innerText = "Error en WebSocket Tiempo Real";
+                    statusEl.style.display = "block";
+                };
             }
 
             async function loadChartData(interval) {
                 statusEl.style.display = "block";
-                statusEl.innerText = `Cargando datos para ${interval}...`;
+                statusEl.innerText = "Cargando datos BTC/USD...";
 
-                if (wsConnection) {
-                    wsConnection.close();
-                    wsConnection = null;
+                try {
+                    currentCandleData = await fetchKlines(interval, 500);
+                    candlestickSeries.setData(currentCandleData);
+                    await renderSRVisuals(currentCandleData);
+                    await updateWhaleDashboard();
+                    
+                    chart.timeScale().fitContent();
+                    chart.priceScale('right').applyOptions({ autoScale: true });
+
+                    connectWebSocket(interval);
+                    startCandleTimer(interval);
+
+                } catch (err) {
+                    console.error(err);
+                    statusEl.innerText = "Error cargando datos de BTC/USD";
+                    statusEl.style.color = "#f23645";
                 }
-
-                const candles = await fetchKlines(interval, 300);
-                if (!candles || candles.length === 0) {
-                    statusEl.innerText = "Error cargando datos de Binance.";
-                    return;
-                }
-
-                currentCandleData = candles;
-                candlestickSeries.setData(candles);
-                updateOverlayLevels();
-                startCandleTimer(interval);
-
-                statusEl.style.display = "none";
-
-                // WebSocket Stream
-                const wsInterval = interval === '1s' ? '1s' : interval;
-                const streamName = `btcusdt@kline_${wsInterval}`;
-                wsConnection = new WebSocket(`wss://stream.binance.com:9443/ws/${streamName}`);
-
-                wsConnection.onmessage = (event) => {
-                    const message = JSON.parse(event.data);
-                    if (message.e === 'kline') {
-                        const k = message.k;
-                        const candle = {
-                            time: Math.floor(k.t / 1000),
-                            open: parseFloat(k.o),
-                            high: parseFloat(k.h),
-                            low: parseFloat(k.l),
-                            close: parseFloat(k.c),
-                            volume: parseFloat(k.v)
-                        };
-
-                        const lastIdx = currentCandleData.length - 1;
-                        if (lastIdx >= 0 && currentCandleData[lastIdx].time === candle.time) {
-                            currentCandleData[lastIdx] = candle;
-                        } else {
-                            currentCandleData.push(candle);
-                            if (currentCandleData.length > 500) currentCandleData.shift();
-                        }
-
-                        candlestickSeries.update(candle);
-                        updateRealtimeAnalysis(candle.close);
-                    }
-                };
-
-                wsConnection.onerror = (err) => console.error("WebSocket Error:", err);
             }
 
-            function setupControlHandlers() {
-                function bindToggle(btn, getter, setter) {
-                    btn.addEventListener("click", () => {
-                        const newState = !getter();
-                        setter(newState);
-                        if (newState) {
-                            btn.classList.remove("inactive");
-                            btn.classList.add("active");
-                        } else {
-                            btn.classList.remove("active");
-                            btn.classList.add("inactive");
-                        }
-                        updateDashboardModulesVisibility();
-                        updateOverlayLevels();
-                    });
-                }
-
-                bindToggle(btnPivots, () => showPivots, (v) => showPivots = v);
-                bindToggle(btnPivotsTf, () => showPivotsTf, (v) => showPivotsTf = v);
-                bindToggle(btnVsa, () => showVsa, (v) => showVsa = v);
-                bindToggle(btnSupertrend, () => showSupertrend, (v) => showSupertrend = v);
-                bindToggle(btnFootprint, () => showFootprint, (v) => showFootprint = v);
-                bindToggle(btnMultiFp, () => showMultiFootprint, (v) => showMultiFootprint = v);
-
-                timeframeSelect.addEventListener("change", (e) => {
-                    loadChartData(e.target.value);
+            function setupToggle(buttonEl, getState, setState) {
+                buttonEl.addEventListener("click", async () => {
+                    const newState = !getState();
+                    setState(newState);
+                    buttonEl.classList.toggle("active", newState);
+                    buttonEl.classList.toggle("inactive", !newState);
+                    await renderSRVisuals(currentCandleData);
                 });
             }
 
-            // Inicialización
-            updateDashboardModulesVisibility();
-            setupControlHandlers();
-            updateWhaleDashboard();
+            setupToggle(btnPivots, () => showPivots, val => showPivots = val);
+            setupToggle(btnPivotsTf, () => showPivotsTf, val => showPivotsTf = val);
+            setupToggle(btnVsa, () => showVsa, val => showVsa = val);
+            setupToggle(btnSupertrend, () => showSupertrend, val => showSupertrend = val);
+            setupToggle(btnFootprint, () => showFootprint, val => showFootprint = val);
+
+            btnMultiFp.addEventListener("click", async () => {
+                showMultiFootprint = !showMultiFootprint;
+                btnMultiFp.classList.toggle("active", showMultiFootprint);
+                
+                statusEl.style.display = "block";
+                statusEl.innerText = showMultiFootprint ? "Cargando Multi-Footprint (1M, 5M, 15M, 1H, 4H)..." : "Actualizando gráfico...";
+                
+                await renderSRVisuals(currentCandleData);
+                
+                chart.timeScale().fitContent();
+                chart.priceScale('right').applyOptions({ autoScale: true });
+
+                statusEl.style.display = "none";
+            });
+
             loadChartData(timeframeSelect.value);
 
-            setInterval(updateWhaleDashboard, 60000);
+            timeframeSelect.addEventListener("change", (e) => {
+                loadChartData(e.target.value);
+            });
+
+            window.addEventListener("resize", () => {
+                chart.applyOptions({ width: chartContainer.clientWidth, height: chartContainer.clientHeight });
+                chart.timeScale().fitContent();
+            });
         });
     </script>
 </body>
