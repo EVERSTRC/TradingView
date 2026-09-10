@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>S/R + VSA + Footprint Tiburon - BTC/USD</title>
+    <title>S/R + VSA + Footprint Tiburón - BTC/USD</title>
     <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
 
     <style>
@@ -74,7 +74,6 @@
         #chart-wrapper { flex: 1; width: 100%; position: relative; }
         #chart { width: 100%; height: 100%; }
 
-        /* DASHBOARD PRINCIPAL Y SUS MÓDULOS DINÁMICOS */
         #candle-dashboard {
             position: absolute;
             top: 16px;
@@ -314,10 +313,6 @@
                 rightPriceScale: { autoScale: true }
             });
 
-            window.addEventListener('resize', () => {
-                chart.applyOptions({ width: chartContainer.clientWidth, height: chartContainer.clientHeight });
-            });
-
             const candlestickSeries = chart.addCandlestickSeries({
                 upColor: '#089981', downColor: '#f23645', borderVisible: false, wickUpColor: '#089981', wickDownColor: '#f23645'
             });
@@ -409,19 +404,22 @@
                 return { buyVol, sellVol };
             }
 
-            async function fetchKlines(symbolOrInterval, limit = 100) {
-                const interval = typeof symbolOrInterval === 'string' ? symbolOrInterval : '4h';
-                const url = `https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=${interval}&limit=${limit}`;
-                const res = await fetch(url);
-                const data = await res.json();
-                return data.map(d => ({
-                    time: Math.floor(d[0] / 1000),
-                    open: parseFloat(d[1]),
-                    high: parseFloat(d[2]),
-                    low: parseFloat(d[3]),
-                    close: parseFloat(d[4]),
-                    volume: parseFloat(d[5])
-                }));
+            async function fetchKlines(interval, limit = 100) {
+                try {
+                    const response = await fetch(`https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=${interval}&limit=${limit}`);
+                    const data = await response.json();
+                    return data.map(d => ({
+                        time: d[0] / 1000,
+                        open: parseFloat(d[1]),
+                        high: parseFloat(d[2]),
+                        low: parseFloat(d[3]),
+                        close: parseFloat(d[4]),
+                        volume: parseFloat(d[5])
+                    }));
+                } catch (e) {
+                    console.error("Error al obtener klines:", e);
+                    return [];
+                }
             }
 
             async function updateWhaleDashboard() {
@@ -472,7 +470,7 @@
                         elNet.style.color = netBtc >= 0 ? "#00e676" : "#ff5252";
                     });
                 } catch (e) {
-                    console.error("Error actualizando métricas de ballenas:", e);
+                    console.error("Error al actualizar métricas de ballenas:", e);
                 }
             }
 
@@ -545,7 +543,7 @@
                 return { footprintPOCs: footprintPOCs.slice(-2) };
             }
 
-            // FUNCIÓN SUPERTREND CORREGIDA: Réplica exacta del indicador UAlgo
+            // FUNCIÓN SUPERTREND CORREGIDA: Réplica exacta del indicador UAlgo (Método 1: ta.atr, estado pos)
             function getSupertrendMarkers(candles, atrPeriods = 14, multiplier = 2.0, stopLossVal = 2.0) {
                 if (!candles || candles.length < atrPeriods + 1) return [];
 
@@ -561,7 +559,7 @@
                     tr[i] = Math.max(hL, hC, lC);
                 }
 
-                // 2. Cálculo de ATR
+                // 2. Cálculo del ATR (Método 1: RMA / ta.atr en TradingView)
                 const atr = new Float64Array(len);
                 let sumTR = 0;
                 for (let i = 0; i < atrPeriods; i++) sumTR += tr[i];
@@ -610,7 +608,7 @@
                     trend[i] = currentTrend;
                 }
 
-                // 3. Control de Estado de Posición (pos)
+                // 3. Control de Estado de Posición (pos) para réplica idéntica de UAlgo
                 const stMarkers = [];
                 let pos = 0;
                 let entryOfLong = 0;
@@ -639,8 +637,11 @@
 
                     const longSL = candles[i].low < stopLossForLong && prevPos === 1;
                     const shortSL = candles[i].high > stopLossForShort && prevPos === -1;
+                    const longTP3 = candles[i].high > tp3Long && prevPos === 1;
+                    const shortTP3 = candles[i].low < tp3Short && prevPos === -1;
 
-                    if (longSL || shortSL) pos = 0;
+                    if (longSL || longTP3) pos = 0;
+                    if (shortSL || shortTP3) pos = 0;
 
                     if (longCond) {
                         stMarkers.push({
@@ -648,7 +649,7 @@
                             position: 'belowBar',
                             color: '#00e676',
                             shape: 'arrowUp',
-                            text: 'BUY'
+                            text: 'COMPRA'
                         });
                     } else if (shortCond) {
                         stMarkers.push({
@@ -656,123 +657,111 @@
                             position: 'aboveBar',
                             color: '#ff5252',
                             shape: 'arrowDown',
-                            text: 'SELL'
+                            text: 'VENTA'
                         });
                     }
                 }
                 return stMarkers;
             }
 
-            function clearLines() {
+            function clearPriceLines() {
                 activePriceLines.forEach(line => candlestickSeries.removePriceLine(line));
                 activePriceLines = [];
             }
 
-            function renderChartIndicators(candles) {
-                clearLines();
-                let markers = [];
+            async function updateOverlayLevels() {
+                clearPriceLines();
 
+                if (currentCandleData.length === 0) return;
+
+                // 1. Dibuja Footprint POC
                 if (showFootprint) {
-                    const { footprintPOCs } = calculateFootprintLevels(candles);
+                    const { footprintPOCs } = calculateFootprintLevels(currentCandleData);
                     if (footprintPOCs.length > 0) {
                         const lastFp = footprintPOCs[footprintPOCs.length - 1];
                         currentFootprintRes = lastFp.price;
-
-                        const line = candlestickSeries.createPriceLine({
+                        
+                        const fpLine = candlestickSeries.createPriceLine({
                             price: lastFp.price,
                             color: lastFp.isBullish ? '#00e5ff' : '#e040fb',
                             lineWidth: 2,
                             lineStyle: LightweightCharts.LineStyle.Solid,
                             axisLabelVisible: true,
-                            title: `FP POC (${lastFp.isBullish ? 'Bull' : 'Bear'})`,
+                            title: `POC Footprint $${lastFp.price.toFixed(2)}`
                         });
-                        activePriceLines.push(line);
+                        activePriceLines.push(fpLine);
                     }
-                } else {
-                    currentFootprintRes = null;
                 }
 
-                if (showPivots && candles.length > 20) {
-                    let highest = -Infinity;
-                    let lowest = Infinity;
-                    const slice = candles.slice(-50);
-                    slice.forEach(c => {
-                        if (c.high > highest) highest = c.high;
-                        if (c.low < lowest) lowest = c.low;
-                    });
+                // 2. Dibuja Pivotes Multi-TF
+                if (showPivots) {
+                    const dailyCandles = await fetchKlines('1d', 5);
+                    if (dailyCandles.length >= 2) {
+                        const prevDay = dailyCandles[dailyCandles.length - 2];
+                        const pp = (prevDay.high + prevDay.low + prevDay.close) / 3;
+                        const r1 = (2 * pp) - prevDay.low;
+                        const s1 = (2 * pp) - prevDay.high;
 
-                    currentMainTarget = highest;
+                        currentMainTarget = r1;
 
-                    const resLine = candlestickSeries.createPriceLine({
-                        price: highest,
-                        color: '#ff9100',
-                        lineWidth: 1,
-                        lineStyle: LightweightCharts.LineStyle.Dashed,
-                        axisLabelVisible: true,
-                        title: 'Resistencia Pivot',
-                    });
-                    activePriceLines.push(resLine);
-                } else {
-                    currentMainTarget = null;
+                        const ppLine = candlestickSeries.createPriceLine({
+                            price: pp, color: '#ff9100', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed, axisLabelVisible: true, title: 'Pivote 1D'
+                        });
+                        const r1Line = candlestickSeries.createPriceLine({
+                            price: r1, color: '#ff5252', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dotted, axisLabelVisible: true, title: 'R1 1D'
+                        });
+                        const s1Line = candlestickSeries.createPriceLine({
+                            price: s1, color: '#00e676', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dotted, axisLabelVisible: true, title: 'S1 1D'
+                        });
+
+                        activePriceLines.push(ppLine, r1Line, s1Line);
+                    }
                 }
 
-                if (showPivotsTf && candles.length > 0) {
-                    const lastCandle = candles[candles.length - 1];
-                    dashPivotTfRes.innerText = `$${lastCandle.high.toFixed(2)}`;
-                    dashPivotTfSup.innerText = `$${lastCandle.low.toFixed(2)}`;
-                } else {
-                    dashPivotTfRes.innerText = "--";
-                    dashPivotTfSup.innerText = "--";
-                }
-
+                // 3. Marcadores Supertrend
                 if (showSupertrend) {
-                    markers = getSupertrendMarkers(candles);
+                    const stMarkers = getSupertrendMarkers(currentCandleData);
+                    candlestickSeries.setMarkers(stMarkers);
+                } else {
+                    candlestickSeries.setMarkers([]);
                 }
 
-                candlestickSeries.setMarkers(markers);
+                const lastCandle = currentCandleData[currentCandleData.length - 1];
+                if (lastCandle) {
+                    updateRealtimeAnalysis(lastCandle.close);
+                }
             }
 
             async function loadChartData(tf) {
+                statusEl.innerText = "Cargando datos...";
                 statusEl.style.display = "block";
-                statusEl.innerText = `Cargando datos para ${tf}...`;
 
-                try {
-                    currentCandleData = await fetchKlines(tf, 200);
-                    candlestickSeries.setData(currentCandleData);
-                    
-                    if (currentCandleData.length > 0) {
-                        const lastPrice = currentCandleData[currentCandleData.length - 1].close;
-                        renderChartIndicators(currentCandleData);
-                        updateRealtimeAnalysis(lastPrice);
-                    }
-
+                const klines = await fetchKlines(tf, 300);
+                if (klines.length > 0) {
+                    currentCandleData = klines;
+                    candlestickSeries.setData(klines);
                     statusEl.style.display = "none";
-                    connectWebSocket(tf);
-                } catch (err) {
-                    console.error("Error al cargar velas:", err);
-                    statusEl.innerText = "Error cargando datos. Reintentando...";
+
+                    await updateOverlayLevels();
+                    startCandleTimer(tf);
+                } else {
+                    statusEl.innerText = "Error cargando datos de Binance";
                 }
             }
 
             function connectWebSocket(tf) {
-                if (wsConnection) {
-                    wsConnection.close();
-                }
+                if (wsConnection) wsConnection.close();
 
-                const streamTf = tf.toLowerCase();
-                const wsUrl = `wss://stream.binance.com:9443/ws/btcusdt@kline_${streamTf}`;
-                wsConnection = new WebSocket(wsUrl);
+                const wsInterval = tf === '1s' ? '1s' : tf;
+                const streamName = `btcusdt@kline_${wsInterval}`;
+                wsConnection = new WebSocket(`wss://stream.binance.com:9443/ws/${streamName}`);
 
-                wsConnection.onopen = () => {
-                    statusEl.style.display = "none";
-                };
-
-                wsConnection.onmessage = (event) => {
+                wsConnection.onmessage = function (event) {
                     const msg = JSON.parse(event.data);
-                    if (msg.e === "kline") {
+                    if (msg.e === 'kline') {
                         const k = msg.k;
                         const candle = {
-                            time: Math.floor(k.t / 1000),
+                            time: k.t / 1000,
                             open: parseFloat(k.o),
                             high: parseFloat(k.h),
                             low: parseFloat(k.l),
@@ -780,71 +769,84 @@
                             volume: parseFloat(k.v)
                         };
 
+                        candlestickSeries.update(candle);
+
                         if (currentCandleData.length > 0) {
                             const lastIdx = currentCandleData.length - 1;
                             if (currentCandleData[lastIdx].time === candle.time) {
                                 currentCandleData[lastIdx] = candle;
-                            } else if (candle.time > currentCandleData[lastIdx].time) {
+                            } else {
                                 currentCandleData.push(candle);
-                                if (currentCandleData.length > 300) currentCandleData.shift();
                             }
-                        } else {
-                            currentCandleData.push(candle);
                         }
 
-                        candlestickSeries.update(candle);
-                        renderChartIndicators(currentCandleData);
                         updateRealtimeAnalysis(candle.close);
                     }
                 };
-
-                wsConnection.onerror = (e) => console.error("WS Error:", e);
-                wsConnection.onclose = () => {
-                    setTimeout(() => connectWebSocket(tf), 3000);
-                };
             }
 
-            function bindToggleBtn(btn, stateGetter, stateSetter) {
-                btn.addEventListener("click", () => {
-                    const newState = !stateGetter();
-                    stateSetter(newState);
-                    if (newState) {
-                        btn.classList.remove("inactive");
-                        btn.classList.add("active");
-                    } else {
-                        btn.classList.remove("active");
-                        btn.classList.add("inactive");
-                    }
-                    updateDashboardModulesVisibility();
-                    if (currentCandleData.length > 0) {
-                        renderChartIndicators(currentCandleData);
-                        updateRealtimeAnalysis(currentCandleData[currentCandleData.length - 1].close);
-                    }
-                });
-            }
-
-            bindToggleBtn(btnPivots, () => showPivots, v => showPivots = v);
-            bindToggleBtn(btnPivotsTf, () => showPivotsTf, v => showPivotsTf = v);
-            bindToggleBtn(btnVsa, () => showVsa, v => showVsa = v);
-            bindToggleBtn(btnSupertrend, () => showSupertrend, v => showSupertrend = v);
-            bindToggleBtn(btnFootprint, () => showFootprint, v => showFootprint = v);
-            bindToggleBtn(btnMultiFp, () => showMultiFootprint, v => showMultiFootprint = v);
-
-            timeframeSelect.addEventListener("change", (e) => {
-                const newTf = e.target.value;
-                startCandleTimer(newTf);
-                loadChartData(newTf);
+            // Oyentes de los Botones de Alternancia
+            btnPivots.addEventListener('click', () => {
+                showPivots = !showPivots;
+                btnPivots.classList.toggle('active', showPivots);
+                btnPivots.classList.toggle('inactive', !showPivots);
+                updateDashboardModulesVisibility();
+                updateOverlayLevels();
             });
 
-            // Inicialización de la aplicación
+            btnPivotsTf.addEventListener('click', () => {
+                showPivotsTf = !showPivotsTf;
+                btnPivotsTf.classList.toggle('active', showPivotsTf);
+                btnPivotsTf.classList.toggle('inactive', !showPivotsTf);
+                updateDashboardModulesVisibility();
+            });
+
+            btnVsa.addEventListener('click', () => {
+                showVsa = !showVsa;
+                btnVsa.classList.toggle('active', showVsa);
+                btnVsa.classList.toggle('inactive', !showVsa);
+                updateDashboardModulesVisibility();
+            });
+
+            btnSupertrend.addEventListener('click', () => {
+                showSupertrend = !showSupertrend;
+                btnSupertrend.classList.toggle('active', showSupertrend);
+                btnSupertrend.classList.toggle('inactive', !showSupertrend);
+                updateOverlayLevels();
+            });
+
+            btnFootprint.addEventListener('click', () => {
+                showFootprint = !showFootprint;
+                btnFootprint.classList.toggle('active', showFootprint);
+                btnFootprint.classList.toggle('inactive', !showFootprint);
+                updateDashboardModulesVisibility();
+                updateOverlayLevels();
+            });
+
+            btnMultiFp.addEventListener('click', () => {
+                showMultiFootprint = !showMultiFootprint;
+                btnMultiFp.classList.toggle('active', showMultiFootprint);
+                btnMultiFp.classList.toggle('inactive', !showMultiFootprint);
+            });
+
+            timeframeSelect.addEventListener('change', async (e) => {
+                const newTf = e.target.value;
+                await loadChartData(newTf);
+                connectWebSocket(newTf);
+            });
+
+            window.addEventListener('resize', () => {
+                chart.resize(chartContainer.clientWidth, chartContainer.clientHeight);
+            });
+
+            // Ejecución Inicial
             const initialTf = timeframeSelect.value;
             updateDashboardModulesVisibility();
-            startCandleTimer(initialTf);
-            loadChartData(initialTf);
-            updateWhaleDashboard();
-
-            // Refresco periódico del análisis de ballenas
-            setInterval(updateWhaleDashboard, 60000);
+            loadChartData(initialTf).then(() => {
+                connectWebSocket(initialTf);
+                updateWhaleDashboard();
+                setInterval(updateWhaleDashboard, 60000); 
+            });
         });
     </script>
 </body>
