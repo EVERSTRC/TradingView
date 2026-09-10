@@ -3,15 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>S/R + VSA + Footprint Tiburon - BTC/USD</title>
+    <title>Trading Workspace - Analytics & CRL System</title>
     <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
 
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        html, body { width: 100%; height: 100%; background-color: #131722; color: #d1d4dc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; overflow: hidden; }
-        #main-container { width: 100vw; height: 100vh; display: flex; flex-direction: column; }
+        html, body { width: 100vw; height: 100vh; background-color: #131722; color: #d1d4dc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; overflow: hidden; }
         
-        #header {
+        .app-view { width: 100vw; height: 100vh; display: flex; flex-direction: column; }
+        .hidden-view { display: none !important; }
+
+        /* ================= ESTILOS VISTA 1: ANALYTICS ================= */
+        #header-v1 {
             min-height: 48px;
             background-color: #1e222d;
             display: flex;
@@ -24,7 +27,6 @@
             gap: 10px;
         }
 
-        /* NAVEGACIÓN POR PESTAÑAS (TABS) */
         .tabs-container { display: flex; align-items: center; gap: 4px; background: #131722; padding: 3px; border-radius: 6px; border: 1px solid #2a2e39; }
         .tab-btn {
             background: transparent;
@@ -40,13 +42,13 @@
         .tab-btn:hover { color: #d1d4dc; }
         .tab-btn.active { background-color: #2962ff; color: #ffffff; box-shadow: 0 0 8px rgba(41, 98, 255, 0.4); }
 
-        .title { font-size: 13px; font-weight: 700; color: #2962ff; letter-spacing: 0.5px; display: flex; align-items: center; gap: 8px; }
+        .title-v1 { font-size: 13px; font-weight: 700; color: #2962ff; letter-spacing: 0.5px; display: flex; align-items: center; gap: 8px; }
         .live-dot { width: 8px; height: 8px; background-color: #00e676; border-radius: 50%; box-shadow: 0 0 8px #00e676; animation: blink 1.5s infinite; }
         @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
 
-        .controls-container { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .controls-container-v1 { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
-        select {
+        select.select-v1 {
             background-color: #2a2e39;
             color: #d1d4dc;
             border: 1px solid #363c4e;
@@ -56,7 +58,7 @@
             outline: none;
             cursor: pointer;
         }
-        select:hover { border-color: #2962ff; }
+        select.select-v1:hover { border-color: #2962ff; }
 
         .btn-fp {
             background-color: #2a2e39;
@@ -82,10 +84,9 @@
         }
         .btn-fp.inactive { opacity: 0.5; border-color: #2a2e39; color: #787b86; }
 
-        #chart-wrapper { flex: 1; width: 100%; position: relative; }
-        #chart { width: 100%; height: 100%; }
+        #chart-wrapper-v1 { flex: 1; width: 100%; position: relative; }
+        #chart-v1 { width: 100%; height: 100%; }
 
-        /* DASHBOARD PRINCIPAL Y MÓDULOS DINÁMICOS */
         #candle-dashboard {
             position: absolute;
             top: 16px;
@@ -113,7 +114,7 @@
         .progress-bar-bg { width: 100%; height: 4px; background-color: #2a2e39; border-radius: 2px; overflow: hidden; }
         .progress-bar-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #2962ff, #00e5ff); transition: width 0.3s ease; }
 
-        #status { 
+        #status-v1 { 
             position: absolute; 
             top: 50%; 
             left: 50%; 
@@ -127,24 +128,59 @@
             z-index: 5;
             text-align: center;
         }
+
+        /* ================= ESTILOS VISTA 2: SYSTEM CRL ================= */
+        #toolbar-v2 {
+            height: 50px; background-color: #161b22; border-bottom: 1px solid #30363d;
+            display: flex; align-items: center; justify-content: space-between; padding: 0 20px;
+        }
+        .title-v2 { font-weight: 800; font-size: 16px; color: #fff; display: flex; align-items: center; gap: 8px; }
+        .controls-v2 { display: flex; gap: 10px; align-items: center; }
+        select.select-v2 { background: #21262d; color: #fff; border: 1px solid #30363d; padding: 6px 12px; border-radius: 6px; outline: none; }
+
+        #workspace-v2 { flex: 1; display: flex; position: relative; overflow: hidden; }
+
+        #htf-draw-panel {
+            width: 220px; background-color: #161b22; border-right: 2px solid #30363d;
+            display: flex; flex-direction: column; align-items: center; padding: 15px 10px; position: relative; z-index: 5;
+        }
+        .panel-title { font-size: 12px; font-weight: 700; color: #8b949e; text-transform: uppercase; margin-bottom: 10px; }
+        #htf-svg { width: 100%; height: 100%; overflow: visible; }
+
+        #chart-container-v2 { flex: 1; height: 100%; position: relative; }
+
+        #auto-decision-box {
+            position: absolute; top: 15px; left: 235px; z-index: 10;
+            background: rgba(22, 27, 34, 0.95); border: 2px solid #30363d;
+            border-radius: 8px; padding: 12px 18px; min-width: 320px;
+            backdrop-filter: blur(8px); box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+        }
+        .dec-title { font-size: 11px; text-transform: uppercase; color: #8b949e; font-weight: 700; letter-spacing: 0.5px; }
+        .dec-action { font-size: 16px; font-weight: 800; margin: 4px 0; }
+        .dec-reason { font-size: 12px; color: #c9d1d9; }
+        
+        .state-buy { color: #00e676; border-color: #00e676 !important; }
+        .state-sell { color: #ff5252; border-color: #ff5252 !important; }
+        .state-wait { color: #ffb300; border-color: #ffb300 !important; }
+        .state-no-trade { color: #8b949e; border-color: #8b949e !important; }
     </style>
 </head>
 <body>
 
-    <div id="main-container">
-        <div id="header">
+    <!-- ================= VISTA 1: ANALYTICS (S/R, VSA, FOOTPRINT, SUPERTREND) ================= -->
+    <div id="view-analytics" class="app-view">
+        <div id="header-v1">
             <div style="display: flex; align-items: center; gap: 16px;">
-                <span class="title"><span class="live-dot"></span> 🦈 BTC/USD ANALYTICS</span>
+                <span class="title-v1"><span class="live-dot"></span> 🦈 BTC/USD ANALYTICS</span>
                 
-                <!-- CEJILLAS / TABS -->
                 <div class="tabs-container">
                     <button id="tab-main" class="tab-btn active">📊 S/R + VSA + Footprint</button>
                     <button id="tab-supertrend" class="tab-btn">📈 Supertrend UAlgo</button>
+                    <button id="tab-crl" class="tab-btn" style="border-left: 1px solid #2a2e39; margin-left: 4px;">🤖 CRL System</button>
                 </div>
             </div>
             
-            <div class="controls-container">
-                <!-- Botones Modulo Principal -->
+            <div class="controls-container-v1">
                 <div id="controls-main" style="display: flex; gap: 8px;">
                     <button id="toggle-pivots" class="btn-fp active">📍 Pivotes Multi-TF</button>
                     <button id="toggle-pivots-tf" class="btn-fp active">📍 Pivotes Dinámicos TF</button>
@@ -152,13 +188,12 @@
                     <button id="toggle-footprint" class="btn-fp active">👣 Footprint POC</button>
                 </div>
 
-                <!-- Botones Módulo Supertrend -->
                 <div id="controls-supertrend" style="display: none; gap: 8px;">
                     <button id="toggle-supertrend" class="btn-fp active">📈 Supertrend Signals</button>
                 </div>
                 
                 <div>
-                    <select id="timeframe">
+                    <select id="timeframe" class="select-v1">
                         <option value="1s">1 Segundo</option>
                         <option value="1m">1 Minuto</option>
                         <option value="3m">3 Minutos</option>
@@ -173,7 +208,7 @@
             </div>
         </div>
 
-        <div id="chart-wrapper">
+        <div id="chart-wrapper-v1">
             <div id="candle-dashboard">
                 <div class="dash-row">
                     <span class="dash-label">Cierre de Vela</span>
@@ -253,40 +288,114 @@
                 </div>
             </div>
 
-            <div id="chart"></div>
+            <div id="chart-v1"></div>
+        </div>
+        <div id="status-v1">Conectando a Binance WebSocket...</div>
+    </div>
+
+
+    <!-- ================= VISTA 2: CRL AUTOMATED TRADING DECISION SYSTEM ================= -->
+    <div id="view-crl" class="app-view hidden-view">
+        <div id="toolbar-v2">
+            <div class="title-v2">
+                <span>CRL :) Automatic Signal System</span>
+            </div>
+            <div class="controls-v2">
+                <div class="tabs-container" style="margin-right: 10px;">
+                    <button id="tab-back-analytics" class="tab-btn">⬅ Volver a Analytics</button>
+                </div>
+                <select id="tf-htf" class="select-v2">
+                    <option value="1h" selected>HTF: 1 Hora</option>
+                    <option value="4h">HTF: 4 Horas</option>
+                </select>
+                <select id="tf-ltf" class="select-v2">
+                    <option value="1m">LTF: 1 Minuto</option>
+                    <option value="5m" selected>LTF: 5 Minutos</option>
+                </select>
+            </div>
+        </div>
+
+        <div id="workspace-v2">
+            <div id="htf-draw-panel">
+                <div class="panel-title" id="htf-name-label">1 HOUR - HTF</div>
+                <svg id="htf-svg" viewBox="0 0 160 400">
+                    <line id="htf-wick" x1="80" y1="40" x2="80" y2="360" stroke="#2962ff" stroke-width="3" />
+                    <rect id="htf-body" x="40" y="100" width="80" height="180" fill="#2962ff" stroke="#2962ff" stroke-width="2" rx="3" />
+
+                    <line x1="10" y1="40" x2="150" y2="40" stroke="#ff5252" stroke-width="1.5" stroke-dasharray="4,4" />
+                    <text x="15" y="32" fill="#ff5252" font-size="11" font-weight="bold">BSL (High)</text>
+                    <text id="txt-bsl" x="145" y="32" fill="#ff5252" font-size="10" text-anchor="end">0.00</text>
+
+                    <line x1="10" y1="200" x2="150" y2="200" stroke="#ffb300" stroke-width="1.5" stroke-dasharray="2,2" />
+                    <text x="15" y="192" fill="#ffb300" font-size="11" font-weight="bold">50% (EQ)</text>
+                    <text id="txt-eq" x="145" y="192" fill="#ffb300" font-size="10" text-anchor="end">0.00</text>
+
+                    <line x1="10" y1="360" x2="150" y2="360" stroke="#00e676" stroke-width="1.5" stroke-dasharray="4,4" />
+                    <text x="15" y="352" fill="#00e676" font-size="11" font-weight="bold">SSL (Low)</text>
+                    <text id="txt-ssl" x="145" y="352" fill="#00e676" font-size="10" text-anchor="end">0.00</text>
+                </svg>
+            </div>
+
+            <div id="auto-decision-box" class="state-wait">
+                <div class="dec-title">ANALIZADOR AUTOMÁTICO CRL</div>
+                <div id="dec-action" class="dec-action">ANALIZANDO MERCADO...</div>
+                <div id="dec-reason" class="dec-reason">Evaluando posición respecto a niveles HTF.</div>
+            </div>
+
+            <div id="chart-container-v2"></div>
         </div>
     </div>
-    <div id="status">Conectando a Binance WebSocket...</div>
 
+
+    <!-- ================= SCRIPTS DE LÓGICA ================= -->
     <script>
-        document.addEventListener("DOMContentLoaded", function () {
-            const statusEl = document.getElementById("status");
-            const timeframeSelect = document.getElementById("timeframe");
-            const chartContainer = document.getElementById("chart");
+        // CONTROL DE NAVEGACIÓN GENERAL ENTRE SISTEMAS
+        const viewAnalytics = document.getElementById("view-analytics");
+        const viewCrl = document.getElementById("view-crl");
 
-            // Elementos de Tabs
-            const tabMain = document.getElementById("tab-main");
-            const tabSupertrend = document.getElementById("tab-supertrend");
+        const tabMain = document.getElementById("tab-main");
+        const tabSupertrend = document.getElementById("tab-supertrend");
+        const tabCrl = document.getElementById("tab-crl");
+        const tabBackAnalytics = document.getElementById("tab-back-analytics");
+
+        function showView(viewName) {
+            if (viewName === 'crl') {
+                viewAnalytics.classList.add("hidden-view");
+                viewCrl.classList.remove("hidden-view");
+                if (window.resizeChartV2) window.resizeChartV2();
+            } else {
+                viewCrl.classList.add("hidden-view");
+                viewAnalytics.classList.remove("hidden-view");
+                if (window.resizeChartV1) window.resizeChartV1();
+            }
+        }
+
+        tabCrl.addEventListener("click", () => showView('crl'));
+        tabBackAnalytics.addEventListener("click", () => showView('analytics'));
+
+
+        /* ================= SCRIPT SISTEMA 1 (ANALYTICS) ================= */
+        (function initAnalyticsSystem() {
+            const statusEl = document.getElementById("status-v1");
+            const timeframeSelect = document.getElementById("timeframe");
+            const chartContainer = document.getElementById("chart-v1");
+
             const controlsMain = document.getElementById("controls-main");
             const controlsSupertrend = document.getElementById("controls-supertrend");
 
-            // Botones
             const btnPivots = document.getElementById("toggle-pivots");
             const btnPivotsTf = document.getElementById("toggle-pivots-tf");
             const btnVsa = document.getElementById("toggle-vsa");
             const btnSupertrend = document.getElementById("toggle-supertrend");
             const btnFootprint = document.getElementById("toggle-footprint");
 
-            // Módulos
             const modFootprint = document.getElementById("dash-module-footprint");
             const modPivots = document.getElementById("dash-module-pivots");
             const modPivotsTf = document.getElementById("dash-module-pivots-tf");
             const modVsa = document.getElementById("dash-module-vsa");
 
-            // Estado de Pestaña (0: Main, 1: Supertrend)
             let activeTab = 0; 
 
-            // Visibilidad de Capas
             let showPivots = true;
             let showPivotsTf = true;
             let showVsa = true;
@@ -336,7 +445,10 @@
                 upColor: '#089981', downColor: '#f23645', borderVisible: false, wickUpColor: '#089981', wickDownColor: '#f23645'
             });
 
-            // LÓGICA DE CONTROL DE PESTAÑAS (TABS)
+            window.resizeChartV1 = function() {
+                chart.applyOptions({ width: chartContainer.clientWidth, height: chartContainer.clientHeight });
+            };
+
             tabMain.addEventListener("click", () => {
                 activeTab = 0;
                 tabMain.classList.add("active");
@@ -549,7 +661,6 @@
                 return { footprintPOCs: footprintPOCs.slice(-2) };
             }
 
-            // FUNCIÓN SUPERTREND UALGO
             function getSupertrendMarkers(candles, atrPeriods = 14, multiplier = 2.0, stopLossVal = 2.0) {
                 if (!candles || candles.length < atrPeriods + 1) return [];
 
@@ -711,7 +822,6 @@
 
                     updateDashboardModulesVisibility();
 
-                    // RENDERIZADO PESTAÑA 1: INDICADOR PRINCIPAL
                     if (activeTab === 0) {
                         if (showPivots) {
                             const [raw4h, raw1d] = await Promise.all([
@@ -773,7 +883,6 @@
                         combinedMarkers.sort((a, b) => a.time - b.time);
                         candlestickSeries.setMarkers(combinedMarkers);
                     } 
-                    // RENDERIZADO PESTAÑA 2: SUPERTREND
                     else if (activeTab === 1) {
                         let combinedMarkers = [];
                         if (showSupertrend) {
@@ -868,7 +977,6 @@
                 else { btn.classList.remove("active"); btn.classList.add("inactive"); }
             }
 
-            // LISTENERS DE BOTONES DE CONTROL
             btnPivots.addEventListener("click", () => {
                 showPivots = !showPivots;
                 toggleButtonState(btnPivots, showPivots);
@@ -904,12 +1012,127 @@
             });
 
             window.addEventListener('resize', () => {
-                chart.applyOptions({ width: chartContainer.clientWidth, height: chartContainer.clientHeight });
+                if (window.resizeChartV1) window.resizeChartV1();
             });
 
-            // Inicialización
             loadChartData(timeframeSelect.value);
-        });
+        })();
+
+
+        /* ================= SCRIPT SISTEMA 2 (CRL AUTOMATED SYSTEM) ================= */
+        (function initCRLSystem() {
+            const chartDom = document.getElementById("chart-container-v2");
+            const selectHTF = document.getElementById("tf-htf");
+            const selectLTF = document.getElementById("tf-ltf");
+
+            const boxDecision = document.getElementById("auto-decision-box");
+            const txtAction = document.getElementById("dec-action");
+            const txtReason = document.getElementById("dec-reason");
+
+            const chart = LightweightCharts.createChart(chartDom, {
+                width: chartDom.clientWidth || 800,
+                height: chartDom.clientHeight || 600,
+                layout: { background: { type: 'solid', color: '#0d1117' }, textColor: '#c9d1d9' },
+                grid: { vertLines: { color: '#21262d' }, horzLines: { color: '#21262d' } },
+                timeScale: { borderColor: '#30363d', timeVisible: true }
+            });
+
+            const series = chart.addCandlestickSeries({
+                upColor: '#26a69a', downColor: '#ef5350',
+                borderUpColor: '#26a69a', borderDownColor: '#ef5350',
+                wickUpColor: '#26a69a', wickDownColor: '#ef5350'
+            });
+
+            window.resizeChartV2 = function() {
+                chart.applyOptions({ width: chartDom.clientWidth, height: chartDom.clientHeight });
+            };
+
+            let activePriceLines = [];
+            let currentHigh = 0, currentLow = 0, currentEQ = 0;
+
+            async function getKlines(symbol, interval, limit = 200) {
+                const res = await fetch(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`);
+                const data = await res.json();
+                return data.map(d => ({
+                    time: Math.floor(d[0] / 1000),
+                    open: parseFloat(d[1]), high: parseFloat(d[2]),
+                    low: parseFloat(d[3]), close: parseFloat(d[4])
+                }));
+            }
+
+            async function updateHTFLevels() {
+                const htfVal = selectHTF.value;
+                document.getElementById('htf-name-label').innerText = `${htfVal.toUpperCase()} - HTF CANDLE`;
+
+                const htfData = await getKlines('BTCUSDT', htfVal, 5);
+                if(htfData.length < 2) return;
+
+                const candle = htfData[htfData.length - 2];
+                currentHigh = candle.high;
+                currentLow = candle.low;
+                currentEQ = currentLow + (currentHigh - currentLow) * 0.5;
+
+                document.getElementById('txt-bsl').innerText = `$${currentHigh.toFixed(1)}`;
+                document.getElementById('txt-eq').innerText = `$${currentEQ.toFixed(1)}`;
+                document.getElementById('txt-ssl').innerText = `$${currentLow.toFixed(1)}`;
+
+                activePriceLines.forEach(line => series.removePriceLine(line));
+                activePriceLines = [];
+
+                activePriceLines.push(series.createPriceLine({ price: currentHigh, color: '#ff5252', lineWidth: 2, lineStyle: 2, title: 'BSL' }));
+                activePriceLines.push(series.createPriceLine({ price: currentEQ, color: '#ffb300', lineWidth: 1, lineStyle: 0, title: '50% EQ' }));
+                activePriceLines.push(series.createPriceLine({ price: currentLow, color: '#00e676', lineWidth: 2, lineStyle: 2, title: 'SSL' }));
+            }
+
+            function evaluateAutomatedTrade(ltfData) {
+                if(!ltfData || ltfData.length < 2) return;
+
+                const lastBar = ltfData[ltfData.length - 1];
+                const prevBar = ltfData[ltfData.length - 2];
+                const markers = [];
+
+                if (lastBar.low < currentLow && lastBar.close > currentLow) {
+                    boxDecision.className = "state-buy";
+                    txtAction.innerText = "🚀 ENTRAR EN COMPRA (LONG)";
+                    txtReason.innerText = `Barrido de SSL detectado. Stop Loss: $${lastBar.low.toFixed(1)} | Objetivo TP: $${currentEQ.toFixed(1)}`;
+                    markers.push({ time: lastBar.time, position: 'belowBar', color: '#00e676', shape: 'arrowUp', text: 'COMPRA (SSL Sweep)' });
+                }
+                else if (lastBar.high > currentHigh && lastBar.close < currentHigh) {
+                    boxDecision.className = "state-sell";
+                    txtAction.innerText = "🐻 ENTRAR EN VENTA (SHORT)";
+                    txtReason.innerText = `Barrido de BSL detectado. Stop Loss: $${lastBar.high.toFixed(1)} | Objetivo TP: $${currentEQ.toFixed(1)}`;
+                    markers.push({ time: lastBar.time, position: 'aboveBar', color: '#ff5252', shape: 'arrowDown', text: 'VENTA (BSL Sweep)' });
+                }
+                else if (lastBar.close > currentHigh || lastBar.close < currentLow) {
+                    boxDecision.className = "state-no-trade";
+                    txtAction.innerText = "⛔ NO OPERAR (BREAKOUT DETECTADO)";
+                    txtReason.innerText = "El precio rompió el rango con cuerpo sólido. Entrada invalidada.";
+                }
+                else {
+                    boxDecision.className = "state-wait";
+                    txtAction.innerText = "⏳ ESPERAR OPORTUNIDAD";
+                    txtReason.innerText = "El precio está en zona neutra. Esperando barrido en BSL o SSL.";
+                }
+
+                series.setMarkers(markers);
+            }
+
+            async function loadChartData() {
+                const ltfVal = selectLTF.value;
+                const ltfData = await getKlines('BTCUSDT', ltfVal, 300);
+                series.setData(ltfData);
+                await updateHTFLevels();
+                evaluateAutomatedTrade(ltfData);
+            }
+
+            selectHTF.addEventListener('change', loadChartData);
+            selectLTF.addEventListener('change', loadChartData);
+            window.addEventListener('resize', () => {
+                if (window.resizeChartV2) window.resizeChartV2();
+            });
+
+            loadChartData();
+        })();
     </script>
 </body>
 </html>
