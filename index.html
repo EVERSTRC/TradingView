@@ -147,6 +147,7 @@
                 <button id="toggle-supertrend" class="btn-fp active">📈 Supertrend</button>
                 <button id="toggle-footprint" class="btn-fp active">👣 Footprint POC</button>
                 <button id="toggle-multi-fp" class="btn-fp">🌐 Multi-FP</button>
+                <button id="toggle-crl" class="btn-fp active">📊 CRL :)</button>
                 
                 <div>
                     <select id="timeframe">
@@ -218,6 +219,14 @@
                     </div>
                 </div>
 
+                <div id="dash-module-crl" class="dash-module">
+                    <div class="dash-divider"></div>
+                    <div class="dash-row">
+                        <span class="dash-label">Mapeo CRL</span>
+                        <span id="dash-crl-mapping" class="dash-value" style="color: #ff007f;">--</span>
+                    </div>
+                </div>
+
                 <div id="dash-module-vsa" class="dash-module">
                     <div class="dash-divider"></div>
                     <div class="dash-row">
@@ -261,11 +270,13 @@
             const btnSupertrend = document.getElementById("toggle-supertrend");
             const btnFootprint = document.getElementById("toggle-footprint");
             const btnMultiFp = document.getElementById("toggle-multi-fp");
+            const btnCrl = document.getElementById("toggle-crl");
 
             const modFootprint = document.getElementById("dash-module-footprint");
             const modPivots = document.getElementById("dash-module-pivots");
             const modPivotsTf = document.getElementById("dash-module-pivots-tf");
             const modVsa = document.getElementById("dash-module-vsa");
+            const modCrl = document.getElementById("dash-module-crl");
 
             let showPivots = true;
             let showPivotsTf = true;
@@ -273,12 +284,14 @@
             let showSupertrend = true;
             let showFootprint = true;
             let showMultiFootprint = false;
+            let showCrl = true;
 
             const timerDisplay = document.getElementById("timer-display");
             const timerProgress = document.getElementById("timer-progress");
             const dashBias = document.getElementById("dash-bias");
             const dashTarget = document.getElementById("dash-target");
             const dashInvalid = document.getElementById("dash-invalid");
+            const dashCrlMapping = document.getElementById("dash-crl-mapping");
 
             const dashPivotTfResLabel = document.getElementById("dash-pivot-tf-res-label");
             const dashPivotTfSupLabel = document.getElementById("dash-pivot-tf-sup-label");
@@ -305,6 +318,13 @@
             let currentWhaleBuyAvg = null;
             let currentMainTarget = null;
 
+            const crlTimeframeMap = {
+                '1h': '1 min',
+                '4h': '5 min',
+                '1d': '15 min',
+                '1w': '1h'
+            };
+
             const chart = LightweightCharts.createChart(chartContainer, {
                 width: chartContainer.clientWidth,
                 height: chartContainer.clientHeight,
@@ -323,6 +343,7 @@
                 modPivots.style.display = showPivots ? "flex" : "none";
                 modPivotsTf.style.display = showPivotsTf ? "flex" : "none";
                 modVsa.style.display = showVsa ? "flex" : "none";
+                modCrl.style.display = showCrl ? "flex" : "none";
             }
 
             function updateRealtimeAnalysis(lastClosePrice) {
@@ -374,6 +395,18 @@
                     dashEntry.innerText = "--";
                     dashTp.innerText = "--";
                     dashSl.innerText = "--";
+                }
+
+                if (showCrl) {
+                    const currentTf = timeframeSelect.value;
+                    const matchedLtf = crlTimeframeMap[currentTf];
+                    if (matchedLtf) {
+                        dashCrlMapping.innerText = `${currentTf.toUpperCase()} (HTF) ➔ ${matchedLtf} (LTF)`;
+                        dashCrlMapping.style.color = "#00e5ff";
+                    } else {
+                        dashCrlMapping.innerText = `${currentTf.toUpperCase()} (Sin mapeo direct CRL)`;
+                        dashCrlMapping.style.color = "#787b86";
+                    }
                 }
             }
 
@@ -526,14 +559,12 @@
                 return { footprintPOCs: footprintPOCs.slice(-2) };
             }
 
-            // FUNCIÓN SUPERTREND CORREGIDA: Réplica exacta del indicador UAlgo (Method 1: ta.atr, pos state)
             function getSupertrendMarkers(candles, atrPeriods = 14, multiplier = 2.0, stopLossVal = 2.0) {
                 if (!candles || candles.length < atrPeriods + 1) return [];
 
                 const len = candles.length;
                 const tr = new Float64Array(len);
                 
-                // 1. Cálculo del True Range
                 tr[0] = candles[0].high - candles[0].low;
                 for (let i = 1; i < len; i++) {
                     const hL = candles[i].high - candles[i].low;
@@ -542,7 +573,6 @@
                     tr[i] = Math.max(hL, hC, lC);
                 }
 
-                // 2. Cálculo de ATR (Method 1: RMA / ta.atr en TradingView)
                 const atr = new Float64Array(len);
                 let sumTR = 0;
                 for (let i = 0; i < atrPeriods; i++) sumTR += tr[i];
@@ -591,7 +621,6 @@
                     trend[i] = currentTrend;
                 }
 
-                // 3. Control de Estado de Posición (pos) para réplica idéntica de UAlgo
                 const stMarkers = [];
                 let pos = 0;
                 let entryOfLong = 0;
@@ -840,6 +869,36 @@
                         fp4h.forEach(p => lineLevels.push({ price: p.price, color: '#76ff03', title: '👣 4H FP POC', width: 2, style: LightweightCharts.LineStyle.Solid }));
                     }
 
+                    if (showCrl) {
+                        const currentTf = timeframeSelect.value;
+                        const targetLtf = crlTimeframeMap[currentTf];
+
+                        if (targetLtf) {
+                            const binanceLtf = targetLtf.replace(' ', '');
+                            const ltfCandles = await fetchKlines(binanceLtf, 200);
+                            const ltfPivots = calculatePivots(ltfCandles, 10, 10);
+
+                            if (ltfPivots.pivotHigh) {
+                                lineLevels.push({
+                                    price: ltfPivots.pivotHigh.high,
+                                    color: '#ff007f',
+                                    title: `[ CRL ${targetLtf.toUpperCase()} RESISTENCIA ]`,
+                                    width: 2,
+                                    style: LightweightCharts.LineStyle.Dotted
+                                });
+                            }
+                            if (ltfPivots.pivotLow) {
+                                lineLevels.push({
+                                    price: ltfPivots.pivotLow.low,
+                                    color: '#00f0ff',
+                                    title: `[ CRL ${targetLtf.toUpperCase()} SOPORTE ]`,
+                                    width: 2,
+                                    style: LightweightCharts.LineStyle.Dotted
+                                });
+                            }
+                        }
+                    }
+
                     let stMarkers = [];
                     if (showSupertrend) {
                         stMarkers = getSupertrendMarkers(currentFormattedData, 14, 2.0, 2.0);
@@ -942,6 +1001,7 @@
             setupToggle(btnVsa, () => showVsa, val => showVsa = val);
             setupToggle(btnSupertrend, () => showSupertrend, val => showSupertrend = val);
             setupToggle(btnFootprint, () => showFootprint, val => showFootprint = val);
+            setupToggle(btnCrl, () => showCrl, val => showCrl = val);
 
             btnMultiFp.addEventListener("click", async () => {
                 showMultiFootprint = !showMultiFootprint;
