@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CRL :) HTF Candle Overlay</title>
+    <title>CRL :) Automated Trading Decision System</title>
     <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -19,72 +19,84 @@
 
         #workspace { flex: 1; display: flex; position: relative; overflow: hidden; }
 
-        /* PANEL IZQUIERDO: DIBUJO DE LA VELA HTF (Igual al dibujo) */
+        /* PANEL IZQUIERDO: DIBUJO HTF DE LA VELA */
         #htf-draw-panel {
-            width: 220px;
-            background-color: #161b22;
-            border-right: 2px solid #30363d;
-            display: flex; flex-direction: column; align-items: center; padding: 15px 10px;
-            position: relative; z-index: 5;
+            width: 220px; background-color: #161b22; border-right: 2px solid #30363d;
+            display: flex; flex-direction: column; align-items: center; padding: 15px 10px; position: relative; z-index: 5;
         }
-        .panel-title { font-size: 13px; font-weight: 700; color: #8b949e; text-transform: uppercase; margin-bottom: 15px; }
-
-        /* SVG para dibujar la vela HTF */
+        .panel-title { font-size: 12px; font-weight: 700; color: #8b949e; text-transform: uppercase; margin-bottom: 10px; }
         #htf-svg { width: 100%; height: 100%; overflow: visible; }
 
         /* PANEL DERECHO: GRÁFICO LTF */
         #chart-container { flex: 1; height: 100%; position: relative; }
+
+        /* BANNER AUTOMÁTICO DE DECISIÓN (SISTEMA DE ALERTA) */
+        #auto-decision-box {
+            position: absolute; top: 15px; left: 235px; z-index: 10;
+            background: rgba(22, 27, 34, 0.95); border: 2px solid #30363d;
+            border-radius: 8px; padding: 12px 18px; min-width: 320px;
+            backdrop-filter: blur(8px); box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+        }
+        .dec-title { font-size: 11px; text-transform: uppercase; color: #8b949e; font-weight: 700; letter-spacing: 0.5px; }
+        .dec-action { font-size: 16px; font-weight: 800; margin: 4px 0; }
+        .dec-reason { font-size: 12px; color: #c9d1d9; }
+        
+        /* ESTADOS DE DECISIÓN */
+        .state-buy { color: #00e676; border-color: #00e676 !important; }
+        .state-sell { color: #ff5252; border-color: #ff5252 !important; }
+        .state-wait { color: #ffb300; border-color: #ffb300 !important; }
+        .state-no-trade { color: #8b949e; border-color: #8b949e !important; }
     </style>
 </head>
 <body>
 
     <div id="toolbar">
         <div class="title">
-            <span>CRL :) Time Frames Indicator</span>
+            <span>CRL :) Automatic Signal System</span>
         </div>
         <div class="controls">
             <select id="tf-htf">
                 <option value="1h" selected>HTF: 1 Hora</option>
                 <option value="4h">HTF: 4 Horas</option>
-                <option value="1d">HTF: 1 Día</option>
             </select>
             <select id="tf-ltf">
                 <option value="1m">LTF: 1 Minuto</option>
                 <option value="5m" selected>LTF: 5 Minutos</option>
-                <option value="15m">LTF: 15 Minutos</option>
             </select>
         </div>
     </div>
 
     <div id="workspace">
-        <!-- CUADRO IZQUIERDO DE DIBUJO DE VELA HTF -->
+        <!-- VELA HTF DIBUJADA -->
         <div id="htf-draw-panel">
             <div class="panel-title" id="htf-name-label">1 HOUR - HTF</div>
-            
             <svg id="htf-svg" viewBox="0 0 160 400">
-                <!-- Mechas y Cuerpo de la Vela HTF Dibujada -->
-                <line id="htf-wick" x1="80" y1="40" x2="80" y2="360" stroke="#00e5ff" stroke-width="3" />
-                <rect id="htf-body" x="40" y="100" width="80" height="180" fill="#2962ff" stroke="#00e5ff" stroke-width="2" rx="3" />
+                <line id="htf-wick" x1="80" y1="40" x2="80" y2="360" stroke="#2962ff" stroke-width="3" />
+                <rect id="htf-body" x="40" y="100" width="80" height="180" fill="#2962ff" stroke="#2962ff" stroke-width="2" rx="3" />
 
-                <!-- Niveles Dibujados estilo Infografía -->
-                <!-- BSL (High) -->
+                <!-- NIVELES -->
                 <line x1="10" y1="40" x2="150" y2="40" stroke="#ff5252" stroke-width="1.5" stroke-dasharray="4,4" />
                 <text x="15" y="32" fill="#ff5252" font-size="11" font-weight="bold">BSL (High)</text>
                 <text id="txt-bsl" x="145" y="32" fill="#ff5252" font-size="10" text-anchor="end">0.00</text>
 
-                <!-- 50% EQ -->
                 <line x1="10" y1="200" x2="150" y2="200" stroke="#ffb300" stroke-width="1.5" stroke-dasharray="2,2" />
                 <text x="15" y="192" fill="#ffb300" font-size="11" font-weight="bold">50% (EQ)</text>
                 <text id="txt-eq" x="145" y="192" fill="#ffb300" font-size="10" text-anchor="end">0.00</text>
 
-                <!-- SSL (Low) -->
                 <line x1="10" y1="360" x2="150" y2="360" stroke="#00e676" stroke-width="1.5" stroke-dasharray="4,4" />
                 <text x="15" y="352" fill="#00e676" font-size="11" font-weight="bold">SSL (Low)</text>
                 <text id="txt-ssl" x="145" y="352" fill="#00e676" font-size="10" text-anchor="end">0.00</text>
             </svg>
         </div>
 
-        <!-- GRÁFICO LTF DERECHO -->
+        <!-- INDICADOR VISUAL DE DECISIÓN DE TRADING AUTOMÁTICO -->
+        <div id="auto-decision-box" class="state-wait">
+            <div class="dec-title">ANALIZADOR AUTOMÁTICO CRL</div>
+            <div id="dec-action" class="dec-action">ANALIZANDO MERCADO...</div>
+            <div id="dec-reason" class="dec-reason">Evaluando posición respecto a niveles HTF.</div>
+        </div>
+
+        <!-- GRÁFICO LTF -->
         <div id="chart-container"></div>
     </div>
 
@@ -93,8 +105,11 @@
             const chartDom = document.getElementById("chart-container");
             const selectHTF = document.getElementById("tf-htf");
             const selectLTF = document.getElementById("tf-ltf");
+            
+            const boxDecision = document.getElementById("auto-decision-box");
+            const txtAction = document.getElementById("dec-action");
+            const txtReason = document.getElementById("dec-reason");
 
-            // Crear Gráfico TradingView
             const chart = LightweightCharts.createChart(chartDom, {
                 width: chartDom.clientWidth,
                 height: chartDom.clientHeight,
@@ -110,8 +125,8 @@
             });
 
             let activePriceLines = [];
+            let currentHigh = 0, currentLow = 0, currentEQ = 0;
 
-            // Función para obtener velas de Binance
             async function getKlines(symbol, interval, limit = 200) {
                 const res = await fetch(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`);
                 const data = await res.json();
@@ -122,64 +137,79 @@
                 }));
             }
 
-            // Actualizar el dibujo de la Vela HTF
-            async function updateHTFVisuals() {
+            async function updateHTFLevels() {
                 const htfVal = selectHTF.value;
                 document.getElementById('htf-name-label').innerText = `${htfVal.toUpperCase()} - HTF CANDLE`;
 
                 const htfData = await getKlines('BTCUSDT', htfVal, 5);
                 if(htfData.length < 2) return;
 
-                // Tomamos la vela HTF anterior (la que define el Rango de la Infografía)
                 const candle = htfData[htfData.length - 2];
-                const high = candle.high;
-                const low = candle.low;
-                const open = candle.open;
-                const close = candle.close;
-                const eq = low + (high - low) * 0.5;
+                currentHigh = candle.high;
+                currentLow = candle.low;
+                currentEQ = currentLow + (currentHigh - currentLow) * 0.5;
 
-                // Actualizar Textos
-                document.getElementById('txt-bsl').innerText = `$${high.toFixed(1)}`;
-                document.getElementById('txt-eq').innerText = `$${eq.toFixed(1)}`;
-                document.getElementById('txt-ssl').innerText = `$${low.toFixed(1)}`;
+                document.getElementById('txt-bsl').innerText = `$${currentHigh.toFixed(1)}`;
+                document.getElementById('txt-eq').innerText = `$${currentEQ.toFixed(1)}`;
+                document.getElementById('txt-ssl').innerText = `$${currentLow.toFixed(1)}`;
 
-                // Ajustar gráfico SVG de la vela en base a si es Alcista o Bajista
-                const isBullish = close >= open;
-                const bodyElem = document.getElementById('htf-body');
-                const wickElem = document.getElementById('htf-wick');
-
-                if (isBullish) {
-                    bodyElem.setAttribute('fill', '#2962ff');
-                    bodyElem.setAttribute('stroke', '#2962ff');
-                    wickElem.setAttribute('stroke', '#2962ff');
-                } else {
-                    bodyElem.setAttribute('fill', '#161b22');
-                    bodyElem.setAttribute('stroke', '#ff5252');
-                    wickElem.setAttribute('stroke', '#ff5252');
-                }
-
-                // Dibujar líneas horizontales en el gráfico de la derecha
                 activePriceLines.forEach(line => series.removePriceLine(line));
                 activePriceLines = [];
 
-                activePriceLines.push(series.createPriceLine({ price: high, color: '#ff5252', lineWidth: 2, lineStyle: 2, title: 'BSL' }));
-                activePriceLines.push(series.createPriceLine({ price: eq, color: '#ffb300', lineWidth: 1, lineStyle: 0, title: '50% EQ' }));
-                activePriceLines.push(series.createPriceLine({ price: low, color: '#00e676', lineWidth: 2, lineStyle: 2, title: 'SSL' }));
+                activePriceLines.push(series.createPriceLine({ price: currentHigh, color: '#ff5252', lineWidth: 2, lineStyle: 2, title: 'BSL' }));
+                activePriceLines.push(series.createPriceLine({ price: currentEQ, color: '#ffb300', lineWidth: 1, lineStyle: 0, title: '50% EQ' }));
+                activePriceLines.push(series.createPriceLine({ price: currentLow, color: '#00e676', lineWidth: 2, lineStyle: 2, title: 'SSL' }));
+            }
+
+            // EVALUACIÓN Y SEÑALIZACIÓN AUTOMÁTICA
+            function evaluateAutomatedTrade(ltfData) {
+                if(!ltfData || ltfData.length < 2) return;
+
+                const lastBar = ltfData[ltfData.length - 1];
+                const prevBar = ltfData[ltfData.length - 2];
+                const markers = [];
+
+                // Condición 1: COMPRA AUTOMÁTICA (SSL Sweep + Return)
+                if (lastBar.low < currentLow && lastBar.close > currentLow) {
+                    boxDecision.className = "state-buy";
+                    txtAction.innerText = "🚀 ENTRAR EN COMPRA (LONG)";
+                    txtReason.innerText = `Barrido de SSL detectado. Stop Loss: $${lastBar.low.toFixed(1)} | Objetivo TP: $${currentEQ.toFixed(1)}`;
+                    markers.push({ time: lastBar.time, position: 'belowBar', color: '#00e676', shape: 'arrowUp', text: 'COMPRA (SSL Sweep)' });
+                }
+                // Condición 2: VENTA AUTOMÁTICA (BSL Sweep + Return)
+                else if (lastBar.high > currentHigh && lastBar.close < currentHigh) {
+                    boxDecision.className = "state-sell";
+                    txtAction.innerText = "🐻 ENTRAR EN VENTA (SHORT)";
+                    txtReason.innerText = `Barrido de BSL detectado. Stop Loss: $${lastBar.high.toFixed(1)} | Objetivo TP: $${currentEQ.toFixed(1)}`;
+                    markers.push({ time: lastBar.time, position: 'aboveBar', color: '#ff5252', shape: 'arrowDown', text: 'VENTA (BSL Sweep)' });
+                }
+                // Condición 3: NO OPERAR (Breakout Sólido)
+                else if (lastBar.close > currentHigh || lastBar.close < currentLow) {
+                    boxDecision.className = "state-no-trade";
+                    txtAction.innerText = "⛔ NO OPERAR (BREAKOUT DETECTADO)";
+                    txtReason.innerText = "El precio rompió el rango con cuerpo sólido. Entrada invalidada.";
+                }
+                // Condición 4: ESPERAR
+                else {
+                    boxDecision.className = "state-wait";
+                    txtAction.innerText = "⏳ ESPERAR OPORTUNIDAD";
+                    txtReason.innerText = "El precio está en zona neutra. Esperando barrido en BSL o SSL.";
+                }
+
+                series.setMarkers(markers);
             }
 
             async function loadChartData() {
                 const ltfVal = selectLTF.value;
                 const ltfData = await getKlines('BTCUSDT', ltfVal, 300);
                 series.setData(ltfData);
-                await updateHTFVisuals();
+                await updateHTFLevels();
+                evaluateAutomatedTrade(ltfData);
             }
 
-            selectHTF.addEventListener('change', updateHTFVisuals);
+            selectHTF.addEventListener('change', loadChartData);
             selectLTF.addEventListener('change', loadChartData);
-
-            window.addEventListener('resize', () => {
-                chart.applyOptions({ width: chartDom.clientWidth, height: chartDom.clientHeight });
-            });
+            window.addEventListener('resize', () => chart.applyOptions({ width: chartDom.clientWidth, height: chartDom.clientHeight }));
 
             loadChartData();
         });
