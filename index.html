@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>S/R + VSA + Footprint Tiburon - BTC/USD</title>
+    <title>S/R + VSA + Footprint + CRL Time Frames - BTC/USD</title>
     <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
 
     <style>
@@ -88,7 +88,7 @@
             display: flex;
             flex-direction: column;
             gap: 8px;
-            min-width: 260px;
+            min-width: 270px;
             box-shadow: 0 4px 16px rgba(0,0,0,0.5);
             max-height: calc(100vh - 80px);
             overflow-y: auto;
@@ -140,9 +140,10 @@
 
     <div id="main-container">
         <div id="header">
-            <span class="title"><span class="live-dot"></span> 🦈 BTC/USD S/R + VSA + FOOTPRINT POC</span>
+            <span class="title"><span class="live-dot"></span> 🦈 BTC/USD S/R + VSA + FOOTPRINT + CRL</span>
             
             <div class="controls-container">
+                <button id="toggle-crl" class="btn-fp active">📊 CRL Liquidez (HTF)</button>
                 <button id="toggle-pivots" class="btn-fp active">📍 Pivotes Multi-TF</button>
                 <button id="toggle-pivots-tf" class="btn-fp active">📍 Pivotes Dinámicos TF</button>
                 <button id="toggle-vsa" class="btn-fp active">🐋 VSA Ballenas</button>
@@ -175,6 +176,27 @@
                 </div>
                 <div class="progress-bar-bg">
                     <div id="timer-progress" class="progress-bar-fill"></div>
+                </div>
+
+                <!-- NUEVO MÓDULO: CRL (Candle Range Liquidity) -->
+                <div id="dash-module-crl" class="dash-module">
+                    <div class="dash-divider"></div>
+                    <div class="dash-row">
+                        <span id="dash-crl-tf-label" class="dash-label">CRL HTF (1H/4H)</span>
+                        <span id="dash-crl-state" class="dash-value" style="color: #e040fb;">RANGO</span>
+                    </div>
+                    <div class="dash-row">
+                        <span class="dash-label">BSL (Alto HTF)</span>
+                        <span id="dash-crl-bsl" class="dash-value" style="color: #ff5252;">--</span>
+                    </div>
+                    <div class="dash-row">
+                        <span class="dash-label">EQ 50% (Medio HTF)</span>
+                        <span id="dash-crl-eq" class="dash-value" style="color: #ffb300;">--</span>
+                    </div>
+                    <div class="dash-row">
+                        <span class="dash-label">SSL (Bajo HTF)</span>
+                        <span id="dash-crl-ssl" class="dash-value" style="color: #00e676;">--</span>
+                    </div>
                 </div>
 
                 <div id="dash-module-footprint" class="dash-module">
@@ -270,6 +292,7 @@
             const timeframeSelect = document.getElementById("timeframe");
             const chartContainer = document.getElementById("chart");
 
+            const btnCrl = document.getElementById("toggle-crl");
             const btnPivots = document.getElementById("toggle-pivots");
             const btnPivotsTf = document.getElementById("toggle-pivots-tf");
             const btnVsa = document.getElementById("toggle-vsa");
@@ -278,12 +301,14 @@
             const btnShark = document.getElementById("toggle-shark");
             const btnMultiFp = document.getElementById("toggle-multi-fp");
 
+            const modCrl = document.getElementById("dash-module-crl");
             const modFootprint = document.getElementById("dash-module-footprint");
             const modShark = document.getElementById("dash-module-shark");
             const modPivots = document.getElementById("dash-module-pivots");
             const modPivotsTf = document.getElementById("dash-module-pivots-tf");
             const modVsa = document.getElementById("dash-module-vsa");
 
+            let showCrl = true;
             let showPivots = true;
             let showPivotsTf = true;
             let showVsa = true;
@@ -297,6 +322,12 @@
             const dashBias = document.getElementById("dash-bias");
             const dashTarget = document.getElementById("dash-target");
             const dashInvalid = document.getElementById("dash-invalid");
+
+            const dashCrlTfLabel = document.getElementById("dash-crl-tf-label");
+            const dashCrlState = document.getElementById("dash-crl-state");
+            const dashCrlBsl = document.getElementById("dash-crl-bsl");
+            const dashCrlEq = document.getElementById("dash-crl-eq");
+            const dashCrlSsl = document.getElementById("dash-crl-ssl");
 
             const dashPivotTfResLabel = document.getElementById("dash-pivot-tf-res-label");
             const dashPivotTfSupLabel = document.getElementById("dash-pivot-tf-sup-label");
@@ -340,6 +371,7 @@
             });
 
             function updateDashboardModulesVisibility() {
+                modCrl.style.display = showCrl ? "flex" : "none";
                 modFootprint.style.display = showFootprint ? "flex" : "none";
                 modShark.style.display = showShark ? "flex" : "none";
                 modPivots.style.display = showPivots ? "flex" : "none";
@@ -362,6 +394,7 @@
                 });
             }
 
+            toggleButton(btnCrl, showCrl, (v) => showCrl = v);
             toggleButton(btnPivots, showPivots, (v) => showPivots = v);
             toggleButton(btnPivotsTf, showPivotsTf, (v) => showPivotsTf = v);
             toggleButton(btnVsa, showVsa, (v) => showVsa = v);
@@ -375,6 +408,34 @@
                 btnMultiFp.classList.toggle('inactive', !showMultiFootprint);
                 renderSRVisuals(currentCandleData);
             });
+
+            // --- INDICADOR NUEVO: CRL (CANDLE RANGE LIQUIDITY / CRT) ---
+            async function calculateCRLData(currentTf) {
+                let htf = '1h';
+                if (['1s', '1m', '3m', '5m', '15m'].includes(currentTf)) {
+                    htf = '1h';
+                } else if (['1h', '4h'].includes(currentTf)) {
+                    htf = '4h';
+                } else {
+                    htf = '1d';
+                }
+
+                try {
+                    const htfCandles = await fetchKlines(htf, 5);
+                    if (!htfCandles || htfCandles.length < 2) return null;
+
+                    // Tomamos la vela anterior de HTF para definir el Rango / Liquidez
+                    const prevCandle = htfCandles[htfCandles.length - 2];
+                    const highBSL = prevCandle.high;
+                    const lowSSL = prevCandle.low;
+                    const eq50 = lowSSL + (highBSL - lowSSL) * 0.5;
+
+                    return { htfLabel: htf.toUpperCase(), highBSL, lowSSL, eq50 };
+                } catch (e) {
+                    console.error("Error obteniendo datos CRL HTF:", e);
+                    return null;
+                }
+            }
 
             function updateRealtimeAnalysis(lastClosePrice) {
                 if (!lastClosePrice) return;
@@ -428,7 +489,6 @@
                 }
             }
 
-            // --- NUEVO INDICADOR: TIBURÓN VSA & LIQUIDEZ ---
             function calculateSharkVSA(candles) {
                 if (!candles || candles.length < 20) return { markers: [], lineLevel: null, pressureText: "--", pressureColor: "#d1d4dc" };
 
@@ -447,7 +507,6 @@
                     if (c.close >= c.open) buyVolSum += c.volume;
                     else sellVolSum += c.volume;
 
-                    // Velas de Ultra Alto Volumen (Anomalía Shark)
                     if (c.volume > avgVol * 2.5) {
                         highVolLevel = c.close >= c.open ? c.low : c.high;
                         markers.push({
@@ -804,6 +863,35 @@
 
                     updateDashboardModulesVisibility();
 
+                    // MÓDULOS DE LÍNEAS CRL (CANDLE RANGE LIQUIDITY)
+                    if (showCrl) {
+                        const crlData = await calculateCRLData(timeframeSelect.value);
+                        if (crlData) {
+                            dashCrlTfLabel.innerText = `CRL HTF (${crlData.htfLabel})`;
+                            dashCrlBsl.innerText = `$${crlData.highBSL.toFixed(2)}`;
+                            dashCrlEq.innerText = `$${crlData.eq50.toFixed(2)}`;
+                            dashCrlSsl.innerText = `$${crlData.lowSSL.toFixed(2)}`;
+
+                            const lastClose = currentFormattedData.length > 0 ? currentFormattedData[currentFormattedData.length - 1].close : null;
+                            if (lastClose) {
+                                if (lastClose > crlData.highBSL) {
+                                    dashCrlState.innerText = "BSL SWEEP 🚀";
+                                    dashCrlState.style.color = "#ff5252";
+                                } else if (lastClose < crlData.lowSSL) {
+                                    dashCrlState.innerText = "SSL SWEEP 🐻";
+                                    dashCrlState.style.color = "#00e676";
+                                } else {
+                                    dashCrlState.innerText = "EN RANGO";
+                                    dashCrlState.style.color = "#e040fb";
+                                }
+                            }
+
+                            lineLevels.push({ price: crlData.highBSL, color: '#ff5252', title: `[ BSL CRL ${crlData.htfLabel} ]`, width: 2, style: LightweightCharts.LineStyle.Solid });
+                            lineLevels.push({ price: crlData.eq50, color: '#ffb300', title: `[ EQ 50% ${crlData.htfLabel} ]`, width: 1, style: LightweightCharts.LineStyle.Dashed });
+                            lineLevels.push({ price: crlData.lowSSL, color: '#00e676', title: `[ SSL CRL ${crlData.htfLabel} ]`, width: 2, style: LightweightCharts.LineStyle.Solid });
+                        }
+                    }
+
                     if (showPivots) {
                         const [raw4h, raw1d] = await Promise.all([
                             fetchKlines('4h', 200),
@@ -912,7 +1000,6 @@
                         }
                     }
 
-                    // Ordenar marcadores por tiempo
                     allMarkers.sort((a, b) => a.time - b.time);
                     candlestickSeries.setMarkers(allMarkers);
 
