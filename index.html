@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CRL Trading System + VSA + Footprint - BTC/USD</title>
+    <title>CRL Trading System + VSA Ballenas + Footprint - BTC/USD</title>
     <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
 
     <style>
@@ -167,7 +167,7 @@
 
     <div id="main-container">
         <div id="header">
-            <span class="title"><span class="live-dot"></span> 🦈 CRL SYSTEM + FOOTPRINT & VSA</span>
+            <span class="title"><span class="live-dot"></span> 🦈 CRL SYSTEM + FOOTPRINT & VSA BALLENAS</span>
             
             <div class="controls-container">
                 <button id="toggle-crl" class="btn-fp active">🎯 CRL Liquidez</button>
@@ -416,38 +416,103 @@
                 drawLine(currentLow, '#00e676', 'SSL (HTF Low)', 2, 2);
             }
 
-            function evaluateAutomatedTrade(ltfData) {
-                if (!showCrl || !ltfData || ltfData.length < 2) return;
-
-                const lastBar = ltfData[ltfData.length - 1];
+            // OBTENER MARCADORES DE VSA (CÍRCULOS/ESFERAS DE BALLENAS)
+            function getVSAMarkers(candles) {
+                if (!showVsa || !candles || candles.length < 20) return [];
                 const markers = [];
 
-                if (lastBar.low < currentLow && lastBar.close > currentLow) {
-                    boxDecision.className = "state-buy";
-                    txtAction.innerText = "🚀 ENTRAR EN COMPRA (LONG)";
-                    txtReason.innerText = `Barrido de SSL detectado. Stop Loss: $${lastBar.low.toFixed(1)} | Objetivo TP: $${currentEQ.toFixed(1)}`;
-                    markers.push({ time: lastBar.time, position: 'belowBar', color: '#00e676', shape: 'arrowUp', text: 'COMPRA (SSL Sweep)' });
-                } else if (lastBar.high > currentHigh && lastBar.close < currentHigh) {
-                    boxDecision.className = "state-sell";
-                    txtAction.innerText = "🐻 ENTRAR EN VENTA (SHORT)";
-                    txtReason.innerText = `Barrido de BSL detectado. Stop Loss: $${lastBar.high.toFixed(1)} | Objetivo TP: $${currentEQ.toFixed(1)}`;
-                    markers.push({ time: lastBar.time, position: 'aboveBar', color: '#ff5252', shape: 'arrowDown', text: 'VENTA (BSL Sweep)' });
-                } else if (lastBar.close > currentHigh || lastBar.close < currentLow) {
-                    boxDecision.className = "state-no-trade";
-                    txtAction.innerText = "⛔ NO OPERAR (BREAKOUT DETECTADO)";
-                    txtReason.innerText = "El precio rompió el rango con cuerpo sólido. Entrada invalidada.";
-                } else {
-                    boxDecision.className = "state-wait";
-                    txtAction.innerText = "⏳ ESPERAR OPORTUNIDAD";
-                    txtReason.innerText = "El precio está en zona neutra. Esperando barrido en BSL o SSL.";
+                let sumVol = 0;
+                for (let i = 0; i < candles.length; i++) sumVol += (candles[i].volume || 0);
+                const avgVol = sumVol / candles.length;
+
+                for (let i = 20; i < candles.length; i++) {
+                    const c = candles[i];
+                    // Si el volumen supera 2.2x el promedio lo consideramos actividad institucional / ballenas
+                    if (c.volume > avgVol * 2.2) {
+                        const isBull = c.close >= c.open;
+                        markers.push({
+                            time: c.time,
+                            position: isBull ? 'belowBar' : 'aboveBar',
+                            color: isBull ? '#00e676' : '#ff5252',
+                            shape: 'circle',
+                            text: isBull ? '🐋 Compra Ballena' : '🐋 Venta Ballena'
+                        });
+                    }
+                }
+                return markers;
+            }
+
+            // CALCULAR MÉTRICAS VSA PARA EL DASHBOARD (1D Y 1W)
+            async function calculateVSADashboard() {
+                if (!showVsa) return;
+                try {
+                    const dKlines = await fetchKlines('BTCUSDT', '1d', 30);
+                    const wKlines = await fetchKlines('BTCUSDT', '1w', 12);
+
+                    const calcStats = (klines) => {
+                        let buyVol = 0, sellVol = 0;
+                        klines.forEach(k => {
+                            if (k.close >= k.open) buyVol += k.volume;
+                            else sellVol += k.volume;
+                        });
+                        const total = buyVol + sellVol || 1;
+                        const buyPct = Math.round((buyVol / total) * 100);
+                        const netVol = buyVol - sellVol;
+                        const netFormatted = (netVol >= 0 ? '+' : '') + (netVol / 1000).toFixed(1) + 'k';
+                        return { buyPct, netFormatted };
+                    };
+
+                    const dRes = calcStats(dKlines);
+                    const wRes = calcStats(wKlines);
+
+                    dashWhale1dPct.innerText = `${dRes.buyPct}%`;
+                    dashWhale1dPct.style.color = dRes.buyPct >= 50 ? '#00e676' : '#ff5252';
+                    dashWhale1dNet.innerText = `(${dRes.netFormatted})`;
+
+                    dashWhale1wPct.innerText = `${wRes.buyPct}%`;
+                    dashWhale1wPct.style.color = wRes.buyPct >= 50 ? '#00e676' : '#ff5252';
+                    dashWhale1wNet.innerText = `(${wRes.netFormatted})`;
+                } catch (e) {
+                    console.error("Error al calcular VSA Dashboard:", e);
+                }
+            }
+
+            function evaluateAutomatedTrade(ltfData) {
+                if (!ltfData || ltfData.length < 2) return;
+
+                const lastBar = ltfData[ltfData.length - 1];
+                let crlMarkers = [];
+
+                if (showCrl) {
+                    if (lastBar.low < currentLow && lastBar.close > currentLow) {
+                        boxDecision.className = "state-buy";
+                        txtAction.innerText = "🚀 ENTRAR EN COMPRA (LONG)";
+                        txtReason.innerText = `Barrido de SSL detectado. Stop Loss: $${lastBar.low.toFixed(1)} | Objetivo TP: $${currentEQ.toFixed(1)}`;
+                        crlMarkers.push({ time: lastBar.time, position: 'belowBar', color: '#00e676', shape: 'arrowUp', text: 'COMPRA (SSL Sweep)' });
+                    } else if (lastBar.high > currentHigh && lastBar.close < currentHigh) {
+                        boxDecision.className = "state-sell";
+                        txtAction.innerText = "🐻 ENTRAR EN VENTA (SHORT)";
+                        txtReason.innerText = `Barrido de BSL detectado. Stop Loss: $${lastBar.high.toFixed(1)} | Objetivo TP: $${currentEQ.toFixed(1)}`;
+                        crlMarkers.push({ time: lastBar.time, position: 'aboveBar', color: '#ff5252', shape: 'arrowDown', text: 'VENTA (BSL Sweep)' });
+                    } else if (lastBar.close > currentHigh || lastBar.close < currentLow) {
+                        boxDecision.className = "state-no-trade";
+                        txtAction.innerText = "⛔ NO OPERAR (BREAKOUT DETECTADO)";
+                        txtReason.innerText = "El precio rompió el rango con cuerpo sólido. Entrada invalidada.";
+                    } else {
+                        boxDecision.className = "state-wait";
+                        txtAction.innerText = "⏳ ESPERAR OPORTUNIDAD";
+                        txtReason.innerText = "El precio está en zona neutra. Esperando barrido en BSL o SSL.";
+                    }
                 }
 
-                if (showSupertrend) {
-                    const stMarkers = getSupertrendMarkers(ltfData);
-                    candlestickSeries.setMarkers([...stMarkers, ...markers]);
-                } else {
-                    candlestickSeries.setMarkers(markers);
-                }
+                const supertrendMarkers = showSupertrend ? getSupertrendMarkers(ltfData) : [];
+                const vsaMarkers = showVsa ? getVSAMarkers(ltfData) : [];
+
+                // Fusionar todos los marcadores activos
+                const allMarkers = [...crlMarkers, ...supertrendMarkers, ...vsaMarkers];
+                allMarkers.sort((a, b) => a.time - b.time);
+
+                candlestickSeries.setMarkers(allMarkers);
             }
 
             function clearPriceLines() {
@@ -628,6 +693,7 @@
                     const lastClose = candles[candles.length - 1].close;
 
                     await updateHTFLevels();
+                    await calculateVSADashboard();
 
                     if (showFootprint) {
                         const { footprintPOCs } = calculateFootprintLevels(candles);
