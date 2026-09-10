@@ -141,6 +141,8 @@
             <span class="title"><span class="live-dot"></span> 🦈 BTC/USD S/R + VSA + FOOTPRINT POC</span>
             
             <div class="controls-container">
+                <button id="toggle-vsa-3m" class="btn-fp active">🔍 Analizar VSA (3M)</button>
+                <button id="toggle-ema200" class="btn-fp active">📈 EMA 200</button>
                 <button id="toggle-pivots" class="btn-fp active">📍 Pivotes Multi-TF</button>
                 <button id="toggle-pivots-tf" class="btn-fp active">📍 Pivotes Dinámicos TF</button>
                 <button id="toggle-vsa" class="btn-fp active">🐋 VSA Ballenas</button>
@@ -264,6 +266,8 @@
             const timeframeSelect = document.getElementById("timeframe");
             const chartContainer = document.getElementById("chart");
 
+            const btnVsa3m = document.getElementById("toggle-vsa-3m");
+            const btnEma200 = document.getElementById("toggle-ema200");
             const btnPivots = document.getElementById("toggle-pivots");
             const btnPivotsTf = document.getElementById("toggle-pivots-tf");
             const btnVsa = document.getElementById("toggle-vsa");
@@ -278,6 +282,8 @@
             const modVsa = document.getElementById("dash-module-vsa");
             const modCrl = document.getElementById("dash-module-crl");
 
+            let showVsa3m = true;
+            let showEma200 = true;
             let showPivots = true;
             let showPivotsTf = true;
             let showVsa = true;
@@ -319,9 +325,13 @@
             let currentMainTarget = null;
 
             const crlTimeframeMap = {
-                '1h': '1 min',
-                '4h': '5 min',
-                '1d': '15 min',
+                '1m': '1s',
+                '3m': '1m',
+                '5m': '1m',
+                '15m': '3m',
+                '1h': '5m',
+                '4h': '5m',
+                '1d': '15m',
                 '1w': '1h'
             };
 
@@ -338,12 +348,35 @@
                 upColor: '#089981', downColor: '#f23645', borderVisible: false, wickUpColor: '#089981', wickDownColor: '#f23645'
             });
 
+            const ema200Series = chart.addLineSeries({
+                color: '#2962ff',
+                lineWidth: 2,
+                title: 'EMA 200'
+            });
+
             function updateDashboardModulesVisibility() {
                 modFootprint.style.display = showFootprint ? "flex" : "none";
                 modPivots.style.display = showPivots ? "flex" : "none";
                 modPivotsTf.style.display = showPivotsTf ? "flex" : "none";
                 modVsa.style.display = showVsa ? "flex" : "none";
                 modCrl.style.display = showCrl ? "flex" : "none";
+            }
+
+            function calculateEMA(data, period) {
+                if (!data || data.length < period) return [];
+                const k = 2 / (period + 1);
+                let emaData = [];
+                let sum = 0;
+
+                for (let i = 0; i < period; i++) sum += data[i].close;
+                let ema = sum / period;
+                emaData.push({ time: data[period - 1].time, value: ema });
+
+                for (let i = period; i < data.length; i++) {
+                    ema = (data[i].close * k) + (ema * (1 - k));
+                    emaData.push({ time: data[i].time, value: ema });
+                }
+                return emaData;
             }
 
             function updateRealtimeAnalysis(lastClosePrice) {
@@ -401,7 +434,7 @@
                     const currentTf = timeframeSelect.value;
                     const matchedLtf = crlTimeframeMap[currentTf];
                     if (matchedLtf) {
-                        dashCrlMapping.innerText = `${currentTf.toUpperCase()} (HTF) ➔ ${matchedLtf} (LTF)`;
+                        dashCrlMapping.innerText = `CRL${currentTf.toUpperCase()} (HTF) ➔ ${matchedLtf} (LTF)`;
                         dashCrlMapping.style.color = "#00e5ff";
                     } else {
                         dashCrlMapping.innerText = `${currentTf.toUpperCase()} (Sin mapeo direct CRL)`;
@@ -746,22 +779,31 @@
 
                     updateDashboardModulesVisibility();
 
+                    if (showEma200 && currentFormattedData.length > 200) {
+                        const emaData = calculateEMA(currentFormattedData, 200);
+                        ema200Series.setData(emaData);
+                    } else {
+                        ema200Series.setData([]);
+                    }
+
                     if (showPivots) {
-                        const [raw4h, raw1d] = await Promise.all([
-                            fetchKlines('4h', 200),
-                            fetchKlines('1d', 200)
-                        ]);
+                        try {
+                            const [raw4h, raw1d] = await Promise.all([
+                                fetchKlines('4h', 200),
+                                fetchKlines('1d', 200)
+                            ]);
 
-                        const pivots4h = calculatePivots(raw4h, 15, 15);
-                        const pivots1d = calculatePivots(raw1d, 15, 15);
+                            const pivots4h = calculatePivots(raw4h, 15, 15);
+                            const pivots1d = calculatePivots(raw1d, 15, 15);
 
-                        if (pivots1d.pivotHigh) {
-                            lineLevels.push({ price: pivots1d.pivotHigh.high, color: '#ff1744', title: '[ 1D RESISTENCIA ]', width: 3, style: LightweightCharts.LineStyle.Solid });
-                            currentMainTarget = pivots1d.pivotHigh.high;
-                        }
-                        if (pivots1d.pivotLow) lineLevels.push({ price: pivots1d.pivotLow.low, color: '#00e676', title: '[ 1D SOPORTE ]', width: 3, style: LightweightCharts.LineStyle.Solid });
-                        if (pivots4h.pivotHigh) lineLevels.push({ price: pivots4h.pivotHigh.high, color: '#ff9100', title: '[ 4H RESISTENCIA ]', width: 2, style: LightweightCharts.LineStyle.Dashed });
-                        if (pivots4h.pivotLow) lineLevels.push({ price: pivots4h.pivotLow.low, color: '#2962ff', title: '[ 4H SOPORTE ]', width: 2, style: LightweightCharts.LineStyle.Dashed });
+                            if (pivots1d.pivotHigh) {
+                                lineLevels.push({ price: pivots1d.pivotHigh.high, color: '#ff1744', title: '[ 1D RESISTENCIA ]', width: 3, style: LightweightCharts.LineStyle.Solid });
+                                currentMainTarget = pivots1d.pivotHigh.high;
+                            }
+                            if (pivots1d.pivotLow) lineLevels.push({ price: pivots1d.pivotLow.low, color: '#00e676', title: '[ 1D SOPORTE ]', width: 3, style: LightweightCharts.LineStyle.Solid });
+                            if (pivots4h.pivotHigh) lineLevels.push({ price: pivots4h.pivotHigh.high, color: '#ff9100', title: '[ 4H RESISTENCIA ]', width: 2, style: LightweightCharts.LineStyle.Dashed });
+                            if (pivots4h.pivotLow) lineLevels.push({ price: pivots4h.pivotLow.low, color: '#2962ff', title: '[ 4H SOPORTE ]', width: 2, style: LightweightCharts.LineStyle.Dashed });
+                        } catch (e) { console.error("Error en pivotes:", e); }
                     }
 
                     if (showPivotsTf && currentFormattedData.length > 0) {
@@ -848,55 +890,59 @@
                     }
 
                     if (showMultiFootprint) {
-                        const [raw1mFP, raw5mFP, raw15mFP, raw1hFP, raw4hFP] = await Promise.all([
-                            fetchKlines('1m', 200),
-                            fetchKlines('5m', 200),
-                            fetchKlines('15m', 200),
-                            fetchKlines('1h', 200),
-                            fetchKlines('4h', 200)
-                        ]);
+                        try {
+                            const [raw1mFP, raw5mFP, raw15mFP, raw1hFP, raw4hFP] = await Promise.all([
+                                fetchKlines('1m', 200),
+                                fetchKlines('5m', 200),
+                                fetchKlines('15m', 200),
+                                fetchKlines('1h', 200),
+                                fetchKlines('4h', 200)
+                            ]);
 
-                        const fp1m = calculateFootprintLevels(raw1mFP).footprintPOCs;
-                        const fp5m = calculateFootprintLevels(raw5mFP).footprintPOCs;
-                        const fp15m = calculateFootprintLevels(raw15mFP).footprintPOCs;
-                        const fp1h = calculateFootprintLevels(raw1hFP).footprintPOCs;
-                        const fp4h = calculateFootprintLevels(raw4hFP).footprintPOCs;
+                            const fp1m = calculateFootprintLevels(raw1mFP).footprintPOCs;
+                            const fp5m = calculateFootprintLevels(raw5mFP).footprintPOCs;
+                            const fp15m = calculateFootprintLevels(raw15mFP).footprintPOCs;
+                            const fp1h = calculateFootprintLevels(raw1hFP).footprintPOCs;
+                            const fp4h = calculateFootprintLevels(raw4hFP).footprintPOCs;
 
-                        fp1m.forEach(p => lineLevels.push({ price: p.price, color: '#ffeb3b', title: '👣 1M FP POC', width: 1, style: LightweightCharts.LineStyle.Dotted }));
-                        fp5m.forEach(p => lineLevels.push({ price: p.price, color: '#ff9800', title: '👣 5M FP POC', width: 1, style: LightweightCharts.LineStyle.Dashed }));
-                        fp15m.forEach(p => lineLevels.push({ price: p.price, color: '#e040fb', title: '👣 15M FP POC', width: 1, style: LightweightCharts.LineStyle.LargeDashed }));
-                        fp1h.forEach(p => lineLevels.push({ price: p.price, color: '#00e5ff', title: '👣 1H FP POC', width: 2, style: LightweightCharts.LineStyle.LargeDashed }));
-                        fp4h.forEach(p => lineLevels.push({ price: p.price, color: '#76ff03', title: '👣 4H FP POC', width: 2, style: LightweightCharts.LineStyle.Solid }));
+                            fp1m.forEach(p => lineLevels.push({ price: p.price, color: '#ffeb3b', title: '👣 1M FP POC', width: 1, style: LightweightCharts.LineStyle.Dotted }));
+                            fp5m.forEach(p => lineLevels.push({ price: p.price, color: '#ff9800', title: '👣 5M FP POC', width: 1, style: LightweightCharts.LineStyle.Dashed }));
+                            fp15m.forEach(p => lineLevels.push({ price: p.price, color: '#e040fb', title: '👣 15M FP POC', width: 1, style: LightweightCharts.LineStyle.LargeDashed }));
+                            fp1h.forEach(p => lineLevels.push({ price: p.price, color: '#00e5ff', title: '👣 1H FP POC', width: 2, style: LightweightCharts.LineStyle.LargeDashed }));
+                            fp4h.forEach(p => lineLevels.push({ price: p.price, color: '#76ff03', title: '👣 4H FP POC', width: 2, style: LightweightCharts.LineStyle.Solid }));
+                        } catch (e) { console.error("Error en multi-footprint:", e); }
                     }
 
                     if (showCrl) {
-                        const currentTf = timeframeSelect.value;
-                        const targetLtf = crlTimeframeMap[currentTf];
+                        try {
+                            const currentTf = timeframeSelect.value;
+                            const targetLtf = crlTimeframeMap[currentTf];
 
-                        if (targetLtf) {
-                            const binanceLtf = targetLtf.replace(' ', '');
-                            const ltfCandles = await fetchKlines(binanceLtf, 200);
-                            const ltfPivots = calculatePivots(ltfCandles, 10, 10);
+                            if (targetLtf) {
+                                const binanceLtf = targetLtf.replace(' ', '');
+                                const ltfCandles = await fetchKlines(binanceLtf, 200);
+                                const ltfPivots = calculatePivots(ltfCandles, 10, 10);
 
-                            if (ltfPivots.pivotHigh) {
-                                lineLevels.push({
-                                    price: ltfPivots.pivotHigh.high,
-                                    color: '#ff007f',
-                                    title: `[ CRL ${targetLtf.toUpperCase()} RESISTENCIA ]`,
-                                    width: 2,
-                                    style: LightweightCharts.LineStyle.Dotted
-                                });
+                                if (ltfPivots.pivotHigh) {
+                                    lineLevels.push({
+                                        price: ltfPivots.pivotHigh.high,
+                                        color: '#ff007f',
+                                        title: `[ CRL ${targetLtf.toUpperCase()} RESISTENCIA ]`,
+                                        width: 2,
+                                        style: LightweightCharts.LineStyle.Dotted
+                                    });
+                                }
+                                if (ltfPivots.pivotLow) {
+                                    lineLevels.push({
+                                        price: ltfPivots.pivotLow.low,
+                                        color: '#00f0ff',
+                                        title: `[ CRL ${targetLtf.toUpperCase()} SOPORTE ]`,
+                                        width: 2,
+                                        style: LightweightCharts.LineStyle.Dotted
+                                    });
+                                }
                             }
-                            if (ltfPivots.pivotLow) {
-                                lineLevels.push({
-                                    price: ltfPivots.pivotLow.low,
-                                    color: '#00f0ff',
-                                    title: `[ CRL ${targetLtf.toUpperCase()} SOPORTE ]`,
-                                    width: 2,
-                                    style: LightweightCharts.LineStyle.Dotted
-                                });
-                            }
-                        }
+                        } catch (e) { console.error("Error cargando datos CRL:", e); }
                     }
 
                     let stMarkers = [];
@@ -918,7 +964,7 @@
                         updateRealtimeAnalysis(currentFormattedData[currentFormattedData.length - 1].close);
                     }
 
-                } catch (e) { console.error("Error en visuales:", e); }
+                } catch (e) { console.error("Error general en visuales:", e); }
             }
 
             function connectWebSocket(interval) {
@@ -996,6 +1042,8 @@
                 });
             }
 
+            setupToggle(btnVsa3m, () => showVsa3m, val => showVsa3m = val);
+            setupToggle(btnEma200, () => showEma200, val => showEma200 = val);
             setupToggle(btnPivots, () => showPivots, val => showPivots = val);
             setupToggle(btnPivotsTf, () => showPivotsTf, val => showPivotsTf = val);
             setupToggle(btnVsa, () => showVsa, val => showVsa = val);
