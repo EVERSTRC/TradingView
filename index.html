@@ -3,236 +3,265 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CRL :) Time Frames</title>
+    <title>SMC - Candle Range Liquidity (CRL / CRT)</title>
+    <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body {
-            background-color: #f7f9fa;
-            color: #000;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+        html, body { width: 100%; height: 100%; background-color: #131722; color: #d1d4dc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; overflow: hidden; }
+        #main-container { width: 100vw; height: 100vh; display: flex; flex-direction: column; }
+        
+        #header {
+            min-height: 48px;
+            background-color: #1e222d;
             display: flex;
-            flex-direction: column;
             align-items: center;
-            padding: 20px 10px;
+            justify-content: space-between;
+            padding: 8px 16px;
+            border-bottom: 1px solid #2a2e39;
+            z-index: 10;
         }
+        .title { font-size: 15px; font-weight: 700; color: #ffffff; letter-spacing: 0.5px; display: flex; align-items: center; gap: 8px; }
+        .live-dot { width: 8px; height: 8px; background-color: #00e676; border-radius: 50%; box-shadow: 0 0 8px #00e676; }
 
-        h1 {
-            font-size: 26px;
-            font-weight: 800;
-            margin-bottom: 20px;
-            text-align: center;
-            letter-spacing: -0.5px;
-        }
-        h1 span { color: #d00000; }
+        .controls-container { display: flex; align-items: center; gap: 10px; }
 
-        .grid-container {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
-            max-width: 800px;
-            width: 100%;
-            background-color: #888;
-            padding: 2px;
-            border: 2px solid #333;
-        }
-
-        .grid-item {
-            background-color: #ffffff;
-            padding: 12px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            position: relative;
-        }
-
-        .item-header {
-            width: 100%;
-            display: flex;
-            justify-content: space-around;
-            font-weight: 700;
+        select, button {
+            background-color: #2a2e39;
+            color: #d1d4dc;
+            border: 1px solid #363c4e;
+            padding: 6px 12px;
+            border-radius: 4px;
             font-size: 13px;
-            margin-bottom: 10px;
+            outline: none;
+            cursor: pointer;
         }
+        select:hover, button:hover { border-color: #2962ff; }
+        .active { background-color: #2962ff; color: #fff; border-color: #2962ff; }
 
-        .diagram-container {
-            display: flex;
-            width: 100%;
-            height: 240px;
-            border-top: 1px dashed #ccc;
-            padding-top: 10px;
+        #chart-wrapper { flex: 1; width: 100%; position: relative; }
+        #chart { width: 100%; height: 100%; }
+
+        /* Panel estilo Infografía */
+        #crl-card {
+            position: absolute;
+            top: 16px;
+            left: 16px;
+            z-index: 8;
+            background: rgba(26, 30, 41, 0.92);
+            backdrop-filter: blur(8px);
+            border: 1px solid #363c4e;
+            border-radius: 6px;
+            padding: 12px;
+            width: 280px;
+            font-size: 12px;
         }
-
-        .htf-pane, .ltf-pane {
-            flex: 1;
-            height: 100%;
-            position: relative;
-        }
-
-        .htf-pane { border-right: 1px dashed #ccc; }
-
-        /* Estilos CSS para dibujo exacto tipo SVG */
-        svg { width: 100%; height: 100%; overflow: visible; }
-
-        /* Estilo de velas HTF */
-        .candle-body-blue { fill: #2b6cb0; stroke: #2b6cb0; }
-        .candle-body-black { fill: #1a202c; stroke: #1a202c; }
-        .wick { stroke: #000000; stroke-width: 1.5; }
-
-        /* Líneas de niveles CRL */
-        .crl-line { stroke: #666; stroke-width: 1; stroke-dasharray: 2,2; }
-        .crl-text { font-size: 9px; fill: #333; font-weight: bold; }
-
-        /* Zonas LTF */
-        .zone-target { fill: #cbe6ff; opacity: 0.7; }
-        .zone-sweep { fill: #e2e8f0; stroke: #cbd5e0; stroke-width: 1; }
-        .ltf-path { fill: none; stroke: #1a202c; stroke-width: 1.8; stroke-linejoin: round; }
+        .card-header { font-weight: 700; color: #fff; border-bottom: 1px solid #363c4e; padding-bottom: 6px; margin-bottom: 8px; display: flex; justify-content: space-between; }
+        .card-row { display: flex; justify-content: space-between; margin-bottom: 4px; }
+        .card-label { color: #787b86; }
+        .card-value { font-family: monospace; font-weight: 600; }
+        
+        .badge-bsl { color: #ff5252; background: rgba(255,82,82,0.1); padding: 2px 4px; border-radius: 2px; }
+        .badge-ssl { color: #00e676; background: rgba(0,230,118,0.1); padding: 2px 4px; border-radius: 2px; }
+        .badge-eq { color: #ffb300; background: rgba(255,179,0,0.1); padding: 2px 4px; border-radius: 2px; }
     </style>
 </head>
 <body>
 
-    <h1>CRL :) Time Frames</h1>
-
-    <div class="grid-container">
-        
-        <!-- CUADRO 1: 1 hour HTF / 1 min LTF (Alcista a Bajista Sweep) -->
-        <div class="grid-item">
-            <div class="item-header">
-                <span>1 hour - HTF</span>
-                <span>1 min - LTF</span>
-            </div>
-            <div class="diagram-container">
-                <div class="htf-pane">
-                    <svg viewBox="0 0 100 200">
-                        <!-- Vela Anterior -->
-                        <line x1="30" y1="30" x2="30" y2="170" class="wick" />
-                        <rect x="20" y="50" width="20" height="100" class="candle-body-blue" />
-                        
-                        <!-- Vela Actual (Sweep Superior) -->
-                        <line x1="65" y1="20" x2="65" y2="180" class="wick" />
-                        <rect x="55" y="50" width="20" height="100" class="candle-body-black" />
-
-                        <!-- Líneas CRL -->
-                        <line x1="10" y1="30" x2="90" y2="30" class="crl-line" />
-                        <text x="75" y="25" class="crl-text">BSL</text>
-
-                        <line x1="10" y1="100" x2="90" y2="100" class="crl-line" />
-                        <text x="75" y="97" class="crl-text">50%</text>
-
-                        <line x1="10" y1="170" x2="90" y2="170" class="crl-line" />
-                        <text x="75" y="182" class="crl-text">SSL</text>
-                    </svg>
-                </div>
-                <div class="ltf-pane">
-                    <svg viewBox="0 0 100 200">
-                        <!-- Zonas -->
-                        <rect x="10" y="20" width="80" height="30" class="zone-sweep" />
-                        <text x="25" y="38" class="crl-text">Turtle Soup / CHoCH</text>
-                        
-                        <rect x="10" y="100" width="80" height="70" class="zone-target" />
-                        
-                        <!-- Estructura de Línea LTF -->
-                        <path d="M 15 120 L 25 80 L 35 100 L 45 25 L 55 50 L 65 40 L 85 170" class="ltf-path" />
-                    </svg>
-                </div>
+    <div id="main-container">
+        <div id="header">
+            <span class="title"><span class="live-dot"></span> CRL :) Time Frames (Smart Money Indicator)</span>
+            <div class="controls-container">
+                <button id="toggle-crl-overlay" class="active">📊 Mostrar Rangos CRL</button>
+                <select id="timeframe">
+                    <option value="1m">1m (LTF)</option>
+                    <option value="5m" selected>5m (LTF)</option>
+                    <option value="15m">15m (LTF)</option>
+                    <option value="1h">1h (HTF)</option>
+                    <option value="4h">4h (HTF)</option>
+                </select>
             </div>
         </div>
 
-        <!-- CUADRO 2: 4 hour HTF / 5 min LTF (Bajista a Alcista) -->
-        <div class="grid-item">
-            <div class="item-header">
-                <span>4 hour - HTF</span>
-                <span>5 min - LTF</span>
-            </div>
-            <div class="diagram-container">
-                <div class="htf-pane">
-                    <svg viewBox="0 0 100 200">
-                        <!-- Vela HTF Azul/Negra -->
-                        <line x1="30" y1="40" x2="30" y2="170" class="wick" />
-                        <rect x="20" y="70" width="20" height="80" class="candle-body-blue" />
-
-                        <line x1="65" y1="30" x2="65" y2="185" class="wick" />
-                        <rect x="55" y="50" width="20" height="100" class="candle-body-black" />
-
-                        <line x1="10" y1="40" x2="90" y2="40" class="crl-line" />
-                        <line x1="10" y1="110" x2="90" y2="110" class="crl-line" />
-                        <text x="75" y="107" class="crl-text">50%</text>
-                        <line x1="10" y1="185" x2="90" y2="185" class="crl-line" />
-                    </svg>
+        <div id="chart-wrapper">
+            <div id="crl-card">
+                <div class="card-header">
+                    <span>ESTADO CRL (HTF)</span>
+                    <span id="htf-label" style="color: #2962ff;">1H HTF</span>
                 </div>
-                <div class="ltf-pane">
-                    <svg viewBox="0 0 100 200">
-                        <rect x="10" y="160" width="80" height="30" class="zone-sweep" />
-                        <rect x="10" y="30" width="80" height="80" class="zone-target" />
-                        
-                        <path d="M 15 60 L 25 120 L 35 100 L 45 180 L 55 140 L 65 150 L 85 30" class="ltf-path" />
-                    </svg>
+                <div class="card-row">
+                    <span class="card-label">BSL (Nivel Alto)</span>
+                    <span id="val-bsl" class="card-value badge-bsl">--</span>
+                </div>
+                <div class="card-row">
+                    <span class="card-label">50% EQ (Cierre Medio)</span>
+                    <span id="val-eq" class="card-value badge-eq">--</span>
+                </div>
+                <div class="card-row">
+                    <span class="card-label">SSL (Nivel Bajo)</span>
+                    <span id="val-ssl" class="card-value badge-ssl">--</span>
+                </div>
+                <div class="card-row" style="margin-top: 8px; border-top: 1px dashed #363c4e; padding-top: 6px;">
+                    <span class="card-label">Fase Actual</span>
+                    <span id="val-phase" class="card-value" style="color:#00e5ff;">Buscando Sweep...</span>
                 </div>
             </div>
+            <div id="chart"></div>
         </div>
-
-        <!-- CUADRO 3: 4 hour HTF / 5 min LTF (Alcista Expansión) -->
-        <div class="grid-item">
-            <div class="item-header">
-                <span>4 hour - HTF</span>
-                <span>5 min - LTF</span>
-            </div>
-            <div class="diagram-container">
-                <div class="htf-pane">
-                    <svg viewBox="0 0 100 200">
-                        <line x1="30" y1="40" x2="30" y2="170" class="wick" />
-                        <rect x="20" y="80" width="20" height="80" class="candle-body-blue" />
-
-                        <line x1="65" y1="20" x2="65" y2="180" class="wick" />
-                        <rect x="55" y="40" width="20" height="130" class="candle-body-black" />
-
-                        <line x1="10" y1="20" x2="90" y2="20" class="crl-line" />
-                        <line x1="10" y1="100" x2="90" y2="100" class="crl-line" />
-                        <line x1="10" y1="180" x2="90" y2="180" class="crl-line" />
-                    </svg>
-                </div>
-                <div class="ltf-pane">
-                    <svg viewBox="0 0 100 200">
-                        <rect x="10" y="150" width="80" height="30" class="zone-sweep" />
-                        <rect x="10" y="20" width="80" height="80" class="zone-target" />
-
-                        <path d="M 15 110 L 25 140 L 35 120 L 45 170 L 60 90 L 70 105 L 85 20" class="ltf-path" />
-                    </svg>
-                </div>
-            </div>
-        </div>
-
-        <!-- CUADRO 4: 1 hour HTF / 1 min LTF (Breaker / CHoCH Bajista) -->
-        <div class="grid-item">
-            <div class="item-header">
-                <span>1 hour - HTF</span>
-                <span>1 min - LTF</span>
-            </div>
-            <div class="diagram-container">
-                <div class="htf-pane">
-                    <svg viewBox="0 0 100 200">
-                        <line x1="30" y1="30" x2="30" y2="160" class="wick" />
-                        <rect x="20" y="50" width="20" height="90" class="candle-body-blue" />
-
-                        <line x1="65" y1="20" x2="65" y2="180" class="wick" />
-                        <rect x="55" y="50" width="20" height="110" class="candle-body-black" />
-
-                        <line x1="10" y1="20" x2="90" y2="20" class="crl-line" />
-                        <line x1="10" y1="90" x2="90" y2="90" class="crl-line" />
-                        <line x1="10" y1="180" x2="90" y2="180" class="crl-line" />
-                    </svg>
-                </div>
-                <div class="ltf-pane">
-                    <svg viewBox="0 0 100 200">
-                        <rect x="10" y="20" width="80" height="30" class="zone-sweep" />
-                        <rect x="10" y="110" width="80" height="70" class="zone-target" />
-
-                        <path d="M 15 90 L 25 60 L 35 75 L 45 20 L 55 50 L 65 35 L 85 180" class="ltf-path" />
-                    </svg>
-                </div>
-            </div>
-        </div>
-
     </div>
 
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const chartContainer = document.getElementById("chart");
+            const tfSelect = document.getElementById("timeframe");
+            const btnToggle = document.getElementById("toggle-crl-overlay");
+
+            let showOverlay = true;
+            let activeLines = [];
+            let currentKlines = [];
+            let ws = null;
+
+            // Inicialización de Gráfico
+            const chart = LightweightCharts.createChart(chartContainer, {
+                width: chartContainer.clientWidth,
+                height: chartContainer.clientHeight,
+                layout: { background: { type: 'solid', color: '#131722' }, textColor: '#d1d4dc' },
+                grid: { vertLines: { color: '#1f2434' }, horzLines: { color: '#1f2434' } },
+                timeScale: { borderColor: '#2a2e39', timeVisible: true, secondsVisible: false }
+            });
+
+            // Velas tipo TradingView / Estilo Infografía (Azul / Negro o Verde / Rojo)
+            const candleSeries = chart.addCandlestickSeries({
+                upColor: '#2962ff', downColor: '#1e222d',
+                borderUpColor: '#2962ff', borderDownColor: '#787b86',
+                wickUpColor: '#2962ff', wickDownColor: '#787b86'
+            });
+
+            btnToggle.addEventListener('click', () => {
+                showOverlay = !showOverlay;
+                btnToggle.classList.toggle('active', showOverlay);
+                renderCRLVisuals();
+            });
+
+            async function fetchKlines(symbol, interval, limit = 300) {
+                const res = await fetch(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`);
+                const data = await res.json();
+                return data.map(d => ({
+                    time: Math.floor(d[0] / 1000),
+                    open: parseFloat(d[1]),
+                    high: parseFloat(d[2]),
+                    low: parseFloat(d[3]),
+                    close: parseFloat(d[4])
+                }));
+            }
+
+            function clearPriceLines() {
+                activeLines.forEach(l => candleSeries.removePriceLine(l));
+                activeLines = [];
+            }
+
+            async function renderCRLVisuals() {
+                clearPriceLines();
+                if (!showOverlay || currentKlines.length === 0) return;
+
+                // Definir temporalidad HTF dependiente de la seleccionada
+                const currentLTF = tfSelect.value;
+                let htf = '1h';
+                if (['1m', '5m', '15m'].includes(currentLTF)) htf = '1h';
+                else if (currentLTF === '1h') htf = '4h';
+                else htf = '1d';
+
+                document.getElementById('htf-label').innerText = `${htf.toUpperCase()} HTF`;
+
+                // Cargar velas HTF para calcular BSL, SSL y EQ 50%
+                const htfCandles = await fetchKlines('BTCUSDT', htf, 5);
+                if (htfCandles.length < 2) return;
+
+                // Tomamos la vela HTF previa cerrada como referencia de la infografía
+                const prevHTF = htfCandles[htfCandles.length - 2];
+                const bsl = prevHTF.high;
+                const ssl = prevHTF.low;
+                const eq = ssl + (bsl - ssl) * 0.5;
+
+                document.getElementById('val-bsl').innerText = `$${bsl.toFixed(2)}`;
+                document.getElementById('val-eq').innerText = `$${eq.toFixed(2)}`;
+                document.getElementById('val-ssl').innerText = `$${ssl.toFixed(2)}`;
+
+                // Dibujar Líneas estilo Infografía
+                const lineBSL = candleSeries.createPriceLine({
+                    price: bsl, color: '#ff5252', lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Dashed,
+                    axisLabelVisible: true, title: 'BSL (HTF High)'
+                });
+
+                const lineEQ = candleSeries.createPriceLine({
+                    price: eq, color: '#ffb300', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Solid,
+                    axisLabelVisible: true, title: '50% (EQ)'
+                });
+
+                const lineSSL = candleSeries.createPriceLine({
+                    price: ssl, color: '#00e676', lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Dashed,
+                    axisLabelVisible: true, title: 'SSL (HTF Low)'
+                });
+
+                activeLines.push(lineBSL, lineEQ, lineSSL);
+
+                // Detección de patrones en LTF (Turtle Soup / CHoCH)
+                const lastPrice = currentKlines[currentKlines.length - 1].close;
+                const markers = [];
+
+                if (lastPrice > bsl) {
+                    document.getElementById('val-phase').innerText = "Turtle Soup (Sweep BSL)";
+                    document.getElementById('val-phase').style.color = "#ff5252";
+                    markers.push({ time: currentKlines[currentKlines.length - 1].time, position: 'aboveBar', color: '#ff5252', shape: 'arrowDown', text: 'BSL Sweep (CHoCH)' });
+                } else if (lastPrice < ssl) {
+                    document.getElementById('val-phase').innerText = "Turtle Soup (Sweep SSL)";
+                    document.getElementById('val-phase').style.color = "#00e676";
+                    markers.push({ time: currentKlines[currentKlines.length - 1].time, position: 'belowBar', color: '#00e676', shape: 'arrowUp', text: 'SSL Sweep (CHoCH)' });
+                } else {
+                    document.getElementById('val-phase').innerText = "En Rango HTF (Buscando Entrada)";
+                    document.getElementById('val-phase').style.color = "#00e5ff";
+                }
+
+                candleSeries.setMarkers(markers);
+            }
+
+            async function loadChartData() {
+                const interval = tfSelect.value;
+                currentKlines = await fetchKlines('BTCUSDT', interval, 300);
+                candleSeries.setData(currentKlines);
+                await renderCRLVisuals();
+                connectWS(interval);
+            }
+
+            function connectWS(interval) {
+                if (ws) ws.close();
+                ws = new WebSocket(`wss://stream.binance.com:9443/ws/btcusdt@kline_${interval}`);
+                ws.onmessage = (e) => {
+                    const data = JSON.parse(e.data);
+                    const k = data.k;
+                    const candle = {
+                        time: Math.floor(k.t / 1000),
+                        open: parseFloat(k.o),
+                        high: parseFloat(k.h),
+                        low: parseFloat(k.l),
+                        close: parseFloat(k.c)
+                    };
+
+                    candleSeries.update(candle);
+                    if (currentKlines.length > 0) {
+                        if (currentKlines[currentKlines.length - 1].time === candle.time) {
+                            currentKlines[currentKlines.length - 1] = candle;
+                        } else {
+                            currentKlines.push(candle);
+                        }
+                    }
+                };
+            }
+
+            tfSelect.addEventListener('change', loadChartData);
+            window.addEventListener('resize', () => chart.applyOptions({ width: chartContainer.clientWidth, height: chartContainer.clientHeight }));
+
+            loadChartData();
+        });
+    </script>
 </body>
 </html>
