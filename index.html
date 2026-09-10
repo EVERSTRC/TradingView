@@ -265,6 +265,10 @@
                 <div id="dash-module-vsa" class="dash-module">
                     <div class="dash-divider"></div>
                     <div class="dash-row">
+                        <span class="dash-label">Promedio Ballenas</span>
+                        <span id="dash-whale-avg" class="dash-value" style="color: #00e5ff;">--</span>
+                    </div>
+                    <div class="dash-row">
                         <span class="dash-label">Ballenas 1D</span>
                         <div>
                             <span id="dash-whale-1d-pct" class="dash-value">--</span>
@@ -349,7 +353,6 @@
 
     <!-- ================= SCRIPTS DE LÓGICA ================= -->
     <script>
-        // CONTROL DE NAVEGACIÓN GENERAL ENTRE SISTEMAS
         const viewAnalytics = document.getElementById("view-analytics");
         const viewCrl = document.getElementById("view-crl");
 
@@ -417,6 +420,7 @@
             const dashTp = document.getElementById("dash-tp");
             const dashSl = document.getElementById("dash-sl");
 
+            const dashWhaleAvg = document.getElementById("dash-whale-avg");
             const dashWhale1dPct = document.getElementById("dash-whale-1d-pct");
             const dashWhale1dNet = document.getElementById("dash-whale-1d-net");
             const dashWhale1wPct = document.getElementById("dash-whale-1w-pct");
@@ -533,7 +537,7 @@
             }
 
             function calculateWhaleMetrics(candles, thresholdMultiplier = 1.5) {
-                if (!candles || candles.length < 20) return { buyVol: 0, sellVol: 0 };
+                if (!candles || candles.length < 20) return { buyVol: 0, sellVol: 0, avgVol: 0 };
                 let buyVol = 0, sellVol = 0, rollingVolumeSum = 0;
 
                 for (let i = 0; i < 20; i++) rollingVolumeSum += (candles[i].volume || 1);
@@ -549,7 +553,8 @@
                         else { buyVol += c.volume / 2; sellVol += c.volume / 2; }
                     }
                 }
-                return { buyVol, sellVol };
+                const avgVol = rollingVolumeSum / 20;
+                return { buyVol, sellVol, avgVol };
             }
 
             async function updateWhaleDashboard() {
@@ -566,8 +571,12 @@
                         { data: raw1m, elPct: dashWhale1mPct, elNet: dashWhale1mNet, multiplier: 1.2 }
                     ];
 
-                    periods.forEach(({ data, elPct, elNet, multiplier }) => {
-                        const { buyVol, sellVol } = calculateWhaleMetrics(data, multiplier);
+                    let mainAvg = 0;
+
+                    periods.forEach(({ data, elPct, elNet, multiplier }, idx) => {
+                        const { buyVol, sellVol, avgVol } = calculateWhaleMetrics(data, multiplier);
+                        if (idx === 0) mainAvg = avgVol;
+
                         const total = buyVol + sellVol;
                         const netBtc = buyVol - sellVol;
 
@@ -589,6 +598,8 @@
                         elNet.innerText = formattedNet;
                         elNet.style.color = netBtc >= 0 ? "#00e676" : "#ff5252";
                     });
+
+                    dashWhaleAvg.innerText = `${Math.round(mainAvg)} BTC`;
                 } catch (e) {
                     console.error("Error actualizando métricas de ballenas:", e);
                 }
