@@ -3,262 +3,183 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SMC - Candle Range Liquidity (CRL / CRT)</title>
+    <title>CRL :) HTF Candle Overlay</title>
     <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        html, body { width: 100%; height: 100%; background-color: #131722; color: #d1d4dc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; overflow: hidden; }
-        #main-container { width: 100vw; height: 100vh; display: flex; flex-direction: column; }
+        body { background-color: #0d1117; color: #c9d1d9; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; height: 100vh; display: flex; flex-direction: column; }
         
-        #header {
-            min-height: 48px;
-            background-color: #1e222d;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 8px 16px;
-            border-bottom: 1px solid #2a2e39;
-            z-index: 10;
+        #toolbar {
+            height: 50px; background-color: #161b22; border-bottom: 1px solid #30363d;
+            display: flex; align-items: center; justify-content: space-between; padding: 0 20px;
         }
-        .title { font-size: 15px; font-weight: 700; color: #ffffff; letter-spacing: 0.5px; display: flex; align-items: center; gap: 8px; }
-        .live-dot { width: 8px; height: 8px; background-color: #00e676; border-radius: 50%; box-shadow: 0 0 8px #00e676; }
+        .title { font-weight: 800; font-size: 16px; color: #fff; display: flex; align-items: center; gap: 8px; }
+        .controls { display: flex; gap: 10px; }
+        select { background: #21262d; color: #fff; border: 1px solid #30363d; padding: 6px 12px; border-radius: 6px; outline: none; }
 
-        .controls-container { display: flex; align-items: center; gap: 10px; }
+        #workspace { flex: 1; display: flex; position: relative; overflow: hidden; }
 
-        select, button {
-            background-color: #2a2e39;
-            color: #d1d4dc;
-            border: 1px solid #363c4e;
-            padding: 6px 12px;
-            border-radius: 4px;
-            font-size: 13px;
-            outline: none;
-            cursor: pointer;
+        /* PANEL IZQUIERDO: DIBUJO DE LA VELA HTF (Igual al dibujo) */
+        #htf-draw-panel {
+            width: 220px;
+            background-color: #161b22;
+            border-right: 2px solid #30363d;
+            display: flex; flex-direction: column; align-items: center; padding: 15px 10px;
+            position: relative; z-index: 5;
         }
-        select:hover, button:hover { border-color: #2962ff; }
-        .active { background-color: #2962ff; color: #fff; border-color: #2962ff; }
+        .panel-title { font-size: 13px; font-weight: 700; color: #8b949e; text-transform: uppercase; margin-bottom: 15px; }
 
-        #chart-wrapper { flex: 1; width: 100%; position: relative; }
-        #chart { width: 100%; height: 100%; }
+        /* SVG para dibujar la vela HTF */
+        #htf-svg { width: 100%; height: 100%; overflow: visible; }
 
-        /* Panel estilo Infografía */
-        #crl-card {
-            position: absolute;
-            top: 16px;
-            left: 16px;
-            z-index: 8;
-            background: rgba(26, 30, 41, 0.92);
-            backdrop-filter: blur(8px);
-            border: 1px solid #363c4e;
-            border-radius: 6px;
-            padding: 12px;
-            width: 280px;
-            font-size: 12px;
-        }
-        .card-header { font-weight: 700; color: #fff; border-bottom: 1px solid #363c4e; padding-bottom: 6px; margin-bottom: 8px; display: flex; justify-content: space-between; }
-        .card-row { display: flex; justify-content: space-between; margin-bottom: 4px; }
-        .card-label { color: #787b86; }
-        .card-value { font-family: monospace; font-weight: 600; }
-        
-        .badge-bsl { color: #ff5252; background: rgba(255,82,82,0.1); padding: 2px 4px; border-radius: 2px; }
-        .badge-ssl { color: #00e676; background: rgba(0,230,118,0.1); padding: 2px 4px; border-radius: 2px; }
-        .badge-eq { color: #ffb300; background: rgba(255,179,0,0.1); padding: 2px 4px; border-radius: 2px; }
+        /* PANEL DERECHO: GRÁFICO LTF */
+        #chart-container { flex: 1; height: 100%; position: relative; }
     </style>
 </head>
 <body>
 
-    <div id="main-container">
-        <div id="header">
-            <span class="title"><span class="live-dot"></span> CRL :) Time Frames (Smart Money Indicator)</span>
-            <div class="controls-container">
-                <button id="toggle-crl-overlay" class="active">📊 Mostrar Rangos CRL</button>
-                <select id="timeframe">
-                    <option value="1m">1m (LTF)</option>
-                    <option value="5m" selected>5m (LTF)</option>
-                    <option value="15m">15m (LTF)</option>
-                    <option value="1h">1h (HTF)</option>
-                    <option value="4h">4h (HTF)</option>
-                </select>
-            </div>
+    <div id="toolbar">
+        <div class="title">
+            <span>CRL :) Time Frames Indicator</span>
         </div>
-
-        <div id="chart-wrapper">
-            <div id="crl-card">
-                <div class="card-header">
-                    <span>ESTADO CRL (HTF)</span>
-                    <span id="htf-label" style="color: #2962ff;">1H HTF</span>
-                </div>
-                <div class="card-row">
-                    <span class="card-label">BSL (Nivel Alto)</span>
-                    <span id="val-bsl" class="card-value badge-bsl">--</span>
-                </div>
-                <div class="card-row">
-                    <span class="card-label">50% EQ (Cierre Medio)</span>
-                    <span id="val-eq" class="card-value badge-eq">--</span>
-                </div>
-                <div class="card-row">
-                    <span class="card-label">SSL (Nivel Bajo)</span>
-                    <span id="val-ssl" class="card-value badge-ssl">--</span>
-                </div>
-                <div class="card-row" style="margin-top: 8px; border-top: 1px dashed #363c4e; padding-top: 6px;">
-                    <span class="card-label">Fase Actual</span>
-                    <span id="val-phase" class="card-value" style="color:#00e5ff;">Buscando Sweep...</span>
-                </div>
-            </div>
-            <div id="chart"></div>
+        <div class="controls">
+            <select id="tf-htf">
+                <option value="1h" selected>HTF: 1 Hora</option>
+                <option value="4h">HTF: 4 Horas</option>
+                <option value="1d">HTF: 1 Día</option>
+            </select>
+            <select id="tf-ltf">
+                <option value="1m">LTF: 1 Minuto</option>
+                <option value="5m" selected>LTF: 5 Minutos</option>
+                <option value="15m">LTF: 15 Minutos</option>
+            </select>
         </div>
     </div>
 
+    <div id="workspace">
+        <!-- CUADRO IZQUIERDO DE DIBUJO DE VELA HTF -->
+        <div id="htf-draw-panel">
+            <div class="panel-title" id="htf-name-label">1 HOUR - HTF</div>
+            
+            <svg id="htf-svg" viewBox="0 0 160 400">
+                <!-- Mechas y Cuerpo de la Vela HTF Dibujada -->
+                <line id="htf-wick" x1="80" y1="40" x2="80" y2="360" stroke="#00e5ff" stroke-width="3" />
+                <rect id="htf-body" x="40" y="100" width="80" height="180" fill="#2962ff" stroke="#00e5ff" stroke-width="2" rx="3" />
+
+                <!-- Niveles Dibujados estilo Infografía -->
+                <!-- BSL (High) -->
+                <line x1="10" y1="40" x2="150" y2="40" stroke="#ff5252" stroke-width="1.5" stroke-dasharray="4,4" />
+                <text x="15" y="32" fill="#ff5252" font-size="11" font-weight="bold">BSL (High)</text>
+                <text id="txt-bsl" x="145" y="32" fill="#ff5252" font-size="10" text-anchor="end">0.00</text>
+
+                <!-- 50% EQ -->
+                <line x1="10" y1="200" x2="150" y2="200" stroke="#ffb300" stroke-width="1.5" stroke-dasharray="2,2" />
+                <text x="15" y="192" fill="#ffb300" font-size="11" font-weight="bold">50% (EQ)</text>
+                <text id="txt-eq" x="145" y="192" fill="#ffb300" font-size="10" text-anchor="end">0.00</text>
+
+                <!-- SSL (Low) -->
+                <line x1="10" y1="360" x2="150" y2="360" stroke="#00e676" stroke-width="1.5" stroke-dasharray="4,4" />
+                <text x="15" y="352" fill="#00e676" font-size="11" font-weight="bold">SSL (Low)</text>
+                <text id="txt-ssl" x="145" y="352" fill="#00e676" font-size="10" text-anchor="end">0.00</text>
+            </svg>
+        </div>
+
+        <!-- GRÁFICO LTF DERECHO -->
+        <div id="chart-container"></div>
+    </div>
+
     <script>
-        document.addEventListener("DOMContentLoaded", function () {
-            const chartContainer = document.getElementById("chart");
-            const tfSelect = document.getElementById("timeframe");
-            const btnToggle = document.getElementById("toggle-crl-overlay");
+        document.addEventListener("DOMContentLoaded", async function () {
+            const chartDom = document.getElementById("chart-container");
+            const selectHTF = document.getElementById("tf-htf");
+            const selectLTF = document.getElementById("tf-ltf");
 
-            let showOverlay = true;
-            let activeLines = [];
-            let currentKlines = [];
-            let ws = null;
-
-            // Inicialización de Gráfico
-            const chart = LightweightCharts.createChart(chartContainer, {
-                width: chartContainer.clientWidth,
-                height: chartContainer.clientHeight,
-                layout: { background: { type: 'solid', color: '#131722' }, textColor: '#d1d4dc' },
-                grid: { vertLines: { color: '#1f2434' }, horzLines: { color: '#1f2434' } },
-                timeScale: { borderColor: '#2a2e39', timeVisible: true, secondsVisible: false }
+            // Crear Gráfico TradingView
+            const chart = LightweightCharts.createChart(chartDom, {
+                width: chartDom.clientWidth,
+                height: chartDom.clientHeight,
+                layout: { background: { type: 'solid', color: '#0d1117' }, textColor: '#c9d1d9' },
+                grid: { vertLines: { color: '#21262d' }, horzLines: { color: '#21262d' } },
+                timeScale: { borderColor: '#30363d', timeVisible: true }
             });
 
-            // Velas tipo TradingView / Estilo Infografía (Azul / Negro o Verde / Rojo)
-            const candleSeries = chart.addCandlestickSeries({
-                upColor: '#2962ff', downColor: '#1e222d',
-                borderUpColor: '#2962ff', borderDownColor: '#787b86',
-                wickUpColor: '#2962ff', wickDownColor: '#787b86'
+            const series = chart.addCandlestickSeries({
+                upColor: '#26a69a', downColor: '#ef5350',
+                borderUpColor: '#26a69a', borderDownColor: '#ef5350',
+                wickUpColor: '#26a69a', wickDownColor: '#ef5350'
             });
 
-            btnToggle.addEventListener('click', () => {
-                showOverlay = !showOverlay;
-                btnToggle.classList.toggle('active', showOverlay);
-                renderCRLVisuals();
-            });
+            let activePriceLines = [];
 
-            async function fetchKlines(symbol, interval, limit = 300) {
+            // Función para obtener velas de Binance
+            async function getKlines(symbol, interval, limit = 200) {
                 const res = await fetch(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`);
                 const data = await res.json();
                 return data.map(d => ({
                     time: Math.floor(d[0] / 1000),
-                    open: parseFloat(d[1]),
-                    high: parseFloat(d[2]),
-                    low: parseFloat(d[3]),
-                    close: parseFloat(d[4])
+                    open: parseFloat(d[1]), high: parseFloat(d[2]),
+                    low: parseFloat(d[3]), close: parseFloat(d[4])
                 }));
             }
 
-            function clearPriceLines() {
-                activeLines.forEach(l => candleSeries.removePriceLine(l));
-                activeLines = [];
-            }
+            // Actualizar el dibujo de la Vela HTF
+            async function updateHTFVisuals() {
+                const htfVal = selectHTF.value;
+                document.getElementById('htf-name-label').innerText = `${htfVal.toUpperCase()} - HTF CANDLE`;
 
-            async function renderCRLVisuals() {
-                clearPriceLines();
-                if (!showOverlay || currentKlines.length === 0) return;
+                const htfData = await getKlines('BTCUSDT', htfVal, 5);
+                if(htfData.length < 2) return;
 
-                // Definir temporalidad HTF dependiente de la seleccionada
-                const currentLTF = tfSelect.value;
-                let htf = '1h';
-                if (['1m', '5m', '15m'].includes(currentLTF)) htf = '1h';
-                else if (currentLTF === '1h') htf = '4h';
-                else htf = '1d';
+                // Tomamos la vela HTF anterior (la que define el Rango de la Infografía)
+                const candle = htfData[htfData.length - 2];
+                const high = candle.high;
+                const low = candle.low;
+                const open = candle.open;
+                const close = candle.close;
+                const eq = low + (high - low) * 0.5;
 
-                document.getElementById('htf-label').innerText = `${htf.toUpperCase()} HTF`;
+                // Actualizar Textos
+                document.getElementById('txt-bsl').innerText = `$${high.toFixed(1)}`;
+                document.getElementById('txt-eq').innerText = `$${eq.toFixed(1)}`;
+                document.getElementById('txt-ssl').innerText = `$${low.toFixed(1)}`;
 
-                // Cargar velas HTF para calcular BSL, SSL y EQ 50%
-                const htfCandles = await fetchKlines('BTCUSDT', htf, 5);
-                if (htfCandles.length < 2) return;
+                // Ajustar gráfico SVG de la vela en base a si es Alcista o Bajista
+                const isBullish = close >= open;
+                const bodyElem = document.getElementById('htf-body');
+                const wickElem = document.getElementById('htf-wick');
 
-                // Tomamos la vela HTF previa cerrada como referencia de la infografía
-                const prevHTF = htfCandles[htfCandles.length - 2];
-                const bsl = prevHTF.high;
-                const ssl = prevHTF.low;
-                const eq = ssl + (bsl - ssl) * 0.5;
-
-                document.getElementById('val-bsl').innerText = `$${bsl.toFixed(2)}`;
-                document.getElementById('val-eq').innerText = `$${eq.toFixed(2)}`;
-                document.getElementById('val-ssl').innerText = `$${ssl.toFixed(2)}`;
-
-                // Dibujar Líneas estilo Infografía
-                const lineBSL = candleSeries.createPriceLine({
-                    price: bsl, color: '#ff5252', lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Dashed,
-                    axisLabelVisible: true, title: 'BSL (HTF High)'
-                });
-
-                const lineEQ = candleSeries.createPriceLine({
-                    price: eq, color: '#ffb300', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Solid,
-                    axisLabelVisible: true, title: '50% (EQ)'
-                });
-
-                const lineSSL = candleSeries.createPriceLine({
-                    price: ssl, color: '#00e676', lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Dashed,
-                    axisLabelVisible: true, title: 'SSL (HTF Low)'
-                });
-
-                activeLines.push(lineBSL, lineEQ, lineSSL);
-
-                // Detección de patrones en LTF (Turtle Soup / CHoCH)
-                const lastPrice = currentKlines[currentKlines.length - 1].close;
-                const markers = [];
-
-                if (lastPrice > bsl) {
-                    document.getElementById('val-phase').innerText = "Turtle Soup (Sweep BSL)";
-                    document.getElementById('val-phase').style.color = "#ff5252";
-                    markers.push({ time: currentKlines[currentKlines.length - 1].time, position: 'aboveBar', color: '#ff5252', shape: 'arrowDown', text: 'BSL Sweep (CHoCH)' });
-                } else if (lastPrice < ssl) {
-                    document.getElementById('val-phase').innerText = "Turtle Soup (Sweep SSL)";
-                    document.getElementById('val-phase').style.color = "#00e676";
-                    markers.push({ time: currentKlines[currentKlines.length - 1].time, position: 'belowBar', color: '#00e676', shape: 'arrowUp', text: 'SSL Sweep (CHoCH)' });
+                if (isBullish) {
+                    bodyElem.setAttribute('fill', '#2962ff');
+                    bodyElem.setAttribute('stroke', '#2962ff');
+                    wickElem.setAttribute('stroke', '#2962ff');
                 } else {
-                    document.getElementById('val-phase').innerText = "En Rango HTF (Buscando Entrada)";
-                    document.getElementById('val-phase').style.color = "#00e5ff";
+                    bodyElem.setAttribute('fill', '#161b22');
+                    bodyElem.setAttribute('stroke', '#ff5252');
+                    wickElem.setAttribute('stroke', '#ff5252');
                 }
 
-                candleSeries.setMarkers(markers);
+                // Dibujar líneas horizontales en el gráfico de la derecha
+                activePriceLines.forEach(line => series.removePriceLine(line));
+                activePriceLines = [];
+
+                activePriceLines.push(series.createPriceLine({ price: high, color: '#ff5252', lineWidth: 2, lineStyle: 2, title: 'BSL' }));
+                activePriceLines.push(series.createPriceLine({ price: eq, color: '#ffb300', lineWidth: 1, lineStyle: 0, title: '50% EQ' }));
+                activePriceLines.push(series.createPriceLine({ price: low, color: '#00e676', lineWidth: 2, lineStyle: 2, title: 'SSL' }));
             }
 
             async function loadChartData() {
-                const interval = tfSelect.value;
-                currentKlines = await fetchKlines('BTCUSDT', interval, 300);
-                candleSeries.setData(currentKlines);
-                await renderCRLVisuals();
-                connectWS(interval);
+                const ltfVal = selectLTF.value;
+                const ltfData = await getKlines('BTCUSDT', ltfVal, 300);
+                series.setData(ltfData);
+                await updateHTFVisuals();
             }
 
-            function connectWS(interval) {
-                if (ws) ws.close();
-                ws = new WebSocket(`wss://stream.binance.com:9443/ws/btcusdt@kline_${interval}`);
-                ws.onmessage = (e) => {
-                    const data = JSON.parse(e.data);
-                    const k = data.k;
-                    const candle = {
-                        time: Math.floor(k.t / 1000),
-                        open: parseFloat(k.o),
-                        high: parseFloat(k.h),
-                        low: parseFloat(k.l),
-                        close: parseFloat(k.c)
-                    };
+            selectHTF.addEventListener('change', updateHTFVisuals);
+            selectLTF.addEventListener('change', loadChartData);
 
-                    candleSeries.update(candle);
-                    if (currentKlines.length > 0) {
-                        if (currentKlines[currentKlines.length - 1].time === candle.time) {
-                            currentKlines[currentKlines.length - 1] = candle;
-                        } else {
-                            currentKlines.push(candle);
-                        }
-                    }
-                };
-            }
-
-            tfSelect.addEventListener('change', loadChartData);
-            window.addEventListener('resize', () => chart.applyOptions({ width: chartContainer.clientWidth, height: chartContainer.clientHeight }));
+            window.addEventListener('resize', () => {
+                chart.applyOptions({ width: chartDom.clientWidth, height: chartDom.clientHeight });
+            });
 
             loadChartData();
         });
