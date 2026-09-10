@@ -69,7 +69,7 @@
         #candle-dashboard {
             position: absolute; top: 16px; left: 16px; z-index: 8; background: rgba(26, 30, 41, 0.90);
             backdrop-filter: blur(8px); border: 1px solid #2a2e39; border-radius: 8px; padding: 12px 16px;
-            display: flex; flex-direction: column; gap: 8px; min-width: 260px; box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+            display: flex; flex-direction: column; gap: 8px; min-width: 270px; box-shadow: 0 4px 16px rgba(0,0,0,0.5);
         }
         .dash-module { display: flex; flex-direction: column; gap: 8px; }
         .dash-row { display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 600; }
@@ -218,6 +218,15 @@
                     <div id="dash-module-vsa" class="dash-module">
                         <div class="dash-divider"></div>
                         <div class="dash-row">
+                            <span class="dash-label">Prom. Compra Ballenas</span>
+                            <span id="dash-whale-buy-avg" class="dash-value" style="color: #00e5ff;">--</span>
+                        </div>
+                        <div class="dash-row">
+                            <span class="dash-label">Prom. Venta Ballenas</span>
+                            <span id="dash-whale-sell-avg" class="dash-value" style="color: #ff5252;">--</span>
+                        </div>
+                        <div class="dash-divider"></div>
+                        <div class="dash-row">
                             <span class="dash-label">Ballenas 1D</span>
                             <div>
                                 <span id="dash-whale-1d-pct" class="dash-value">--</span>
@@ -363,6 +372,9 @@
             const dashTp = document.getElementById("dash-tp");
             const dashSl = document.getElementById("dash-sl");
 
+            const dashWhaleBuyAvg = document.getElementById("dash-whale-buy-avg");
+            const dashWhaleSellAvg = document.getElementById("dash-whale-sell-avg");
+
             const dashWhale1dPct = document.getElementById("dash-whale-1d-pct");
             const dashWhale1dNet = document.getElementById("dash-whale-1d-net");
             const dashWhale1wPct = document.getElementById("dash-whale-1w-pct");
@@ -377,6 +389,7 @@
 
             let currentFootprintRes = null;
             let currentWhaleBuyAvg = null;
+            let currentWhaleSellAvg = null;
             let currentMainTarget = null;
 
             const chart1 = LightweightCharts.createChart(chartContainer1, {
@@ -614,8 +627,9 @@
 
             function processWhaleData(candles) {
                 const markers = [];
-                if (!candles || candles.length < 20) return { markers, buyPrices: [] };
+                if (!candles || candles.length < 20) return { markers, buyPrices: [], sellPrices: [] };
                 const buyPrices = [];
+                const sellPrices = [];
                 let rollingVolumeSum = 0;
                 for (let i = 0; i < 20; i++) rollingVolumeSum += (candles[i].volume || 1);
 
@@ -629,11 +643,12 @@
                             buyPrices.push(c.close);
                             markers.push({ time: c.time, position: 'belowBar', color: '#00b0ff', shape: 'circle', text: 'BUY' });
                         } else if (c.close < c.open) {
+                            sellPrices.push(c.close);
                             markers.push({ time: c.time, position: 'aboveBar', color: '#ff4081', shape: 'circle', text: 'SELL' });
                         }
                     }
                 }
-                return { markers, buyPrices };
+                return { markers, buyPrices, sellPrices };
             }
 
             async function renderSRVisuals(currentFormattedData) {
@@ -642,7 +657,7 @@
                     activePriceLines1 = [];
 
                     const lineLevels = [];
-                    currentMainTarget = null; currentWhaleBuyAvg = null; currentFootprintRes = null;
+                    currentMainTarget = null; currentWhaleBuyAvg = null; currentWhaleSellAvg = null; currentFootprintRes = null;
                     updateDashboardModulesVisibility();
 
                     if (showPivots) {
@@ -683,12 +698,27 @@
                     let allMarkers = [];
 
                     if (showVsa && currentFormattedData.length > 0) {
-                        const { markers: whaleMarkers, buyPrices } = processWhaleData(currentFormattedData);
+                        const { markers: whaleMarkers, buyPrices, sellPrices } = processWhaleData(currentFormattedData);
                         allMarkers = allMarkers.concat(whaleMarkers);
+                        
                         if (buyPrices.length > 0) {
                             currentWhaleBuyAvg = buyPrices.reduce((a, b) => a + b, 0) / buyPrices.length;
+                            dashWhaleBuyAvg.innerText = `$${currentWhaleBuyAvg.toFixed(2)}`;
                             lineLevels.push({ price: currentWhaleBuyAvg, color: '#00e5ff', title: '[ PROMEDIO COMPRA BALLENAS ]', width: 2, style: LightweightCharts.LineStyle.Dashed });
+                        } else {
+                            dashWhaleBuyAvg.innerText = "--";
                         }
+
+                        if (sellPrices.length > 0) {
+                            currentWhaleSellAvg = sellPrices.reduce((a, b) => a + b, 0) / sellPrices.length;
+                            dashWhaleSellAvg.innerText = `$${currentWhaleSellAvg.toFixed(2)}`;
+                            lineLevels.push({ price: currentWhaleSellAvg, color: '#ff1744', title: '[ PROMEDIO VENTA BALLENAS ]', width: 2, style: LightweightCharts.LineStyle.Dashed });
+                        } else {
+                            dashWhaleSellAvg.innerText = "--";
+                        }
+                    } else {
+                        dashWhaleBuyAvg.innerText = "--";
+                        dashWhaleSellAvg.innerText = "--";
                     }
 
                     if (showSupertrend && currentFormattedData.length > 0) {
