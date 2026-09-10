@@ -167,7 +167,7 @@
 </head>
 <body>
 
-    <!-- ================= VISTA 1: ANALYTICS (S/R, VSA, FOOTPRINT, SUPERTREND) ================= -->
+    <!-- ================= VISTA 1: ANALYTICS ================= -->
     <div id="view-analytics" class="app-view">
         <div id="header-v1">
             <div style="display: flex; align-items: center; gap: 16px;">
@@ -298,7 +298,7 @@
     </div>
 
 
-    <!-- ================= VISTA 2: CRL AUTOMATED TRADING DECISION SYSTEM ================= -->
+    <!-- ================= VISTA 2: SYSTEM CRL ================= -->
     <div id="view-crl" class="app-view hidden-view">
         <div id="toolbar-v2">
             <div class="title-v2">
@@ -435,6 +435,7 @@
 
             let currentFootprintRes = null;
             let currentMainTarget = null;
+            let lastWhaleAvgPrice = null;
 
             const chart = LightweightCharts.createChart(chartContainer, {
                 width: chartContainer.clientWidth,
@@ -537,8 +538,9 @@
             }
 
             function calculateWhaleMetrics(candles, thresholdMultiplier = 1.5) {
-                if (!candles || candles.length < 20) return { buyVol: 0, sellVol: 0, avgVol: 0 };
+                if (!candles || candles.length < 20) return { buyVol: 0, sellVol: 0, avgVol: 0, weightedPrice: 0 };
                 let buyVol = 0, sellVol = 0, rollingVolumeSum = 0;
+                let weightedPriceSum = 0, totalWhaleVolume = 0;
 
                 for (let i = 0; i < 20; i++) rollingVolumeSum += (candles[i].volume || 1);
 
@@ -548,13 +550,18 @@
                     rollingVolumeSum += (c.volume || 1) - (candles[i - 20].volume || 1);
 
                     if ((c.volume || 0) > (avgVol * thresholdMultiplier)) {
+                        const midPrice = (c.high + c.low + c.close) / 3;
+                        weightedPriceSum += midPrice * c.volume;
+                        totalWhaleVolume += c.volume;
+
                         if (c.close > c.open) buyVol += c.volume;
                         else if (c.close < c.open) sellVol += c.volume;
                         else { buyVol += c.volume / 2; sellVol += c.volume / 2; }
                     }
                 }
                 const avgVol = rollingVolumeSum / 20;
-                return { buyVol, sellVol, avgVol };
+                const weightedPrice = totalWhaleVolume > 0 ? (weightedPriceSum / totalWhaleVolume) : 0;
+                return { buyVol, sellVol, avgVol, weightedPrice };
             }
 
             async function updateWhaleDashboard() {
@@ -574,8 +581,11 @@
                     let mainAvg = 0;
 
                     periods.forEach(({ data, elPct, elNet, multiplier }, idx) => {
-                        const { buyVol, sellVol, avgVol } = calculateWhaleMetrics(data, multiplier);
-                        if (idx === 0) mainAvg = avgVol;
+                        const { buyVol, sellVol, avgVol, weightedPrice } = calculateWhaleMetrics(data, multiplier);
+                        if (idx === 0) {
+                            mainAvg = avgVol;
+                            lastWhaleAvgPrice = weightedPrice;
+                        }
 
                         const total = buyVol + sellVol;
                         const netBtc = buyVol - sellVol;
@@ -600,6 +610,7 @@
                     });
 
                     dashWhaleAvg.innerText = `${Math.round(mainAvg)} BTC`;
+                    renderSRVisuals(currentCandleData);
                 } catch (e) {
                     console.error("Error actualizando métricas de ballenas:", e);
                 }
@@ -885,6 +896,16 @@
                             });
                         }
 
+                        if (showVsa && lastWhaleAvgPrice && lastWhaleAvgPrice > 0) {
+                            lineLevels.push({
+                                price: lastWhaleAvgPrice,
+                                color: '#00e5ff',
+                                title: '[ 🐋 PRECIO PROMEDIO BALLENAS ]',
+                                width: 2,
+                                style: LightweightCharts.LineStyle.Dashed
+                            });
+                        }
+
                         let combinedMarkers = [];
                         if (showVsa) {
                             const vsaResult = processWhaleData(currentFormattedData);
@@ -969,8 +990,8 @@
                     currentCandleData = await fetchKlines(interval, 500);
                     candlestickSeries.setData(currentCandleData);
 
-                    await renderSRVisuals(currentCandleData);
                     await updateWhaleDashboard();
+                    await renderSRVisuals(currentCandleData);
 
                     startCandleTimer(interval);
                     setupWebSocket(interval);
