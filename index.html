@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Trading Decision System - Multi Dashboard</title>
+    <title>Trading Decision System - Multi Dashboard Realtime</title>
     <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
 
     <style>
@@ -11,7 +11,6 @@
         html, body { width: 100%; height: 100%; background-color: #131722; color: #d1d4dc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; overflow: hidden; }
         #main-container { width: 100vw; height: 100vh; display: flex; flex-direction: column; }
         
-        /* HEADER PRINCIPAL Y NAVEGACIÓN */
         #header {
             min-height: 48px;
             background-color: #1e222d;
@@ -30,7 +29,6 @@
         .live-dot { width: 8px; height: 8px; background-color: #00e676; border-radius: 50%; box-shadow: 0 0 8px #00e676; animation: blink 1.5s infinite; }
         @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
 
-        /* PESTAÑAS (TABS) */
         .tab-nav { display: flex; gap: 4px; background: #131722; padding: 3px; border-radius: 6px; border: 1px solid #2a2e39; }
         .tab-btn {
             background: transparent; color: #787b86; border: none; padding: 5px 12px; font-size: 12px;
@@ -58,11 +56,9 @@
         }
         .btn-fp.inactive { opacity: 0.5; border-color: #2a2e39; color: #787b86; }
 
-        /* VIEWS (CONTENEDORES DE PESTAÑAS) */
         .tab-content { flex: 1; width: 100%; height: calc(100vh - 48px); display: none; position: relative; }
         .tab-content.active-view { display: flex; }
 
-        /* VISTA 1: FOOTPRINT & VSA */
         #chart-wrapper { flex: 1; width: 100%; height: 100%; position: relative; }
         #chart { width: 100%; height: 100%; }
 
@@ -80,7 +76,6 @@
         .progress-bar-bg { width: 100%; height: 4px; background-color: #2a2e39; border-radius: 2px; overflow: hidden; }
         .progress-bar-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #2962ff, #00e5ff); transition: width 0.3s ease; }
 
-        /* VISTA 2: CRL AUTOMATED SYSTEM */
         #workspace-crl { flex: 1; display: flex; width: 100%; height: 100%; position: relative; overflow: hidden; }
         #htf-draw-panel {
             width: 220px; background-color: #161b22; border-right: 2px solid #30363d;
@@ -114,7 +109,6 @@
 <body>
 
     <div id="main-container">
-        <!-- HEADER GENERAL CON NAVEGACIÓN DE PESTAÑAS -->
         <div id="header">
             <div class="header-left">
                 <span class="title"><span class="live-dot"></span> 🦈 BTC/USD SYSTEM</span>
@@ -124,7 +118,6 @@
                 </div>
             </div>
             
-            <!-- CONTROLES PESTAÑA 1 (FOOTPRINT/VSA) -->
             <div id="controls-tab-footprint" class="controls-container">
                 <button id="toggle-pivots" class="btn-fp active">📍 Pivotes Multi-TF</button>
                 <button id="toggle-pivots-tf" class="btn-fp active">📍 Pivotes Dinámicos TF</button>
@@ -142,11 +135,9 @@
                     <option value="1h">1 Hora</option>
                     <option value="4h" selected>4 Horas</option>
                     <option value="1d">1 Día</option>
-                    <option value="1w">1 Semana</option>
                 </select>
             </div>
 
-            <!-- CONTROLES PESTAÑA 2 (CRL SYSTEM ENHANCED) -->
             <div id="controls-tab-crl" class="controls-container" style="display: none;">
                 <button id="crl-toggle-pivots" class="btn-fp active">📍 Pivotes Multi-TF</button>
                 <button id="crl-toggle-pivots-tf" class="btn-fp active">📍 Pivotes LTF</button>
@@ -163,7 +154,6 @@
             </div>
         </div>
 
-        <!-- PESTAÑA 1: FOOTPRINT / VSA -->
         <div id="view-footprint" class="tab-content active-view">
             <div id="chart-wrapper">
                 <div id="candle-dashboard">
@@ -186,24 +176,12 @@
                             <span id="dash-entry" class="dash-value" style="color: #00e5ff;">--</span>
                         </div>
                         <div class="dash-row">
-                            <span class="dash-label">Take Profit (Objetivo)</span>
+                            <span class="dash-label">Take Profit</span>
                             <span id="dash-tp" class="dash-value" style="color: #00e676;">--</span>
                         </div>
                         <div class="dash-row">
-                            <span class="dash-label">Stop Loss (Invalidación)</span>
+                            <span class="dash-label">Stop Loss</span>
                             <span id="dash-sl" class="dash-value" style="color: #ff5252;">--</span>
-                        </div>
-                        <div class="dash-row">
-                            <span class="dash-label">Invalidación Metodología</span>
-                            <span id="dash-invalid" class="dash-value" style="color: #e040fb;">--</span>
-                        </div>
-                    </div>
-
-                    <div id="dash-module-pivots" class="dash-module">
-                        <div class="dash-divider"></div>
-                        <div class="dash-row">
-                            <span class="dash-label">Objetivo Multi-TF</span>
-                            <span id="dash-target" class="dash-value" style="color: #ff9100;">--</span>
                         </div>
                     </div>
 
@@ -229,28 +207,6 @@
                             <span class="dash-label">Prom. Venta Ballenas</span>
                             <span id="dash-whale-sell-avg" class="dash-value" style="color: #ff5252;">--</span>
                         </div>
-                        <div class="dash-divider"></div>
-                        <div class="dash-row">
-                            <span class="dash-label">Ballenas 1D</span>
-                            <div>
-                                <span id="dash-whale-1d-pct" class="dash-value">--</span>
-                                <span id="dash-whale-1d-net" class="dash-subvalue">(--)</span>
-                            </div>
-                        </div>
-                        <div class="dash-row">
-                            <span class="dash-label">Ballenas 1W</span>
-                            <div>
-                                <span id="dash-whale-1w-pct" class="dash-value">--</span>
-                                <span id="dash-whale-1w-net" class="dash-subvalue">(--)</span>
-                            </div>
-                        </div>
-                        <div class="dash-row">
-                            <span class="dash-label">Ballenas 1M</span>
-                            <div>
-                                <span id="dash-whale-1m-pct" class="dash-value">--</span>
-                                <span id="dash-whale-1m-net" class="dash-subvalue">(--)</span>
-                            </div>
-                        </div>
                     </div>
                 </div>
 
@@ -258,7 +214,6 @@
             </div>
         </div>
 
-        <!-- PESTAÑA 2: CRL SYSTEM -->
         <div id="view-crl" class="tab-content">
             <div id="workspace-crl">
                 <div id="htf-draw-panel">
@@ -298,7 +253,6 @@
         document.addEventListener("DOMContentLoaded", function () {
             const statusEl = document.getElementById("status");
 
-            // GLOBAL TAB SWITCHING LOGIC
             const tabBtnFootprint = document.getElementById("tab-btn-footprint");
             const tabBtnCrl = document.getElementById("tab-btn-crl");
             const viewFootprint = document.getElementById("view-footprint");
@@ -327,7 +281,6 @@
                 loadCrlData();
             });
 
-            // COMMON API FETCH
             async function fetchKlines(symbol, interval, limit = 500) {
                 const is1s = interval === "1s";
                 const endpoint = is1s ? 'uiKlines' : 'klines';
@@ -341,7 +294,6 @@
                 }));
             }
 
-            // HELPER FUNCTIONS (SHARED METRICS)
             function calculatePivots(candles, leftBars = 15, rightBars = 15) {
                 let lastPivotHigh = null, lastPivotLow = null;
                 for (let i = leftBars; i < candles.length - rightBars; i++) {
@@ -427,9 +379,7 @@
                 return stMarkers;
             }
 
-            // ==========================================
-            // LÓGICA PESTAÑA 1: FOOTPRINT & VSA
-            // ==========================================
+            // PESTAÑA 1 LOGIC
             const timeframeSelect = document.getElementById("timeframe");
             const chartContainer1 = document.getElementById("chart");
 
@@ -440,400 +390,67 @@
             const btnFootprint = document.getElementById("toggle-footprint");
             const btnMultiFp = document.getElementById("toggle-multi-fp");
 
-            const modFootprint = document.getElementById("dash-module-footprint");
-            const modPivots = document.getElementById("dash-module-pivots");
-            const modPivotsTf = document.getElementById("dash-module-pivots-tf");
-            const modVsa = document.getElementById("dash-module-vsa");
-
             let showPivots = true, showPivotsTf = true, showVsa = true, showSupertrend = true, showFootprint = true, showMultiFootprint = false;
-
-            const timerDisplay = document.getElementById("timer-display");
-            const timerProgress = document.getElementById("timer-progress");
-            const dashBias = document.getElementById("dash-bias");
-            const dashTarget = document.getElementById("dash-target");
-            const dashInvalid = document.getElementById("dash-invalid");
-
-            const dashPivotTfResLabel = document.getElementById("dash-pivot-tf-res-label");
-            const dashPivotTfSupLabel = document.getElementById("dash-pivot-tf-sup-label");
-            const dashPivotTfRes = document.getElementById("dash-pivot-tf-res");
-            const dashPivotTfSup = document.getElementById("dash-pivot-tf-sup");
-
-            const dashEntry = document.getElementById("dash-entry");
-            const dashTp = document.getElementById("dash-tp");
-            const dashSl = document.getElementById("dash-sl");
-
-            const dashWhaleBuyAvg = document.getElementById("dash-whale-buy-avg");
-            const dashWhaleSellAvg = document.getElementById("dash-whale-sell-avg");
-
-            const dashWhale1dPct = document.getElementById("dash-whale-1d-pct");
-            const dashWhale1dNet = document.getElementById("dash-whale-1d-net");
-            const dashWhale1wPct = document.getElementById("dash-whale-1w-pct");
-            const dashWhale1wNet = document.getElementById("dash-whale-1w-net");
-            const dashWhale1mPct = document.getElementById("dash-whale-1m-pct");
-            const dashWhale1mNet = document.getElementById("dash-whale-1m-net");
 
             let activePriceLines1 = [];
             let wsConnection1 = null;
             let currentCandleData1 = [];
-            let timerInterval1 = null;
-
-            let currentFootprintRes = null;
-            let currentWhaleBuyAvg = null;
-            let currentWhaleSellAvg = null;
-            let currentMainTarget = null;
 
             const chart1 = LightweightCharts.createChart(chartContainer1, {
                 width: chartContainer1.clientWidth,
                 height: chartContainer1.clientHeight,
                 layout: { background: { type: 'solid', color: '#131722' }, textColor: '#d1d4dc' },
                 grid: { vertLines: { color: 'rgba(42, 46, 57, 0.5)' }, horzLines: { color: 'rgba(42, 46, 57, 0.5)' } },
-                timeScale: { borderColor: 'rgba(197, 203, 206, 0.8)', timeVisible: true, secondsVisible: true },
-                rightPriceScale: { autoScale: true }
+                timeScale: { borderColor: 'rgba(197, 203, 206, 0.8)', timeVisible: true, secondsVisible: true }
             });
 
-            const series1 = chart1.addCandlestickSeries({
-                upColor: '#089981', downColor: '#f23645', borderVisible: false, wickUpColor: '#089981', wickDownColor: '#f23645'
-            });
+            const series1 = chart1.addCandlestickSeries({ upColor: '#089981', downColor: '#f23645' });
 
-            function updateDashboardModulesVisibility() {
-                modFootprint.style.display = showFootprint ? "flex" : "none";
-                modPivots.style.display = showPivots ? "flex" : "none";
-                modPivotsTf.style.display = showPivotsTf ? "flex" : "none";
-                modVsa.style.display = showVsa ? "flex" : "none";
-            }
+            async function renderSRVisuals1() {
+                activePriceLines1.forEach(line => series1.removePriceLine(line));
+                activePriceLines1 = [];
 
-            function updateRealtimeAnalysis(lastClosePrice) {
-                if (!lastClosePrice) return;
-                let isBullish = false;
-
-                if (currentFootprintRes && showFootprint) {
-                    const invalidLevel = currentFootprintRes + 35;
-                    dashInvalid.innerText = `$${invalidLevel.toFixed(2)}`;
-
-                    if (lastClosePrice < currentFootprintRes) {
-                        dashBias.innerText = "BAJISTA 🐻";
-                        dashBias.style.color = "#ff5252";
-                        isBullish = false;
-                    } else {
-                        dashBias.innerText = "ALCISTA 🚀";
-                        dashBias.style.color = "#00e676";
-                        isBullish = true;
-                    }
-                } else {
-                    dashBias.innerText = "NEUTRO";
-                    dashBias.style.color = "#d1d4dc";
-                    dashInvalid.innerText = "--";
+                let allMarkers = [];
+                if (showVsa) {
+                    const { markers: whaleMarkers, buyPrices, sellPrices } = processWhaleData(currentCandleData1);
+                    allMarkers = allMarkers.concat(whaleMarkers);
                 }
-
-                dashTarget.innerText = (currentMainTarget && showPivots) ? `$${currentMainTarget.toFixed(2)}` : "--";
-
-                if (currentFootprintRes && showFootprint) {
-                    let entryPrice = lastClosePrice; 
-                    let slPrice = isBullish ? currentFootprintRes * 0.997 : currentFootprintRes * 1.003; 
-                    let tpPrice;
-                    if (currentMainTarget && showPivots && ((isBullish && currentMainTarget > entryPrice) || (!isBullish && currentMainTarget < entryPrice))) {
-                        tpPrice = currentMainTarget;
-                    } else {
-                        let risk = Math.abs(entryPrice - slPrice);
-                        tpPrice = isBullish ? entryPrice + (risk * 2) : entryPrice - (risk * 2);
-                    }
-
-                    dashEntry.innerText = `$${entryPrice.toFixed(2)}`;
-                    dashTp.innerText = `$${tpPrice.toFixed(2)}`;
-                    dashSl.innerText = `$${slPrice.toFixed(2)}`;
-                } else {
-                    dashEntry.innerText = "--"; dashTp.innerText = "--"; dashSl.innerText = "--";
+                if (showSupertrend) {
+                    allMarkers = allMarkers.concat(getSupertrendMarkers(currentCandleData1));
                 }
-            }
-
-            function calculateWhaleMetrics(candles, thresholdMultiplier = 1.5) {
-                if (!candles || candles.length < 20) return { buyVol: 0, sellVol: 0 };
-                let buyVol = 0, sellVol = 0, rollingVolumeSum = 0;
-                for (let i = 0; i < 20; i++) rollingVolumeSum += (candles[i].volume || 1);
-
-                for (let i = 20; i < candles.length; i++) {
-                    const c = candles[i];
-                    const avgVol = rollingVolumeSum / 20;
-                    rollingVolumeSum += (c.volume || 1) - (candles[i - 20].volume || 1);
-
-                    if ((c.volume || 0) > (avgVol * thresholdMultiplier)) {
-                        if (c.close > c.open) buyVol += c.volume;
-                        else if (c.close < c.open) sellVol += c.volume;
-                        else { buyVol += c.volume / 2; sellVol += c.volume / 2; }
-                    }
-                }
-                return { buyVol, sellVol };
-            }
-
-            async function updateWhaleDashboard() {
-                try {
-                    const [raw1d, raw1w, raw1m] = await Promise.all([
-                        fetchKlines('BTCUSDT', '1d', 100),
-                        fetchKlines('BTCUSDT', '1w', 100),
-                        fetchKlines('BTCUSDT', '1M', 60)
-                    ]);
-
-                    const periods = [
-                        { data: raw1d, elPct: dashWhale1dPct, elNet: dashWhale1dNet, multiplier: 1.4 },
-                        { data: raw1w, elPct: dashWhale1wPct, elNet: dashWhale1wNet, multiplier: 1.3 },
-                        { data: raw1m, elPct: dashWhale1mPct, elNet: dashWhale1mNet, multiplier: 1.2 }
-                    ];
-
-                    periods.forEach(({ data, elPct, elNet, multiplier }) => {
-                        const { buyVol, sellVol } = calculateWhaleMetrics(data, multiplier);
-                        const total = buyVol + sellVol;
-                        const netBtc = buyVol - sellVol;
-
-                        if (total === 0) {
-                            elPct.innerText = "50%C/50%V"; elPct.style.color = "#d1d4dc";
-                            elNet.innerText = "(0 BTC)"; elNet.style.color = "#d1d4dc";
-                            return;
-                        }
-
-                        const buyPct = Math.round((buyVol / total) * 100);
-                        const sellPct = 100 - buyPct;
-                        elPct.innerText = `${buyPct}%C/${sellPct}%V`;
-                        elPct.style.color = buyPct > 50 ? "#00e676" : buyPct < 50 ? "#ff5252" : "#d1d4dc";
-
-                        const formattedNet = netBtc >= 0 ? `(+${Math.round(netBtc)} BTC)` : `(${Math.round(netBtc)} BTC)`;
-                        elNet.innerText = formattedNet;
-                        elNet.style.color = netBtc >= 0 ? "#00e676" : "#ff5252";
-                    });
-                } catch (e) {
-                    console.error("Error actualizando métricas de ballenas:", e);
-                }
-            }
-
-            function getIntervalInSeconds(interval) {
-                const unit = interval.slice(-1); const val = parseInt(interval);
-                if (unit === 's') return val;
-                if (unit === 'm') return val * 60;
-                if (unit === 'h') return val * 3600;
-                if (unit === 'd') return val * 86400;
-                if (unit === 'w') return val * 604800;
-                return 60;
-            }
-
-            function startCandleTimer(interval) {
-                if (timerInterval1) clearInterval(timerInterval1);
-                const intervalSecs = getIntervalInSeconds(interval);
-
-                function updateTimer() {
-                    const nowSecs = Math.floor(Date.now() / 1000);
-                    const elapsed = nowSecs % intervalSecs;
-                    const remaining = intervalSecs - elapsed;
-                    const mins = Math.floor(remaining / 60);
-                    const secs = remaining % 60;
-
-                    if (intervalSecs < 60) timerDisplay.innerText = `${remaining}s`;
-                    else if (mins >= 60) timerDisplay.innerText = `${Math.floor(mins / 60)}h ${(mins % 60).toString().padStart(2, '0')}m`;
-                    else timerDisplay.innerText = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-
-                    timerProgress.style.width = `${(elapsed / intervalSecs) * 100}%`;
-                }
-                updateTimer();
-                timerInterval1 = setInterval(updateTimer, 1000);
-            }
-
-            function calculateFootprintLevels(candles) {
-                if (!candles || candles.length < 20) return { footprintPOCs: [] };
-                const footprintPOCs = [];
-                let rollingVolumeSum = 0;
-                for (let i = 0; i < 20; i++) rollingVolumeSum += (candles[i].volume || 1);
-
-                for (let i = 20; i < candles.length; i++) {
-                    const c = candles[i];
-                    const avgVol = rollingVolumeSum / 20;
-                    rollingVolumeSum += (c.volume || 1) - (candles[i - 20].volume || 1);
-
-                    if ((c.volume || 0) > (avgVol * 2.2)) {
-                        const footprintPOC = c.open < c.close 
-                            ? c.open + ((c.close - c.open) * 0.70)
-                            : c.open - ((c.open - c.close) * 0.70);
-                        footprintPOCs.push({ price: footprintPOC, isBullish: c.close > c.open, time: c.time });
-                    }
-                }
-                return { footprintPOCs: footprintPOCs.slice(-2) };
-            }
-
-            async function renderSRVisuals(currentFormattedData) {
-                try {
-                    activePriceLines1.forEach(line => series1.removePriceLine(line));
-                    activePriceLines1 = [];
-
-                    const lineLevels = [];
-                    currentMainTarget = null; currentWhaleBuyAvg = null; currentWhaleSellAvg = null; currentFootprintRes = null;
-                    updateDashboardModulesVisibility();
-
-                    if (showPivots) {
-                        const [raw4h, raw1d] = await Promise.all([
-                            fetchKlines('BTCUSDT', '4h', 200),
-                            fetchKlines('BTCUSDT', '1d', 200)
-                        ]);
-
-                        const pivots4h = calculatePivots(raw4h, 15, 15);
-                        const pivots1d = calculatePivots(raw1d, 15, 15);
-
-                        if (pivots1d.pivotHigh) {
-                            lineLevels.push({ price: pivots1d.pivotHigh.high, color: '#ff1744', title: '[ 1D RESISTENCIA ]', width: 3, style: LightweightCharts.LineStyle.Solid });
-                            currentMainTarget = pivots1d.pivotHigh.high;
-                        }
-                        if (pivots1d.pivotLow) lineLevels.push({ price: pivots1d.pivotLow.low, color: '#00e676', title: '[ 1D SOPORTE ]', width: 3, style: LightweightCharts.LineStyle.Solid });
-                        if (pivots4h.pivotHigh) lineLevels.push({ price: pivots4h.pivotHigh.high, color: '#ff9100', title: '[ 4H RESISTENCIA ]', width: 2, style: LightweightCharts.LineStyle.Dashed });
-                        if (pivots4h.pivotLow) lineLevels.push({ price: pivots4h.pivotLow.low, color: '#2962ff', title: '[ 4H SOPORTE ]', width: 2, style: LightweightCharts.LineStyle.Dashed });
-                    }
-
-                    if (showPivotsTf && currentFormattedData.length > 0) {
-                        const currentTfLabel = timeframeSelect.value.toUpperCase();
-                        const currentTfPivots = calculatePivots(currentFormattedData, 10, 10);
-                        dashPivotTfResLabel.innerText = `RESISTENCIA ${currentTfLabel}`;
-                        dashPivotTfSupLabel.innerText = `SOPORTE ${currentTfLabel}`;
-
-                        if (currentTfPivots.pivotHigh) {
-                            lineLevels.push({ price: currentTfPivots.pivotHigh.high, color: '#e040fb', title: `[ ${currentTfLabel} RESISTENCIA ]`, width: 2, style: LightweightCharts.LineStyle.Dotted });
-                            dashPivotTfRes.innerText = `$${currentTfPivots.pivotHigh.high.toFixed(2)}`;
-                        } else dashPivotTfRes.innerText = "--";
-
-                        if (currentTfPivots.pivotLow) {
-                            lineLevels.push({ price: currentTfPivots.pivotLow.low, color: '#00e5ff', title: `[ ${currentTfLabel} SOPORTE ]`, width: 2, style: LightweightCharts.LineStyle.Dotted });
-                            dashPivotTfSup.innerText = `$${currentTfPivots.pivotLow.low.toFixed(2)}`;
-                        } else dashPivotTfSup.innerText = "--";
-                    }
-
-                    let allMarkers = [];
-
-                    if (showVsa && currentFormattedData.length > 0) {
-                        const { markers: whaleMarkers, buyPrices, sellPrices } = processWhaleData(currentFormattedData);
-                        allMarkers = allMarkers.concat(whaleMarkers);
-                        
-                        if (buyPrices.length > 0) {
-                            currentWhaleBuyAvg = buyPrices.reduce((a, b) => a + b, 0) / buyPrices.length;
-                            dashWhaleBuyAvg.innerText = `$${currentWhaleBuyAvg.toFixed(2)}`;
-                            lineLevels.push({ price: currentWhaleBuyAvg, color: '#00e5ff', title: '[ PROMEDIO COMPRA BALLENAS ]', width: 2, style: LightweightCharts.LineStyle.Dashed });
-                        } else {
-                            dashWhaleBuyAvg.innerText = "--";
-                        }
-
-                        if (sellPrices.length > 0) {
-                            currentWhaleSellAvg = sellPrices.reduce((a, b) => a + b, 0) / sellPrices.length;
-                            dashWhaleSellAvg.innerText = `$${currentWhaleSellAvg.toFixed(2)}`;
-                            lineLevels.push({ price: currentWhaleSellAvg, color: '#ff1744', title: '[ PROMEDIO VENTA BALLENAS ]', width: 2, style: LightweightCharts.LineStyle.Dashed });
-                        } else {
-                            dashWhaleSellAvg.innerText = "--";
-                        }
-                    } else {
-                        dashWhaleBuyAvg.innerText = "--";
-                        dashWhaleSellAvg.innerText = "--";
-                    }
-
-                    if (showSupertrend && currentFormattedData.length > 0) {
-                        allMarkers = allMarkers.concat(getSupertrendMarkers(currentFormattedData));
-                    }
-
-                    if (showFootprint && currentFormattedData.length > 0) {
-                        const { footprintPOCs } = calculateFootprintLevels(currentFormattedData);
-                        footprintPOCs.forEach((poc, index) => {
-                            const title = poc.isBullish ? `[ FOOTPRINT POC COMPRA #${index + 1} ]` : `[ FOOTPRINT POC VENTA #${index + 1} ]`;
-                            lineLevels.push({ price: poc.price, color: poc.isBullish ? '#00e676' : '#ff5252', title: title, width: 2, style: LightweightCharts.LineStyle.Solid });
-                            if (!poc.isBullish) currentFootprintRes = poc.price;
-                        });
-                    }
-
-                    if (showMultiFootprint) {
-                        const [raw15m, raw1h] = await Promise.all([ fetchKlines('BTCUSDT', '15m', 200), fetchKlines('BTCUSDT', '1h', 200) ]);
-                        calculateFootprintLevels(raw15m).footprintPOCs.forEach(poc => {
-                            lineLevels.push({ price: poc.price, color: poc.isBullish ? '#69f0ae' : '#ff80ab', title: '[ MULTI-FP 15M ]', width: 1, style: LightweightCharts.LineStyle.Dotted });
-                        });
-                        calculateFootprintLevels(raw1h).footprintPOCs.forEach(poc => {
-                            lineLevels.push({ price: poc.price, color: poc.isBullish ? '#b9f6ca' : '#ff4081', title: '[ MULTI-FP 1H ]', width: 2, style: LightweightCharts.LineStyle.Dashed });
-                        });
-                    }
-
-                    allMarkers.sort((a, b) => a.time - b.time);
-                    series1.setMarkers(allMarkers);
-
-                    lineLevels.forEach(lvl => {
-                        activePriceLines1.push(series1.createPriceLine({
-                            price: lvl.price, color: lvl.color, lineWidth: lvl.width, lineStyle: lvl.style, axisLabelVisible: true, title: lvl.title
-                        }));
-                    });
-
-                    if (currentFormattedData.length > 0) {
-                        updateRealtimeAnalysis(currentFormattedData[currentFormattedData.length - 1].close);
-                    }
-                } catch (e) {
-                    console.error("Error renderizando mapa dinámico:", e);
-                }
+                allMarkers.sort((a, b) => a.time - b.time);
+                series1.setMarkers(allMarkers);
             }
 
             function connectWebSocket1(interval) {
                 if (wsConnection1) wsConnection1.close();
-                const wsUrl = `wss://stream.binance.com:9443/ws/btcusdt@kline_${interval === "1s" ? "1s" : interval}`;
-                wsConnection1 = new WebSocket(wsUrl);
-
-                wsConnection1.onopen = () => {
-                    statusEl.innerText = `Conectado Binance [${interval.toUpperCase()}]`;
-                    setTimeout(() => { statusEl.style.display = "none"; }, 2000);
-                };
-
+                wsConnection1 = new WebSocket(`wss://stream.binance.com:9443/ws/btcusdt@kline_${interval === "1s" ? "1s" : interval}`);
                 wsConnection1.onmessage = (event) => {
-                    const message = JSON.parse(event.data);
-                    if (message.e === "kline") {
-                        const k = message.k;
-                        const candle = {
-                            time: Math.floor(k.t / 1000), open: parseFloat(k.o), high: parseFloat(k.h), low: parseFloat(k.l), close: parseFloat(k.c), volume: parseFloat(k.v)
-                        };
+                    const msg = JSON.parse(event.data);
+                    if (msg.e === "kline") {
+                        const k = msg.k;
+                        const candle = { time: Math.floor(k.t / 1000), open: parseFloat(k.o), high: parseFloat(k.h), low: parseFloat(k.l), close: parseFloat(k.c), volume: parseFloat(k.v) };
                         series1.update(candle);
-
                         if (currentCandleData1.length > 0) {
-                            const lastIdx = currentCandleData1.length - 1;
-                            if (currentCandleData1[lastIdx].time === candle.time) currentCandleData1[lastIdx] = candle;
+                            const last = currentCandleData1[currentCandleData1.length - 1];
+                            if (last.time === candle.time) currentCandleData1[currentCandleData1.length - 1] = candle;
                             else currentCandleData1.push(candle);
                         }
-                        updateRealtimeAnalysis(candle.close);
                     }
                 };
             }
 
             async function loadTab1Data() {
                 const interval = timeframeSelect.value;
-                statusEl.innerText = `Cargando datos (${interval})...`;
-                statusEl.style.display = "block";
-
-                try {
-                    currentCandleData1 = await fetchKlines('BTCUSDT', interval, 500);
-                    series1.setData(currentCandleData1);
-                    await renderSRVisuals(currentCandleData1);
-                    await updateWhaleDashboard();
-                    startCandleTimer(interval);
-                    connectWebSocket1(interval);
-                } catch (e) {
-                    console.error("Error cargando Tab 1:", e);
-                }
+                currentCandleData1 = await fetchKlines('BTCUSDT', interval, 300);
+                series1.setData(currentCandleData1);
+                renderSRVisuals1();
+                connectWebSocket1(interval);
             }
 
             timeframeSelect.addEventListener("change", loadTab1Data);
 
-            function setupToggleButton(btn, getVal, setVal, callback) {
-                btn.addEventListener("click", () => {
-                    setVal(!getVal());
-                    btn.classList.toggle("active", getVal());
-                    btn.classList.toggle("inactive", !getVal());
-                    if (callback) callback();
-                    else renderSRVisuals(currentCandleData1);
-                });
-            }
-
-            setupToggleButton(btnPivots, () => showPivots, v => showPivots = v);
-            setupToggleButton(btnPivotsTf, () => showPivotsTf, v => showPivotsTf = v);
-            setupToggleButton(btnVsa, () => showVsa, v => showVsa = v);
-            setupToggleButton(btnSupertrend, () => showSupertrend, v => showSupertrend = v);
-            setupToggleButton(btnFootprint, () => showFootprint, v => showFootprint = v);
-            setupToggleButton(btnMultiFp, () => showMultiFootprint, v => showMultiFootprint = v);
-
-            // ==========================================
-            // LÓGICA PESTAÑA 2: CRL AUTOMATED SYSTEM (CON VSA, PIVOTES Y SUPERTREND)
-            // ==========================================
+            // PESTAÑA 2 REAL-TIME ENHANCED LOGIC (CRL SYSTEM)
             const crlChartDom = document.getElementById("crl-chart-container");
             const selectHTF = document.getElementById("tf-htf");
             const selectLTF = document.getElementById("tf-ltf");
@@ -844,6 +461,7 @@
             const crlBtnSupertrend = document.getElementById("crl-toggle-supertrend");
 
             let crlShowPivots = true, crlShowPivotsTf = true, crlShowVsa = true, crlShowSupertrend = true;
+            let wsConnection2 = null;
 
             const boxDecision = document.getElementById("auto-decision-box");
             const txtAction = document.getElementById("dec-action");
@@ -854,14 +472,10 @@
                 height: crlChartDom.clientHeight,
                 layout: { background: { type: 'solid', color: '#0d1117' }, textColor: '#c9d1d9' },
                 grid: { vertLines: { color: '#21262d' }, horzLines: { color: '#21262d' } },
-                timeScale: { borderColor: '#30363d', timeVisible: true }
+                timeScale: { borderColor: '#30363d', timeVisible: true, secondsVisible: true }
             });
 
-            const series2 = chart2.addCandlestickSeries({
-                upColor: '#26a69a', downColor: '#ef5350',
-                borderUpColor: '#26a69a', borderDownColor: '#ef5350',
-                wickUpColor: '#26a69a', wickDownColor: '#ef5350'
-            });
+            const series2 = chart2.addCandlestickSeries({ upColor: '#26a69a', downColor: '#ef5350' });
 
             let activePriceLines2 = [];
             let currentHigh = 0, currentLow = 0, currentEQ = 0;
@@ -870,7 +484,6 @@
             async function updateHTFLevels() {
                 const htfVal = selectHTF.value;
                 document.getElementById('htf-name-label').innerText = `${htfVal.toUpperCase()} - HTF CANDLE`;
-
                 const htfData = await fetchKlines('BTCUSDT', htfVal, 5);
                 if (htfData.length < 2) return;
 
@@ -888,39 +501,12 @@
                 activePriceLines2.forEach(line => series2.removePriceLine(line));
                 activePriceLines2 = [];
 
-                // 1. Añadir siempre los niveles clave HTF de CRL
                 activePriceLines2.push(series2.createPriceLine({ price: currentHigh, color: '#ff5252', lineWidth: 2, lineStyle: 2, title: 'BSL' }));
                 activePriceLines2.push(series2.createPriceLine({ price: currentEQ, color: '#ffb300', lineWidth: 1, lineStyle: 0, title: '50% EQ' }));
                 activePriceLines2.push(series2.createPriceLine({ price: currentLow, color: '#00e676', lineWidth: 2, lineStyle: 2, title: 'SSL' }));
 
-                // 2. Añadir Pivotes Multi-TF en CRL si está activo
-                if (crlShowPivots) {
-                    try {
-                        const [raw4h, raw1d] = await Promise.all([
-                            fetchKlines('BTCUSDT', '4h', 200),
-                            fetchKlines('BTCUSDT', '1d', 200)
-                        ]);
-                        const pivots4h = calculatePivots(raw4h, 15, 15);
-                        const pivots1d = calculatePivots(raw1d, 15, 15);
-
-                        if (pivots1d.pivotHigh) activePriceLines2.push(series2.createPriceLine({ price: pivots1d.pivotHigh.high, color: '#ff1744', title: '[ 1D RESISTENCIA ]', lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Solid }));
-                        if (pivots1d.pivotLow) activePriceLines2.push(series2.createPriceLine({ price: pivots1d.pivotLow.low, color: '#00e676', title: '[ 1D SOPORTE ]', lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Solid }));
-                        if (pivots4h.pivotHigh) activePriceLines2.push(series2.createPriceLine({ price: pivots4h.pivotHigh.high, color: '#ff9100', title: '[ 4H RESISTENCIA ]', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed }));
-                        if (pivots4h.pivotLow) activePriceLines2.push(series2.createPriceLine({ price: pivots4h.pivotLow.low, color: '#2962ff', title: '[ 4H SOPORTE ]', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed }));
-                    } catch(e) { console.error("Error cargando pivotes en CRL:", e); }
-                }
-
-                // 3. Añadir Pivotes LTF en CRL
-                if (crlShowPivotsTf && currentLtfData2.length > 0) {
-                    const ltfPivots = calculatePivots(currentLtfData2, 10, 10);
-                    const label = selectLTF.value.toUpperCase();
-                    if (ltfPivots.pivotHigh) activePriceLines2.push(series2.createPriceLine({ price: ltfPivots.pivotHigh.high, color: '#e040fb', title: `[ ${label} RESISTENCIA ]`, lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dotted }));
-                    if (ltfPivots.pivotLow) activePriceLines2.push(series2.createPriceLine({ price: ltfPivots.pivotLow.low, color: '#00e5ff', title: `[ ${label} SOPORTE ]`, lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dotted }));
-                }
-
                 let allMarkers = [];
 
-                // 4. Añadir VSA Ballenas en CRL
                 if (crlShowVsa && currentLtfData2.length > 0) {
                     const { markers: whaleMarkers, buyPrices, sellPrices } = processWhaleData(currentLtfData2);
                     allMarkers = allMarkers.concat(whaleMarkers);
@@ -935,15 +521,12 @@
                     }
                 }
 
-                // 5. Añadir Supertrend en CRL
                 if (crlShowSupertrend && currentLtfData2.length > 0) {
                     allMarkers = allMarkers.concat(getSupertrendMarkers(currentLtfData2));
                 }
 
-                // 6. Evaluar Señal de Trading CRL Automática
                 if (currentLtfData2.length > 0) {
                     const lastBar = currentLtfData2[currentLtfData2.length - 1];
-
                     if (lastBar.low < currentLow && lastBar.close > currentLow) {
                         boxDecision.className = "state-buy";
                         txtAction.innerText = "🚀 ENTRAR EN COMPRA (LONG)";
@@ -969,12 +552,45 @@
                 series2.setMarkers(allMarkers);
             }
 
+            function connectWebSocketCRL(ltfInterval) {
+                if (wsConnection2) wsConnection2.close();
+                wsConnection2 = new WebSocket(`wss://stream.binance.com:9443/ws/btcusdt@kline_${ltfInterval}`);
+                wsConnection2.onmessage = (event) => {
+                    const msg = JSON.parse(event.data);
+                    if (msg.e === "kline") {
+                        const k = msg.k;
+                        const candle = { time: Math.floor(k.t / 1000), open: parseFloat(k.o), high: parseFloat(k.h), low: parseFloat(k.l), close: parseFloat(k.c), volume: parseFloat(k.v) };
+                        series2.update(candle);
+                        
+                        if (currentLtfData2.length > 0) {
+                            const lastIdx = currentLtfData2.length - 1;
+                            if (currentLtfData2[lastIdx].time === candle.time) {
+                                currentLtfData2[lastIdx] = candle;
+                            } else {
+                                currentLtfData2.push(candle);
+                            }
+                        }
+                        renderCrlVisuals();
+                    }
+                };
+            }
+
             async function loadCrlData() {
                 const ltfVal = selectLTF.value;
                 currentLtfData2 = await fetchKlines('BTCUSDT', ltfVal, 300);
                 series2.setData(currentLtfData2);
                 await updateHTFLevels();
                 await renderCrlVisuals();
+                connectWebSocketCRL(ltfVal);
+            }
+
+            function setupToggleButton(btn, getVal, setVal, callback) {
+                btn.addEventListener("click", () => {
+                    setVal(!getVal());
+                    btn.classList.toggle("active", getVal());
+                    btn.classList.toggle("inactive", !getVal());
+                    if (callback) callback();
+                });
             }
 
             setupToggleButton(crlBtnPivots, () => crlShowPivots, v => crlShowPivots = v, renderCrlVisuals);
@@ -990,7 +606,6 @@
                 chart2.applyOptions({ width: crlChartDom.clientWidth, height: crlChartDom.clientHeight });
             });
 
-            // Inicializar Tab 1 al abrir
             loadTab1Data();
         });
     </script>
