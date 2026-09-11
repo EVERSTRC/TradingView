@@ -41,6 +41,19 @@
         #chart-wrapper { flex: 1; width: 100%; height: 100%; position: relative; }
         #chart { width: 100%; height: 100%; }
 
+        #candle-dashboard {
+            position: absolute; top: 16px; left: 16px; z-index: 8; background: rgba(26, 30, 41, 0.90);
+            backdrop-filter: blur(8px); border: 1px solid #2a2e39; border-radius: 8px; padding: 12px 16px;
+            display: flex; flex-direction: column; gap: 8px; min-width: 270px; box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+        }
+        .dash-module { display: flex; flex-direction: column; gap: 8px; }
+        .dash-row { display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 600; }
+        .dash-label { color: #787b86; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px; }
+        .dash-value { font-family: monospace; font-size: 13px; }
+        .dash-divider { height: 1px; background-color: #2a2e39; margin: 2px 0; }
+        .progress-bar-bg { width: 100%; height: 4px; background-color: #2a2e39; border-radius: 2px; overflow: hidden; }
+        .progress-bar-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #2962ff, #00e5ff); transition: width 0.3s ease; }
+
         #workspace-crl { flex: 1; display: flex; width: 100%; height: 100%; position: relative; overflow: hidden; }
         #htf-draw-panel { width: 220px; background-color: #161b22; border-right: 2px solid #30363d; display: flex; flex-direction: column; align-items: center; padding: 15px 10px; position: relative; z-index: 5; }
         .panel-title { font-size: 12px; font-weight: 700; color: #8b949e; text-transform: uppercase; margin-bottom: 10px; }
@@ -73,17 +86,28 @@
             </div>
             
             <div id="controls-tab-footprint" class="controls-container">
+                <button id="toggle-pivots" class="btn-fp active">📍 Pivotes Multi-TF</button>
+                <button id="toggle-pivots-tf" class="btn-fp active">📍 Pivotes Dinámicos TF</button>
                 <button id="toggle-vsa" class="btn-fp active">🐋 VSA Ballenas</button>
                 <button id="toggle-supertrend" class="btn-fp active">📈 Supertrend</button>
+                <button id="toggle-footprint" class="btn-fp active">👣 Footprint POC</button>
+                <button id="toggle-multi-fp" class="btn-fp">🌐 Multi-FP</button>
+                
                 <select id="timeframe">
+                    <option value="1s">1 Segundo</option>
                     <option value="1m">1 Minuto</option>
+                    <option value="3m">3 Minutos</option>
                     <option value="5m" selected>5 Minutos</option>
                     <option value="15m">15 Minutos</option>
                     <option value="1h">1 Hora</option>
+                    <option value="4h">4 Horas</option>
+                    <option value="1d">1 Día</option>
                 </select>
             </div>
 
             <div id="controls-tab-crl" class="controls-container" style="display: none;">
+                <button id="crl-toggle-pivots" class="btn-fp active">📍 Pivotes Multi-TF</button>
+                <button id="crl-toggle-pivots-tf" class="btn-fp active">📍 Pivotes LTF</button>
                 <button id="crl-toggle-vsa" class="btn-fp active">🐋 VSA Ballenas</button>
                 <button id="crl-toggle-supertrend" class="btn-fp active">📈 Supertrend</button>
                 <select id="tf-htf">
@@ -98,7 +122,63 @@
         </div>
 
         <div id="view-footprint" class="tab-content active-view">
-            <div id="chart-wrapper"><div id="chart"></div></div>
+            <div id="chart-wrapper">
+                <div id="candle-dashboard">
+                    <div class="dash-row">
+                        <span class="dash-label">Cierre de Vela</span>
+                        <span id="timer-display" class="dash-value" style="color: #00e5ff;">00:00</span>
+                    </div>
+                    <div class="progress-bar-bg">
+                        <div id="timer-progress" class="progress-bar-fill"></div>
+                    </div>
+
+                    <div id="dash-module-footprint" class="dash-module">
+                        <div class="dash-divider"></div>
+                        <div class="dash-row">
+                            <span class="dash-label">Sesgo Mercado</span>
+                            <span id="dash-bias" class="dash-value">--</span>
+                        </div>
+                        <div class="dash-row">
+                            <span class="dash-label">Punto de Entrada</span>
+                            <span id="dash-entry" class="dash-value" style="color: #00e5ff;">--</span>
+                        </div>
+                        <div class="dash-row">
+                            <span class="dash-label">Take Profit</span>
+                            <span id="dash-tp" class="dash-value" style="color: #00e676;">--</span>
+                        </div>
+                        <div class="dash-row">
+                            <span class="dash-label">Stop Loss</span>
+                            <span id="dash-sl" class="dash-value" style="color: #ff5252;">--</span>
+                        </div>
+                    </div>
+
+                    <div id="dash-module-pivots-tf" class="dash-module">
+                        <div class="dash-divider"></div>
+                        <div class="dash-row">
+                            <span id="dash-pivot-tf-res-label" class="dash-label">Resistencia TF</span>
+                            <span id="dash-pivot-tf-res" class="dash-value" style="color: #ff5252;">--</span>
+                        </div>
+                        <div class="dash-row">
+                            <span id="dash-pivot-tf-sup-label" class="dash-label">Soporte TF</span>
+                            <span id="dash-pivot-tf-sup" class="dash-value" style="color: #00e676;">--</span>
+                        </div>
+                    </div>
+
+                    <div id="dash-module-vsa" class="dash-module">
+                        <div class="dash-divider"></div>
+                        <div class="dash-row">
+                            <span class="dash-label">Prom. Compra Ballenas</span>
+                            <span id="dash-whale-buy-avg" class="dash-value" style="color: #00e5ff;">--</span>
+                        </div>
+                        <div class="dash-row">
+                            <span class="dash-label">Prom. Venta Ballenas</span>
+                            <span id="dash-whale-sell-avg" class="dash-value" style="color: #ff5252;">--</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="chart"></div>
+            </div>
         </div>
 
         <div id="view-crl" class="tab-content">
@@ -108,6 +188,7 @@
                     <svg id="htf-svg" viewBox="0 0 160 400">
                         <line x1="80" y1="40" x2="80" y2="360" stroke="#2962ff" stroke-width="3" />
                         <rect x="40" y="100" width="80" height="180" fill="#2962ff" stroke="#2962ff" stroke-width="2" rx="3" />
+
                         <line x1="10" y1="40" x2="150" y2="40" stroke="#ff5252" stroke-width="1.5" stroke-dasharray="4,4" />
                         <text x="15" y="32" fill="#ff5252" font-size="11" font-weight="bold">BSL (High)</text>
                         <text id="txt-bsl" x="145" y="32" fill="#ff5252" font-size="10" text-anchor="end">--</text>
@@ -163,7 +244,9 @@
             });
 
             async function fetchKlines(symbol, interval, limit = 300) {
-                const res = await fetch(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`);
+                const is1s = interval === "1s";
+                const endpoint = is1s ? 'uiKlines' : 'klines';
+                const res = await fetch(`https://api.binance.com/api/v3/${endpoint}?symbol=${symbol}&interval=${interval}&limit=${limit}`);
                 const data = await res.json();
                 return data.map(d => ({
                     time: Math.floor(d[0] / 1000), open: parseFloat(d[1]), high: parseFloat(d[2]), low: parseFloat(d[3]), close: parseFloat(d[4]), volume: parseFloat(d[5])
@@ -195,17 +278,85 @@
                 return { markers, buyPrices, sellPrices };
             }
 
-            // PESTAÑA 1 - FOOTPRINT
+            function getSupertrendMarkers(candles, atrPeriods = 14, multiplier = 2.0) {
+                if (!candles || candles.length < atrPeriods + 1) return [];
+                const len = candles.length; const tr = new Float64Array(len);
+                tr[0] = candles[0].high - candles[0].low;
+                for (let i = 1; i < len; i++) {
+                    tr[i] = Math.max(candles[i].high - candles[i].low, Math.abs(candles[i].high - candles[i - 1].close), Math.abs(candles[i].low - candles[i - 1].close));
+                }
+
+                const atr = new Float64Array(len);
+                let sumTR = 0;
+                for (let i = 0; i < atrPeriods; i++) sumTR += tr[i];
+                atr[atrPeriods - 1] = sumTR / atrPeriods;
+                for (let i = atrPeriods; i < len; i++) atr[i] = (atr[i - 1] * (atrPeriods - 1) + tr[i]) / atrPeriods;
+
+                const up = new Float64Array(len); const dn = new Float64Array(len); const trend = new Int32Array(len);
+                let currentTrend = 1;
+
+                for (let i = 0; i < len; i++) {
+                    const src = (candles[i].high + candles[i].low) / 2;
+                    let basicUp = src - (multiplier * atr[i]);
+                    let basicDn = src + (multiplier * atr[i]);
+
+                    if (i === 0) { up[i] = basicUp; dn[i] = basicDn; trend[i] = 1; continue; }
+
+                    up[i] = candles[i - 1].close > up[i - 1] ? Math.max(basicUp, up[i - 1]) : basicUp;
+                    dn[i] = candles[i - 1].close < dn[i - 1] ? Math.min(basicDn, dn[i - 1]) : basicDn;
+
+                    if (trend[i - 1] === -1 && candles[i].close > dn[i - 1]) currentTrend = 1;
+                    else if (trend[i - 1] === 1 && candles[i].close < up[i - 1]) currentTrend = -1;
+                    else currentTrend = trend[i - 1];
+                    trend[i] = currentTrend;
+                }
+
+                const stMarkers = [];
+                for (let i = 1; i < len; i++) {
+                    if (trend[i] === 1 && trend[i - 1] === -1) {
+                        stMarkers.push({ time: candles[i].time, position: 'belowBar', color: '#00e676', shape: 'arrowUp', text: 'Buy' });
+                    } else if (trend[i] === -1 && trend[i - 1] === 1) {
+                        stMarkers.push({ time: candles[i].time, position: 'aboveBar', color: '#ff1744', shape: 'arrowDown', text: 'Sell' });
+                    }
+                }
+                return stMarkers;
+            }
+
+            // PESTAÑA 1 - FOOTPRINT & VSA
             const timeframeSelect = document.getElementById("timeframe");
             const chartContainer1 = document.getElementById("chart");
+
+            const btnPivots = document.getElementById("toggle-pivots");
+            const btnPivotsTf = document.getElementById("toggle-pivots-tf");
+            const btnVsa = document.getElementById("toggle-vsa");
+            const btnSupertrend = document.getElementById("toggle-supertrend");
+            const btnFootprint = document.getElementById("toggle-footprint");
+            const btnMultiFp = document.getElementById("toggle-multi-fp");
+
+            let showPivots = true, showPivotsTf = true, showVsa = true, showSupertrend = true, showFootprint = true, showMultiFp = false;
             let wsConnection1 = null, currentCandleData1 = [];
 
             const chart1 = LightweightCharts.createChart(chartContainer1, {
                 width: chartContainer1.clientWidth, height: chartContainer1.clientHeight,
                 layout: { background: { type: 'solid', color: '#131722' }, textColor: '#d1d4dc' },
-                grid: { vertLines: { color: '#2a2e39' }, horzLines: { color: '#2a2e39' } }
+                grid: { vertLines: { color: 'rgba(42, 46, 57, 0.5)' }, horzLines: { color: 'rgba(42, 46, 57, 0.5)' } }
             });
             const series1 = chart1.addCandlestickSeries({ upColor: '#089981', downColor: '#f23645' });
+
+            function renderTab1Visuals() {
+                let allMarkers = [];
+                if (showVsa) {
+                    const { markers: whaleMarkers, buyPrices, sellPrices } = processWhaleData(currentCandleData1);
+                    allMarkers = allMarkers.concat(whaleMarkers);
+                    if (buyPrices.length > 0) document.getElementById("dash-whale-buy-avg").innerText = `$${(buyPrices.reduce((a,b)=>a+b,0)/buyPrices.length).toFixed(1)}`;
+                    if (sellPrices.length > 0) document.getElementById("dash-whale-sell-avg").innerText = `$${(sellPrices.reduce((a,b)=>a+b,0)/sellPrices.length).toFixed(1)}`;
+                }
+                if (showSupertrend) {
+                    allMarkers = allMarkers.concat(getSupertrendMarkers(currentCandleData1));
+                }
+                allMarkers.sort((a, b) => a.time - b.time);
+                series1.setMarkers(allMarkers);
+            }
 
             function connectWebSocket1(interval) {
                 if (wsConnection1) wsConnection1.close();
@@ -215,6 +366,13 @@
                     const k = JSON.parse(e.data).k;
                     const candle = { time: Math.floor(k.t / 1000), open: parseFloat(k.o), high: parseFloat(k.h), low: parseFloat(k.l), close: parseFloat(k.c), volume: parseFloat(k.v) };
                     series1.update(candle);
+
+                    if (currentCandleData1.length > 0) {
+                        const lastIdx = currentCandleData1.length - 1;
+                        if (currentCandleData1[lastIdx].time === candle.time) currentCandleData1[lastIdx] = candle;
+                        else currentCandleData1.push(candle);
+                    }
+                    renderTab1Visuals();
                 };
             }
 
@@ -222,20 +380,45 @@
                 const interval = timeframeSelect.value;
                 currentCandleData1 = await fetchKlines('BTCUSDT', interval);
                 series1.setData(currentCandleData1);
+                renderTab1Visuals();
                 connectWebSocket1(interval);
             }
+
+            function setupToggle(btn, stateGetter, stateSetter) {
+                btn.addEventListener("click", () => {
+                    stateSetter(!stateGetter());
+                    btn.classList.toggle("active", stateGetter());
+                    btn.classList.toggle("inactive", !stateGetter());
+                    renderTab1Visuals();
+                });
+            }
+
+            setupToggle(btnPivots, () => showPivots, v => showPivots = v);
+            setupToggle(btnPivotsTf, () => showPivotsTf, v => showPivotsTf = v);
+            setupToggle(btnVsa, () => showVsa, v => showVsa = v);
+            setupToggle(btnSupertrend, () => showSupertrend, v => showSupertrend = v);
+            setupToggle(btnFootprint, () => showFootprint, v => showFootprint = v);
+            setupToggle(btnMultiFp, () => showMultiFp, v => showMultiFp = v);
+
             timeframeSelect.addEventListener("change", loadTab1Data);
 
             // PESTAÑA 2 - CRL SYSTEM
             const crlChartDom = document.getElementById("crl-chart-container");
             const selectHTF = document.getElementById("tf-htf");
             const selectLTF = document.getElementById("tf-ltf");
+
+            const crlBtnPivots = document.getElementById("crl-toggle-pivots");
+            const crlBtnPivotsTf = document.getElementById("crl-toggle-pivots-tf");
+            const crlBtnVsa = document.getElementById("crl-toggle-vsa");
+            const crlBtnSupertrend = document.getElementById("crl-toggle-supertrend");
+
+            let crlShowPivots = true, crlShowPivotsTf = true, crlShowVsa = true, crlShowSupertrend = true;
+            let wsConnection2 = null, activePriceLines2 = [], currentLtfData2 = [];
+            let currentHigh = 0, currentLow = 0, currentEQ = 0;
+
             const boxDecision = document.getElementById("auto-decision-box");
             const txtAction = document.getElementById("dec-action");
             const txtReason = document.getElementById("dec-reason");
-
-            let wsConnection2 = null, activePriceLines2 = [], currentLtfData2 = [];
-            let currentHigh = 0, currentLow = 0, currentEQ = 0;
 
             const chart2 = LightweightCharts.createChart(crlChartDom, {
                 width: crlChartDom.clientWidth, height: crlChartDom.clientHeight,
@@ -270,9 +453,17 @@
                     activePriceLines2.push(series2.createPriceLine({ price: currentLow, color: '#00e676', lineWidth: 2, lineStyle: 2, title: 'SSL' }));
                 }
 
+                let allMarkers = [];
+                if (crlShowVsa && currentLtfData2.length > 0) {
+                    const { markers: whaleMarkers } = processWhaleData(currentLtfData2);
+                    allMarkers = allMarkers.concat(whaleMarkers);
+                }
+                if (crlShowSupertrend && currentLtfData2.length > 0) {
+                    allMarkers = allMarkers.concat(getSupertrendMarkers(currentLtfData2));
+                }
+
                 if (currentLtfData2.length > 0) {
                     const lastBar = currentLtfData2[currentLtfData2.length - 1];
-                    const { markers } = processWhaleData(currentLtfData2);
 
                     if (lastBar.low < currentLow && lastBar.close > currentLow) {
                         boxDecision.className = "state-buy";
@@ -287,8 +478,9 @@
                         txtAction.innerText = "⏳ ESPERAR OPORTUNIDAD";
                         txtReason.innerText = "El precio está dentro del rango HTF.";
                     }
-                    series2.setMarkers(markers);
                 }
+                allMarkers.sort((a, b) => a.time - b.time);
+                series2.setMarkers(allMarkers);
             }
 
             function connectWebSocketCRL(ltfInterval) {
@@ -317,6 +509,11 @@
                 renderCrlVisuals();
                 connectWebSocketCRL(ltfVal);
             }
+
+            setupToggle(crlBtnPivots, () => crlShowPivots, v => crlShowPivots = v);
+            setupToggle(crlBtnPivotsTf, () => crlShowPivotsTf, v => crlShowPivotsTf = v);
+            setupToggle(crlBtnVsa, () => crlShowVsa, v => crlShowVsa = v);
+            setupToggle(crlBtnSupertrend, () => crlShowSupertrend, v => crlShowSupertrend = v);
 
             selectHTF.addEventListener('change', loadCrlData);
             selectLTF.addEventListener('change', loadCrlData);
