@@ -175,6 +175,18 @@
                     <div id="timer-progress" class="progress-bar-fill"></div>
                 </div>
 
+                <div id="dash-module-supertrend" class="dash-module">
+                    <div class="dash-divider"></div>
+                    <div class="dash-row">
+                        <span class="dash-label">Señal Supertrend</span>
+                        <span id="dash-st-signal" class="dash-value">--</span>
+                    </div>
+                    <div class="dash-row">
+                        <span class="dash-label">Precio Señal ST</span>
+                        <span id="dash-st-price" class="dash-value" style="color: #ffeb3b;">--</span>
+                    </div>
+                </div>
+
                 <div id="dash-module-footprint" class="dash-module">
                     <div class="dash-divider"></div>
                     <div class="dash-row">
@@ -263,6 +275,7 @@
             const btnFootprint = document.getElementById("toggle-footprint");
             const btnMultiFp = document.getElementById("toggle-multi-fp");
 
+            const modSupertrend = document.getElementById("dash-module-supertrend");
             const modFootprint = document.getElementById("dash-module-footprint");
             const modPivots = document.getElementById("dash-module-pivots");
             const modPivotsTf = document.getElementById("dash-module-pivots-tf");
@@ -277,6 +290,10 @@
 
             const timerDisplay = document.getElementById("timer-display");
             const timerProgress = document.getElementById("timer-progress");
+            
+            const dashStSignal = document.getElementById("dash-st-signal");
+            const dashStPrice = document.getElementById("dash-st-price");
+
             const dashBias = document.getElementById("dash-bias");
             const dashTarget = document.getElementById("dash-target");
             const dashInvalid = document.getElementById("dash-invalid");
@@ -320,6 +337,7 @@
             });
 
             function updateDashboardModulesVisibility() {
+                modSupertrend.style.display = showSupertrend ? "flex" : "none";
                 modFootprint.style.display = showFootprint ? "flex" : "none";
                 modPivots.style.display = showPivots ? "flex" : "none";
                 modPivotsTf.style.display = showPivotsTf ? "flex" : "none";
@@ -528,7 +546,7 @@
             }
 
             function getSupertrendMarkers(candles, atrPeriods = 14, multiplier = 2.0, stopLossVal = 2.0) {
-                if (!candles || candles.length < atrPeriods + 1) return [];
+                if (!candles || candles.length < atrPeriods + 1) return { stMarkers: [], lastSignal: null };
 
                 const len = candles.length;
                 const tr = new Float64Array(len);
@@ -593,6 +611,7 @@
                 let pos = 0;
                 let entryOfLong = 0;
                 let entryOfShort = 0;
+                let lastSignal = null;
 
                 const sl = stopLossVal > 0 ? stopLossVal / 100 : 99999;
 
@@ -632,6 +651,7 @@
                             shape: 'arrowUp',
                             text: 'Buy'
                         });
+                        lastSignal = { type: 'BUY', price: candles[i].close };
                     } else if (shortCond) {
                         stMarkers.push({
                             time: candles[i].time,
@@ -640,10 +660,11 @@
                             shape: 'arrowDown',
                             text: 'Sell'
                         });
+                        lastSignal = { type: 'SELL', price: candles[i].close };
                     }
                 }
 
-                return stMarkers;
+                return { stMarkers, lastSignal };
             }
 
             function calculatePivots(candles, leftBars = 15, rightBars = 15) {
@@ -883,7 +904,23 @@
 
                     let stMarkers = [];
                     if (showSupertrend) {
-                        stMarkers = getSupertrendMarkers(currentFormattedData, 14, 2.0, 2.0);
+                        const { stMarkers: calculatedMarkers, lastSignal } = getSupertrendMarkers(currentFormattedData, 14, 2.0, 2.0);
+                        stMarkers = calculatedMarkers;
+
+                        if (lastSignal) {
+                            if (lastSignal.type === 'BUY') {
+                                dashStSignal.innerText = "COMPRA (BUY) 🟢";
+                                dashStSignal.style.color = "#00e676";
+                            } else {
+                                dashStSignal.innerText = "VENTA (SELL) 🔴";
+                                dashStSignal.style.color = "#ff1744";
+                            }
+                            dashStPrice.innerText = `$${lastSignal.price.toFixed(2)}`;
+                        } else {
+                            dashStSignal.innerText = "SIN SEÑAL";
+                            dashStSignal.style.color = "#d1d4dc";
+                            dashStPrice.innerText = "--";
+                        }
                     }
 
                     const allMarkers = [...whaleMarkers, ...stMarkers].sort((a, b) => a.time - b.time);
