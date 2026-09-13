@@ -10,7 +10,6 @@
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #131722; color: #d1d4dc; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
         
-        /* Barra Superior */
         #top-bar { display: flex; align-items: center; justify-content: space-between; padding: 6px 14px; background-color: #1e222d; border-bottom: 1px solid #2a2e39; flex-shrink: 0; }
         .controls-group { display: flex; align-items: center; gap: 8px; }
         label { font-size: 12px; color: #787b86; }
@@ -21,11 +20,9 @@
         
         #status { font-size: 11px; color: #2962ff; font-weight: bold; }
         
-        /* Contenedor Principal */
         #main-container { display: flex; flex: 1; position: relative; overflow: hidden; width: 100%; height: 100%; }
         #chart { flex: 1; height: 100%; width: 100%; min-width: 0; min-height: 0; position: relative; }
         
-        /* Dashboard Lateral Compacto */
         #dashboard { 
             width: 270px; 
             background-color: #1e222d; 
@@ -59,18 +56,14 @@
         .dash-row { display: flex; justify-content: space-between; font-size: 11px; align-items: center; }
         .dash-val { font-weight: bold; }
         
-        /* Tabla VSA Volumen */
         .vsa-table { width: 100%; border-collapse: collapse; font-size: 10px; margin-top: 2px; }
         .vsa-table th { text-align: left; color: #787b86; padding: 2px 0; font-weight: normal; border-bottom: 1px solid #2a2e39; }
         .vsa-table td { padding: 3px 0; text-align: right; }
         .vsa-table td:first-child { text-align: left; }
-        .vsa-table th:last-child, .vsa-table td:last-child { text-align: right; }
         
-        /* Barra de Progreso y Timer */
         #timer-progress-container { width: 100%; height: 3px; background-color: #2a2e39; border-radius: 2px; overflow: hidden; margin-top: 2px; }
         #timer-progress { height: 100%; width: 0%; background-color: #2962ff; transition: width 1s linear; }
         
-        /* Badge VSA */
         .vsa-badge { padding: 1px 3px; border-radius: 2px; font-size: 8px; font-weight: bold; text-transform: uppercase; display: inline-block; text-align: center; }
         .vsa-buy { background-color: rgba(0, 230, 118, 0.2); color: #00e676; border: 1px solid #00e676; }
         .vsa-sell { background-color: rgba(255, 23, 68, 0.2); color: #ff1744; border: 1px solid #ff1744; }
@@ -127,7 +120,6 @@
                 </div>
             </div>
 
-            <!-- Módulo VSA MTF -->
             <div id="dash-module-vsa" class="dash-module">
                 <h4>S/R VSA Ballenas % Vol MTF</h4>
                 <table class="vsa-table">
@@ -262,9 +254,14 @@
             rightPriceScale: { autoScale: true }
         });
 
-        const candlestickSeries = chart.addCandlestickSeries 
-            ? chart.addCandlestickSeries({ upColor: '#089981', downColor: '#f23645', borderVisible: false, wickUpColor: '#089981', wickDownColor: '#f23645' })
-            : chart.addSeries(LightweightCharts.CandlestickSeries, { upColor: '#089981', downColor: '#f23645', borderVisible: false, wickUpColor: '#089981', wickDownColor: '#f23645' });
+        const candlestickSeries = chart.addSeries 
+            ? chart.addSeries(LightweightCharts.CandlestickSeries, { upColor: '#089981', downColor: '#f23645', borderVisible: false, wickUpColor: '#089981', wickDownColor: '#f23645' })
+            : chart.addCandlestickSeries({ upColor: '#089981', downColor: '#f23645', borderVisible: false, wickUpColor: '#089981', wickDownColor: '#f23645' });
+
+        // Serie superpuesta de línea continua para el Poc Footprint en vivo
+        const pocLineSeries = chart.addSeries 
+            ? chart.addSeries(LightweightCharts.LineSeries, { color: '#b388ff', lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Solid, crosshairMarkerVisible: true })
+            : chart.addLineSeries({ color: '#b388ff', lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Solid, crosshairMarkerVisible: true });
 
         const resizeObserver = new ResizeObserver(entries => {
             if (!entries || entries.length === 0) return;
@@ -286,27 +283,9 @@
             activePriceLines = [];
         }
 
-        function calculateFootprintPOC(candles, lookback = 30) {
-            if (!candles || candles.length === 0) return null;
-            const recent = candles.slice(-lookback);
-            const volumeMap = {};
-
-            recent.forEach(c => {
-                const typicalPrice = (Math.floor((c.high + c.low + c.close) / 10) * 10);
-                volumeMap[typicalPrice] = (volumeMap[typicalPrice] || 0) + (c.volume || 1);
-            });
-
-            let pocPrice = null;
-            let maxVol = 0;
-
-            for (const price in volumeMap) {
-                if (volumeMap[price] > maxVol) {
-                    maxVol = volumeMap[price];
-                    pocPrice = parseFloat(price);
-                }
-            }
-
-            return pocPrice;
+        function calculateCandlePOC(candle) {
+            // Estima el centro neurálgico del volumen dentro del rango de la vela (High, Low, Close, Open)
+            return (candle.high + candle.low + (candle.close * 2)) / 4;
         }
 
         function updateRealtimeAnalysis(lastClosePrice) {
@@ -610,14 +589,16 @@
                 }
             }
 
-            // Calculo para "Footprint POC"
+            // Dibuja la línea POC paso a paso sobre el gráfico por cada vela
             if (showFootprint) {
-                currentFootprintRes = calculateFootprintPOC(currentCandleData, 40);
-                if (currentFootprintRes) {
-                    activePriceLines.push(candlestickSeries.createPriceLine({
-                        price: currentFootprintRes, color: '#b388ff', lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Solid, title: 'POC Footprint'
-                    }));
-                }
+                const pocData = currentCandleData.map(c => ({
+                    time: c.time,
+                    value: calculateCandlePOC(c)
+                }));
+                pocLineSeries.setData(pocData);
+                currentFootprintRes = pocData[pocData.length - 1].value;
+            } else {
+                pocLineSeries.setData([]);
             }
 
             if (showVsa) {
@@ -636,7 +617,6 @@
                 }
             }
 
-            // Calculo para "Pivots" (Objetivo Principal)
             if (showPivots) {
                 const { pivotHigh, pivotLow } = calculatePivots(currentCandleData, 20, 20);
                 if (pivotHigh) {
@@ -652,7 +632,6 @@
                 }
             }
 
-            // Calculo para "Pivots TF" (Rango Estructura)
             if (showPivotsTf) {
                 const { pivotHigh, pivotLow } = calculatePivots(currentCandleData, 10, 10);
                 if (pivotHigh) {
@@ -700,6 +679,13 @@
                 };
 
                 candlestickSeries.update(updatedCandle);
+
+                if (showFootprint) {
+                    const candlePoc = calculateCandlePOC(updatedCandle);
+                    pocLineSeries.update({ time: updatedCandle.time, value: candlePoc });
+                    currentFootprintRes = candlePoc;
+                }
+
                 updateRealtimeAnalysis(updatedCandle.close);
 
                 if (statusEl.style.display !== "none") {
