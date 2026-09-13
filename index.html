@@ -371,7 +371,6 @@
             timerInterval = setInterval(updateTimer, 1000);
         }
 
-        // Algoritmo VSA Ballenas
         function processWhaleVSA(candles) {
             const markers = [];
             let lastWhaleBuyPrice = null;
@@ -607,7 +606,15 @@
                     updateRealtimeAnalysis(currentCandleData[currentCandleData.length - 1].close);
                 }
 
-                chart.timeScale().fitContent();
+                // CORRECCIÓN DE ENFOQUE Y ZOOM AL CAMBIAR DE TIMEFRAME:
+                // Muestra únicamente las últimas 60 velas en pantalla con un margen limpio a la derecha
+                const totalBars = currentCandleData.length;
+                chart.priceScale('right').resetPriceScale();
+                chart.timeScale().setVisibleLogicalRange({
+                    from: totalBars - 60,
+                    to: totalBars + 5
+                });
+
                 statusEl.style.display = "none";
                 connectWebSocket(selectedInterval);
             } catch (err) {
