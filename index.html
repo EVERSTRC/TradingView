@@ -96,6 +96,8 @@
                 <option value="1h">1 Hour</option>
                 <option value="4h">4 Hours</option>
                 <option value="1d">1 Day</option>
+                <option value="1w">1 Week</option>
+                <option value="1M">1 Month</option>
             </select>
             <div id="status">Iniciando...</div>
         </div>
@@ -333,6 +335,8 @@
             if (unit === 'm') return val * 60;
             if (unit === 'h') return val * 3600;
             if (unit === 'd') return val * 86400;
+            if (unit === 'w') return val * 604800;
+            if (unit === 'M') return val * 2592000;
             return 60;
         }
 
@@ -344,13 +348,18 @@
                 const nowSecs = Math.floor(Date.now() / 1000);
                 const elapsed = nowSecs % intervalSecs;
                 const remaining = intervalSecs - elapsed;
-                const mins = Math.floor(remaining / 60);
+                
+                const days = Math.floor(remaining / 86400);
+                const hours = Math.floor((remaining % 86400) / 3600);
+                const mins = Math.floor((remaining % 3600) / 60);
                 const secs = remaining % 60;
 
                 if (intervalSecs < 60) {
                     timerDisplay.innerText = `${remaining}s`;
-                } else if (mins >= 60) {
-                    timerDisplay.innerText = `${Math.floor(mins / 60)}h ${(mins % 60).toString().padStart(2, '0')}m`;
+                } else if (days > 0) {
+                    timerDisplay.innerText = `${days}d ${hours}h`;
+                } else if (hours > 0) {
+                    timerDisplay.innerText = `${hours}h ${mins.toString().padStart(2, '0')}m`;
                 } else {
                     timerDisplay.innerText = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
                 }
