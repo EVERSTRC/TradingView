@@ -27,7 +27,7 @@
         
         /* Dashboard Lateral Compacto */
         #dashboard { 
-            width: 240px; 
+            width: 270px; 
             background-color: #1e222d; 
             border-left: 1px solid #2a2e39; 
             padding: 8px; 
@@ -59,14 +59,25 @@
         .dash-row { display: flex; justify-content: space-between; font-size: 11px; align-items: center; }
         .dash-val { font-weight: bold; }
         
+        /* Tabla VSA Volumen */
+        .vsa-table { width: 100%; border-collapse: collapse; font-size: 10px; margin-top: 2px; }
+        .vsa-table th { text-align: left; color: #787b86; padding: 2px 0; font-weight: normal; border-bottom: 1px solid #2a2e39; }
+        .vsa-table td { padding: 3px 0; text-align: right; }
+        .vsa-table td:first-child { text-align: left; }
+        .vsa-table th:last-child, .vsa-table td:last-child { text-align: right; }
+        
         /* Barra de Progreso y Timer */
         #timer-progress-container { width: 100%; height: 3px; background-color: #2a2e39; border-radius: 2px; overflow: hidden; margin-top: 2px; }
         #timer-progress { height: 100%; width: 0%; background-color: #2962ff; transition: width 1s linear; }
         
         /* Badge VSA */
-        .vsa-badge { padding: 1px 4px; border-radius: 2px; font-size: 9px; font-weight: bold; text-transform: uppercase; }
+        .vsa-badge { padding: 1px 3px; border-radius: 2px; font-size: 8px; font-weight: bold; text-transform: uppercase; display: inline-block; text-align: center; }
         .vsa-buy { background-color: rgba(0, 230, 118, 0.2); color: #00e676; border: 1px solid #00e676; }
         .vsa-sell { background-color: rgba(255, 23, 68, 0.2); color: #ff1744; border: 1px solid #ff1744; }
+        .vsa-neutral { background-color: rgba(120, 123, 134, 0.2); color: #787b86; border: 1px solid #787b86; }
+        
+        .txt-buy { color: #00e676; font-weight: bold; }
+        .txt-sell { color: #ff1744; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -111,12 +122,28 @@
                 </div>
             </div>
 
+            <!-- Módulo VSA MTF con Porcentajes de Compra/Venta -->
             <div id="dash-module-vsa" class="dash-module">
-                <h4>S/R VSA Ballenas MTF</h4>
-                <div class="dash-row"><span>15m VSA:</span><span id="vsa-tf-15m" class="vsa-badge vsa-buy">BUY</span></div>
-                <div class="dash-row"><span>1h VSA:</span><span id="vsa-tf-1h" class="vsa-badge vsa-buy">BUY</span></div>
-                <div class="dash-row"><span>4h VSA:</span><span id="vsa-tf-4h" class="vsa-badge vsa-sell">SELL</span></div>
-                <div class="dash-row"><span>1d VSA:</span><span id="vsa-tf-1d" class="vsa-badge vsa-buy">BUY</span></div>
+                <h4>S/R VSA Ballenas % Vol MTF</h4>
+                <table class="vsa-table">
+                    <thead>
+                        <tr>
+                            <th>TF</th>
+                            <th>Señal</th>
+                            <th>Vol (K)</th>
+                            <th>% Comp</th>
+                            <th>% Vent</th>
+                        </tr>
+                    </thead>
+                    <tbody id="vsa-mtf-tbody">
+                        <tr><td>15 Min</td><td><span class="vsa-badge vsa-buy">BUY</span></td><td>0.01</td><td class="txt-buy">100%</td><td class="txt-sell">0%</td></tr>
+                        <tr><td>1 Hora</td><td><span class="vsa-badge vsa-buy">BUY</span></td><td>0.01</td><td class="txt-buy">100%</td><td class="txt-sell">0%</td></tr>
+                        <tr><td>4 Horas</td><td><span class="vsa-badge vsa-buy">BUY</span></td><td>0.99</td><td class="txt-buy">100%</td><td class="txt-sell">0%</td></tr>
+                        <tr><td>1 Diario</td><td><span class="vsa-badge vsa-sell">SELL</span></td><td>7.23</td><td class="txt-buy">94.4%</td><td class="txt-sell">5.6%</td></tr>
+                        <tr><td>1 Sem</td><td><span class="vsa-badge vsa-neutral">NEUTRAL</span></td><td>245.5</td><td class="txt-buy">31.8%</td><td class="txt-sell">68.2%</td></tr>
+                        <tr><td>1 Mes</td><td><span class="vsa-badge vsa-neutral">NEUTRAL</span></td><td>264.5</td><td class="txt-buy">21.9%</td><td class="txt-sell">78.1%</td></tr>
+                    </tbody>
+                </table>
             </div>
 
             <div id="dash-module-supertrend" class="dash-module">
@@ -221,7 +248,6 @@
 
         const klineCache = new Map();
 
-        // Inicialización Chart
         const chart = LightweightCharts.createChart(chartContainer, {
             width: chartContainer.clientWidth,
             height: chartContainer.clientHeight,
@@ -333,7 +359,7 @@
             timerInterval = setInterval(updateTimer, 1000);
         }
 
-        // Algoritmo VSA + Señales tipo CÍRCULO para no confundir con Supertrend
+        // Algoritmo VSA Ballenas
         function processWhaleVSA(candles) {
             const markers = [];
             let lastWhaleBuyPrice = null;
@@ -342,6 +368,9 @@
             if (!candles || candles.length < 20) return { markers, lastWhaleBuyPrice, lastWhaleSellPrice };
             
             let rollingVolumeSum = 0;
+            let totalBuyVol = 0;
+            let totalSellVol = 0;
+
             for (let i = 0; i < 20; i++) rollingVolumeSum += (candles[i].volume || 1);
 
             for (let i = 20; i < candles.length; i++) {
@@ -350,13 +379,16 @@
                 const isWhaleVol = (c.volume || 0) > (avgVol * 2.2);
                 rollingVolumeSum += (c.volume || 1) - (candles[i - 20].volume || 1);
 
+                if (c.close >= c.open) totalBuyVol += c.volume;
+                else totalSellVol += c.volume;
+
                 if (isWhaleVol) {
                     if (c.close > c.open) {
                         markers.push({ 
                             time: c.time, 
                             position: 'belowBar', 
                             color: '#00e676', 
-                            shape: 'circle', // Cambiado a círculo
+                            shape: 'circle', 
                             text: 'W-BUY' 
                         });
                         lastWhaleBuyPrice = c.low;
@@ -365,13 +397,27 @@
                             time: c.time, 
                             position: 'aboveBar', 
                             color: '#ff1744', 
-                            shape: 'circle', // Cambiado a círculo
+                            shape: 'circle', 
                             text: 'W-SELL' 
                         });
                         lastWhaleSellPrice = c.high;
                     }
                 }
             }
+
+            // Actualización dinámica de porcentajes en la tabla VSA
+            const totalVol = totalBuyVol + totalSellVol;
+            if (totalVol > 0) {
+                const buyPct = ((totalBuyVol / totalVol) * 100).toFixed(1);
+                const sellPct = ((totalSellVol / totalVol) * 100).toFixed(1);
+                const currentTfRow = document.querySelector('#vsa-mtf-tbody tr:nth-child(2)'); // 1 Horas ref
+                if (currentTfRow) {
+                    currentTfRow.children[2].innerText = (totalVol / 1000).toFixed(2);
+                    currentTfRow.children[3].innerText = `${buyPct}%`;
+                    currentTfRow.children[4].innerText = `${sellPct}%`;
+                }
+            }
+
             return { markers, lastWhaleBuyPrice, lastWhaleSellPrice };
         }
 
