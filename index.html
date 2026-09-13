@@ -4,14 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bitcoin Trading Terminal</title>
-    <!-- Lightweight Charts Library CDN -->
+    <!-- Lightweight Charts Library CDN (v4) -->
     <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #131722; color: #d1d4dc; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
         
         /* Top Navigation Bar */
-        #top-bar { display: flex; align-items: center; justify-content: space-between; padding: 10px 20px; background-color: #1e222d; border-bottom: 1px solid #2a2e39; }
+        #top-bar { display: flex; align-items: center; justify-content: space-between; padding: 10px 20px; background-color: #1e222d; border-bottom: 1px solid #2a2e39; flex-shrink: 0; }
         .controls-group { display: flex; align-items: center; gap: 10px; }
         label { font-size: 14px; color: #787b86; }
         select, button { background-color: #2a2e39; color: #d1d4dc; border: 1px solid #363c4e; padding: 6px 12px; border-radius: 4px; font-size: 13px; cursor: pointer; transition: all 0.2s; }
@@ -22,11 +22,11 @@
         #status { font-size: 12px; color: #2962ff; font-weight: bold; }
         
         /* Main Layout */
-        #main-container { display: flex; flex: 1; position: relative; }
-        #chart { flex: 1; height: 100%; min-width: 0; }
+        #main-container { display: flex; flex: 1; position: relative; overflow: hidden; width: 100%; height: 100%; }
+        #chart { flex: 1; height: 100%; width: 100%; min-width: 0; min-height: 0; position: relative; }
         
         /* Side Dashboard */
-        #dashboard { width: 300px; background-color: #1e222d; border-left: 1px solid #2a2e39; padding: 15px; display: flex; flex-direction: column; gap: 15px; overflow-y: auto; }
+        #dashboard { width: 300px; background-color: #1e222d; border-left: 1px solid #2a2e39; padding: 15px; display: flex; flex-direction: column; gap: 15px; overflow-y: auto; flex-shrink: 0; }
         .dash-module { background-color: #131722; border-radius: 6px; padding: 12px; border: 1px solid #2a2e39; display: flex; flex-direction: column; gap: 8px; }
         .dash-module h4 { font-size: 12px; color: #787b86; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
         .dash-row { display: flex; justify-content: space-between; font-size: 13px; }
@@ -216,24 +216,27 @@
 
         const klineCache = new Map();
 
-        // Inicialización del gráfico con compatibilidad v4
+        // 1. Inicialización del Gráfico
         const chart = LightweightCharts.createChart(chartContainer, {
-            width: chartContainer.clientWidth || 800,
-            height: chartContainer.clientHeight || 600,
+            width: chartContainer.clientWidth,
+            height: chartContainer.clientHeight,
             layout: { background: { type: 'solid', color: '#131722' }, textColor: '#d1d4dc' },
             grid: { vertLines: { color: 'rgba(42, 46, 57, 0.5)' }, horzLines: { color: 'rgba(42, 46, 57, 0.5)' } },
             timeScale: { borderColor: 'rgba(197, 203, 206, 0.8)', timeVisible: true, secondsVisible: true },
             rightPriceScale: { autoScale: true }
         });
 
-        // Verificación de método según la versión de la librería
         const candlestickSeries = chart.addCandlestickSeries 
             ? chart.addCandlestickSeries({ upColor: '#089981', downColor: '#f23645', borderVisible: false, wickUpColor: '#089981', wickDownColor: '#f23645' })
             : chart.addSeries(LightweightCharts.CandlestickSeries, { upColor: '#089981', downColor: '#f23645', borderVisible: false, wickUpColor: '#089981', wickDownColor: '#f23645' });
 
-        window.addEventListener('resize', () => {
-            chart.applyOptions({ width: chartContainer.clientWidth, height: chartContainer.clientHeight });
+        // 2. ResizeObserver: Autoajuste dinámico al 100% de la pantalla sin cortes
+        const resizeObserver = new ResizeObserver(entries => {
+            if (!entries || entries.length === 0) return;
+            const { width, height } = entries[0].contentRect;
+            chart.applyOptions({ width, height });
         });
+        resizeObserver.observe(chartContainer);
 
         function updateDashboardModulesVisibility() {
             modSupertrend.style.display = showSupertrend ? "flex" : "none";
@@ -508,7 +511,6 @@
             return { markers };
         }
 
-        // Petición con respaldo anti-CORS
         async function fetchKlines(interval, limit = 500) {
             const cacheKey = `${interval}_${limit}`;
             const now = Date.now();
@@ -536,7 +538,7 @@
                         break;
                     }
                 } catch (e) {
-                    console.warn(`Falló endpoint ${url}, intentando siguiente...`);
+                    console.warn(`Falló endpoint ${url}, probando siguiente...`);
                 }
             }
 
@@ -611,6 +613,9 @@
                 if (currentCandleData.length > 0) {
                     updateRealtimeAnalysis(currentCandleData[currentCandleData.length - 1].close);
                 }
+
+                // Ajusta la visualización para mostrar todo el contenido cargado correctamente
+                chart.timeScale().fitContent();
 
                 statusEl.style.display = "none";
                 connectWebSocket(selectedInterval);
