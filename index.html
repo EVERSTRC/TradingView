@@ -99,7 +99,7 @@
                 <option value="1w">1 Week</option>
                 <option value="1M">1 Month</option>
             </select>
-            <div id="status">Iniciando...</div>
+            <div id="status">Conectando...</div>
         </div>
 
         <div class="controls-group">
@@ -127,7 +127,7 @@
                 </div>
             </div>
 
-            <!-- Módulo VSA MTF con Porcentajes de Compra/Venta -->
+            <!-- Módulo VSA MTF -->
             <div id="dash-module-vsa" class="dash-module">
                 <h4>S/R VSA Ballenas % Vol MTF</h4>
                 <table class="vsa-table">
@@ -518,9 +518,10 @@
             const apiInterval = is1s ? '1s' : interval;
 
             const urls = [
+                `https://api1.binance.com/api/v3/${endpoint}?symbol=BTCUSDT&interval=${apiInterval}&limit=${limit}`,
+                `https://api3.binance.com/api/v3/${endpoint}?symbol=BTCUSDT&interval=${apiInterval}&limit=${limit}`,
                 `https://api.binance.com/api/v3/${endpoint}?symbol=BTCUSDT&interval=${apiInterval}&limit=${limit}`,
-                `https://data-api.binance.vision/api/v3/${endpoint}?symbol=BTCUSDT&interval=${apiInterval}&limit=${limit}`,
-                `https://corsproxy.io/?https://api.binance.com/api/v3/${endpoint}?symbol=BTCUSDT&interval=${apiInterval}&limit=${limit}`
+                `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://api.binance.com/api/v3/${endpoint}?symbol=BTCUSDT&interval=${apiInterval}&limit=${limit}`)}`
             ];
 
             let data = null;
@@ -529,14 +530,16 @@
                     const res = await fetch(url);
                     if (res.ok) {
                         data = await res.json();
-                        break;
+                        if (data && Array.isArray(data) && data.length > 0) break;
                     }
                 } catch (e) {
-                    console.warn(`Falló endpoint ${url}`);
+                    console.warn(`Falló endpoint: ${url}`);
                 }
             }
 
-            if (!data) throw new Error("Error obteniendo velas de Binance");
+            if (!data || !Array.isArray(data)) {
+                throw new Error("No se pudo obtener el historial via REST.");
+            }
 
             const formatted = data.map(d => ({
                 time: Math.floor(d[0] / 1000), open: parseFloat(d[1]), high: parseFloat(d[2]), low: parseFloat(d[3]), close: parseFloat(d[4]), volume: parseFloat(d[5])
@@ -558,69 +561,70 @@
             try {
                 currentCandleData = await fetchKlines(selectedInterval, 500);
                 candlestickSeries.setData(currentCandleData);
-
-                let allMarkers = [];
-
-                if (showSupertrend) {
-                    const { stMarkers, lastSignal } = getSupertrendMarkers(currentCandleData);
-                    allMarkers = allMarkers.concat(stMarkers);
-                    if (lastSignal) {
-                        dashStSignal.innerText = lastSignal.type;
-                        dashStSignal.style.color = lastSignal.type === "BUY" ? "#00e676" : "#ff5252";
-                        dashStPrice.innerText = `$${lastSignal.price.toFixed(2)}`;
-                    }
-                }
-
-                if (showVsa) {
-                    const { markers: whaleMarkers, lastWhaleBuyPrice, lastWhaleSellPrice } = processWhaleVSA(currentCandleData);
-                    allMarkers = allMarkers.concat(whaleMarkers);
-
-                    if (lastWhaleSellPrice) {
-                        activePriceLines.push(candlestickSeries.createPriceLine({
-                            price: lastWhaleSellPrice, color: '#ff1744', lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Solid, title: 'Res Ballena'
-                        }));
-                    }
-                    if (lastWhaleBuyPrice) {
-                        activePriceLines.push(candlestickSeries.createPriceLine({
-                            price: lastWhaleBuyPrice, color: '#00e676', lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Solid, title: 'Sop Ballena'
-                        }));
-                    }
-                }
-
-                if (showPivotsTf) {
-                    const { pivotHigh, pivotLow } = calculatePivots(currentCandleData);
-                    if (pivotHigh) {
-                        dashPivotTfRes.innerText = `$${pivotHigh.high.toFixed(2)}`;
-                        currentMainTarget = pivotHigh.high;
-                        activePriceLines.push(candlestickSeries.createPriceLine({ price: pivotHigh.high, color: '#ff9100', lineWidth: 1, title: 'Res TF' }));
-                    }
-                    if (pivotLow) {
-                        dashPivotTfSup.innerText = `$${pivotLow.low.toFixed(2)}`;
-                        activePriceLines.push(candlestickSeries.createPriceLine({ price: pivotLow.low, color: '#2979ff', lineWidth: 1, title: 'Sop TF' }));
-                    }
-                }
-
-                allMarkers.sort((a, b) => a.time - b.time);
-                candlestickSeries.setMarkers(allMarkers);
-
-                if (currentCandleData.length > 0) {
-                    updateRealtimeAnalysis(currentCandleData[currentCandleData.length - 1].close);
-                }
-
-                const totalBars = currentCandleData.length;
-                chart.priceScale('right').resetPriceScale();
-                chart.timeScale().setVisibleLogicalRange({
-                    from: totalBars - 60,
-                    to: totalBars + 5
-                });
-
-                statusEl.style.display = "none";
+                processIndicators();
                 connectWebSocket(selectedInterval);
             } catch (err) {
-                console.error(err);
-                statusEl.innerText = "Error API Binance";
-                statusEl.style.color = "#ff5252";
+                console.warn("Fallo REST API, alternando a WebSocket directo.");
+                statusEl.innerText = "Conectando WS...";
+                statusEl.style.color = "#ff9100";
+                connectWebSocket(selectedInterval);
             }
+        }
+
+        function processIndicators() {
+            if (!currentCandleData || currentCandleData.length === 0) return;
+            let allMarkers = [];
+
+            if (showSupertrend) {
+                const { stMarkers, lastSignal } = getSupertrendMarkers(currentCandleData);
+                allMarkers = allMarkers.concat(stMarkers);
+                if (lastSignal) {
+                    dashStSignal.innerText = lastSignal.type;
+                    dashStSignal.style.color = lastSignal.type === "BUY" ? "#00e676" : "#ff5252";
+                    dashStPrice.innerText = `$${lastSignal.price.toFixed(2)}`;
+                }
+            }
+
+            if (showVsa) {
+                const { markers: whaleMarkers, lastWhaleBuyPrice, lastWhaleSellPrice } = processWhaleVSA(currentCandleData);
+                allMarkers = allMarkers.concat(whaleMarkers);
+
+                if (lastWhaleSellPrice) {
+                    activePriceLines.push(candlestickSeries.createPriceLine({
+                        price: lastWhaleSellPrice, color: '#ff1744', lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Solid, title: 'Res Ballena'
+                    }));
+                }
+                if (lastWhaleBuyPrice) {
+                    activePriceLines.push(candlestickSeries.createPriceLine({
+                        price: lastWhaleBuyPrice, color: '#00e676', lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Solid, title: 'Sop Ballena'
+                    }));
+                }
+            }
+
+            if (showPivotsTf) {
+                const { pivotHigh, pivotLow } = calculatePivots(currentCandleData);
+                if (pivotHigh) {
+                    dashPivotTfRes.innerText = `$${pivotHigh.high.toFixed(2)}`;
+                    currentMainTarget = pivotHigh.high;
+                    activePriceLines.push(candlestickSeries.createPriceLine({ price: pivotHigh.high, color: '#ff9100', lineWidth: 1, title: 'Res TF' }));
+                }
+                if (pivotLow) {
+                    dashPivotTfSup.innerText = `$${pivotLow.low.toFixed(2)}`;
+                    activePriceLines.push(candlestickSeries.createPriceLine({ price: pivotLow.low, color: '#2979ff', lineWidth: 1, title: 'Sop TF' }));
+                }
+            }
+
+            allMarkers.sort((a, b) => a.time - b.time);
+            candlestickSeries.setMarkers(allMarkers);
+
+            updateRealtimeAnalysis(currentCandleData[currentCandleData.length - 1].close);
+
+            const totalBars = currentCandleData.length;
+            chart.priceScale('right').resetPriceScale();
+            chart.timeScale().setVisibleLogicalRange({
+                from: totalBars - 60,
+                to: totalBars + 5
+            });
         }
 
         function connectWebSocket(interval) {
@@ -639,6 +643,10 @@
 
                 candlestickSeries.update(updatedCandle);
                 updateRealtimeAnalysis(updatedCandle.close);
+
+                if (statusEl.style.display !== "none") {
+                    statusEl.style.display = "none";
+                }
             };
         }
 
