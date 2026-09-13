@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bitcoin Trading Terminal</title>
+    <title>Bitcoin Trading Terminal - Multi TF Pivots</title>
     <!-- Lightweight Charts Library CDN (v4) -->
     <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
     <style>
@@ -99,7 +99,7 @@
             <button id="toggle-supertrend" class="active">Supertrend</button>
             <button id="toggle-footprint" class="active">Footprint POC</button>
             <button id="toggle-pivots" class="active">Pivots</button>
-            <button id="toggle-pivots-tf" class="active">Pivots TF</button>
+            <button id="toggle-pivots-tf" class="active">Pivots Multi-TF</button>
             <button id="toggle-vsa" class="active">S/R Ballenas (Lux)</button>
             <button id="toggle-multi-fp" class="inactive">Multi-FP</button>
         </div>
@@ -188,15 +188,11 @@
             </div>
 
             <div id="dash-module-pivots-tf" class="dash-module">
-                <h4>Rango Estructura TF</h4>
-                <div class="dash-row">
-                    <span>Resistencia:</span>
-                    <span id="dash-pivot-tf-res" class="dash-val">--</span>
-                </div>
-                <div class="dash-row">
-                    <span>Soporte:</span>
-                    <span id="dash-pivot-tf-sup" class="dash-val">--</span>
-                </div>
+                <h4>Matriz Pivots Multi-TF</h4>
+                <div class="dash-row"><span>R/S 15M:</span><span id="pvt-15m" class="dash-val">--</span></div>
+                <div class="dash-row"><span>R/S 1H:</span><span id="pvt-1h" class="dash-val">--</span></div>
+                <div class="dash-row"><span>R/S 4H:</span><span id="pvt-4h" class="dash-val">--</span></div>
+                <div class="dash-row"><span>R/S 1D:</span><span id="pvt-1d" class="dash-val">--</span></div>
             </div>
         </div>
     </div>
@@ -230,8 +226,6 @@
         const dashBias = document.getElementById("dash-bias");
         const dashTarget = document.getElementById("dash-target");
         const dashInvalid = document.getElementById("dash-invalid");
-        const dashPivotTfRes = document.getElementById("dash-pivot-tf-res");
-        const dashPivotTfSup = document.getElementById("dash-pivot-tf-sup");
         const dashEntry = document.getElementById("dash-entry");
         const dashTp = document.getElementById("dash-tp");
         const dashSl = document.getElementById("dash-sl");
@@ -244,6 +238,14 @@
         let currentMainTarget = null;
 
         const klineCache = new Map();
+
+        // Configuración visual para cada Timeframe
+        const multiTfConfig = [
+            { tf: '15m', colorRes: '#ff9800', colorSup: '#2196f3', label: '15M' },
+            { tf: '1h',  colorRes: '#e91e63', colorSup: '#00bcd4', label: '1H' },
+            { tf: '4h',  colorRes: '#9c27b0', colorSup: '#4caf50', label: '4H' },
+            { tf: '1d',  colorRes: '#ff1744', colorSup: '#00e676', label: '1D' }
+        ];
 
         const chart = LightweightCharts.createChart(chartContainer, {
             width: chartContainer.clientWidth,
@@ -278,15 +280,13 @@
             activePriceLines = [];
         }
 
-        // Algoritmo para obtener soportes y resistencias por Footprint POC (acumulado de volumen)
-        function calculateFootprintSR(candles, lookback = 50) {
+        function calculateFootprintSR(candles, lookback = 60) {
             if (!candles || candles.length === 0) return { resPOC: null, supPOC: null };
             
             const recent = candles.slice(-lookback);
             const currentPrice = candles[candles.length - 1].close;
             const volumeMap = {};
 
-            // Agrupa el volumen en escalones de precio (Ticks)
             recent.forEach(c => {
                 const pocLevel = Math.round(c.close / 5) * 5; 
                 volumeMap[pocLevel] = (volumeMap[pocLevel] || 0) + c.volume;
@@ -300,18 +300,11 @@
                 const vol = volumeMap[priceStr];
 
                 if (price >= currentPrice) {
-                    if (vol > maxResVol) {
-                        maxResVol = vol;
-                        resPOC = price;
-                    }
+                    if (vol > maxResVol) { maxResVol = vol; resPOC = price; }
                 } else {
-                    if (vol > maxSupVol) {
-                        maxSupVol = vol;
-                        supPOC = price;
-                    }
+                    if (vol > maxSupVol) { maxSupVol = vol; supPOC = price; }
                 }
             }
-
             return { resPOC, supPOC };
         }
 
@@ -566,6 +559,47 @@
             return formatted;
         }
 
+        async function processMultiTfPivots() {
+            if (!showPivotsTf) return;
+
+            for (const item of multiTfConfig) {
+                try {
+                    const candles = await fetchKlines(item.tf, 100);
+                    const { pivotHigh, pivotLow } = calculatePivots(candles, 10, 10);
+                    const labelEl = document.getElementById(`pvt-${item.tf}`);
+
+                    let textInfo = "";
+
+                    if (pivotHigh) {
+                        activePriceLines.push(candlestickSeries.createPriceLine({
+                            price: pivotHigh.high,
+                            color: item.colorRes,
+                            lineWidth: 1,
+                            lineStyle: LightweightCharts.LineStyle.Dotted,
+                            title: `Res ${item.label}`
+                        }));
+                        textInfo += `R: $${pivotHigh.high.toFixed(0)} `;
+                    }
+
+                    if (pivotLow) {
+                        activePriceLines.push(candlestickSeries.createPriceLine({
+                            price: pivotLow.low,
+                            color: item.colorSup,
+                            lineWidth: 1,
+                            lineStyle: LightweightCharts.LineStyle.Dotted,
+                            title: `Sop ${item.label}`
+                        }));
+                        textInfo += `S: $${pivotLow.low.toFixed(0)}`;
+                    }
+
+                    if (labelEl) labelEl.innerText = textInfo || "--";
+
+                } catch (e) {
+                    console.warn(`Error procesando Pivots para ${item.tf}:`, e);
+                }
+            }
+        }
+
         async function renderChart() {
             statusEl.style.display = "block";
             statusEl.style.color = "#2962ff";
@@ -578,7 +612,7 @@
             try {
                 currentCandleData = await fetchKlines(selectedInterval, 500);
                 candlestickSeries.setData(currentCandleData);
-                processIndicators();
+                await processIndicators();
                 connectWebSocket(selectedInterval);
             } catch (err) {
                 console.warn("Fallo REST API, alternando a WebSocket directo.");
@@ -588,7 +622,7 @@
             }
         }
 
-        function processIndicators() {
+        async function processIndicators() {
             if (!currentCandleData || currentCandleData.length === 0) return;
             let allMarkers = [];
             currentMainTarget = null;
@@ -604,7 +638,6 @@
                 }
             }
 
-            // Dibuja los niveles S/R del Footprint POC
             if (showFootprint) {
                 const { resPOC, supPOC } = calculateFootprintSR(currentCandleData, 60);
                 
@@ -653,24 +686,8 @@
                 }
             }
 
-            if (showPivotsTf) {
-                const { pivotHigh, pivotLow } = calculatePivots(currentCandleData, 10, 10);
-                if (pivotHigh) {
-                    dashPivotTfRes.innerText = `$${pivotHigh.high.toFixed(2)}`;
-                    activePriceLines.push(candlestickSeries.createPriceLine({ price: pivotHigh.high, color: '#ff9100', lineWidth: 1, title: 'Res TF' }));
-                } else {
-                    dashPivotTfRes.innerText = "--";
-                }
-                if (pivotLow) {
-                    dashPivotTfSup.innerText = `$${pivotLow.low.toFixed(2)}`;
-                    activePriceLines.push(candlestickSeries.createPriceLine({ price: pivotLow.low, color: '#2979ff', lineWidth: 1, title: 'Sop TF' }));
-                } else {
-                    dashPivotTfSup.innerText = "--";
-                }
-            } else {
-                dashPivotTfRes.innerText = "--";
-                dashPivotTfSup.innerText = "--";
-            }
+            // Dibuja los Pivots de MÚLTIPLES temporalidades (15M, 1H, 4H, 1D)
+            await processMultiTfPivots();
 
             allMarkers.sort((a, b) => a.time - b.time);
             candlestickSeries.setMarkers(allMarkers);
@@ -709,13 +726,13 @@
         }
 
         function setupToggleBtn(btn, getVal, setVal) {
-            btn.addEventListener('click', () => {
+            btn.addEventListener('click', async () => {
                 setVal(!getVal());
                 btn.classList.toggle('active', getVal());
                 btn.classList.toggle('inactive', !getVal());
                 updateDashboardModulesVisibility();
                 clearActiveLines();
-                processIndicators();
+                await processIndicators();
             });
         }
 
