@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bitcoin Trading Terminal</title>
-    <!-- Lightweight Charts Library -->
-    <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+    <!-- Lightweight Charts Library CDN -->
+    <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #131722; color: #d1d4dc; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
@@ -23,7 +23,7 @@
         
         /* Main Layout */
         #main-container { display: flex; flex: 1; position: relative; }
-        #chart { flex: 1; height: 100%; }
+        #chart { flex: 1; height: 100%; min-width: 0; }
         
         /* Side Dashboard */
         #dashboard { width: 300px; background-color: #1e222d; border-left: 1px solid #2a2e39; padding: 15px; display: flex; flex-direction: column; gap: 15px; overflow-y: auto; }
@@ -33,14 +33,12 @@
         .dash-val { font-weight: bold; }
         
         /* Timer & Progress Bar */
-        #timer-box { margin-top: 5px; }
         #timer-progress-container { width: 100%; height: 4px; background-color: #2a2e39; border-radius: 2px; overflow: hidden; margin-top: 4px; }
         #timer-progress { height: 100%; width: 0%; background-color: #2962ff; transition: width 1s linear; }
     </style>
 </head>
 <body>
 
-    <!-- Bara Superior -->
     <div id="top-bar">
         <div class="controls-group">
             <label for="timeframe">Timeframe:</label>
@@ -53,7 +51,7 @@
                 <option value="4h">4 Hours</option>
                 <option value="1d">1 Day</option>
             </select>
-            <div id="status">Cargando...</div>
+            <div id="status">Iniciando...</div>
         </div>
 
         <div class="controls-group">
@@ -66,11 +64,9 @@
         </div>
     </div>
 
-    <!-- Áreas Principales -->
     <div id="main-container">
         <div id="chart"></div>
 
-        <!-- Dashboard Latveral -->
         <div id="dashboard">
             <div class="dash-module">
                 <h4>Vela Actual</h4>
@@ -169,7 +165,6 @@
         </div>
     </div>
 
-    <!-- Script Principal -->
     <script>
     document.addEventListener("DOMContentLoaded", function () {
         const statusEl = document.getElementById("status");
@@ -221,18 +216,20 @@
 
         const klineCache = new Map();
 
+        // Inicialización del gráfico con compatibilidad v4
         const chart = LightweightCharts.createChart(chartContainer, {
-            width: chartContainer.clientWidth,
-            height: chartContainer.clientHeight,
+            width: chartContainer.clientWidth || 800,
+            height: chartContainer.clientHeight || 600,
             layout: { background: { type: 'solid', color: '#131722' }, textColor: '#d1d4dc' },
             grid: { vertLines: { color: 'rgba(42, 46, 57, 0.5)' }, horzLines: { color: 'rgba(42, 46, 57, 0.5)' } },
             timeScale: { borderColor: 'rgba(197, 203, 206, 0.8)', timeVisible: true, secondsVisible: true },
             rightPriceScale: { autoScale: true }
         });
 
-        const candlestickSeries = chart.addCandlestickSeries({
-            upColor: '#089981', downColor: '#f23645', borderVisible: false, wickUpColor: '#089981', wickDownColor: '#f23645'
-        });
+        // Verificación de método según la versión de la librería
+        const candlestickSeries = chart.addCandlestickSeries 
+            ? chart.addCandlestickSeries({ upColor: '#089981', downColor: '#f23645', borderVisible: false, wickUpColor: '#089981', wickDownColor: '#f23645' })
+            : chart.addSeries(LightweightCharts.CandlestickSeries, { upColor: '#089981', downColor: '#f23645', borderVisible: false, wickUpColor: '#089981', wickDownColor: '#f23645' });
 
         window.addEventListener('resize', () => {
             chart.applyOptions({ width: chartContainer.clientWidth, height: chartContainer.clientHeight });
@@ -511,6 +508,7 @@
             return { markers };
         }
 
+        // Petición con respaldo anti-CORS
         async function fetchKlines(interval, limit = 500) {
             const cacheKey = `${interval}_${limit}`;
             const now = Date.now();
@@ -524,9 +522,25 @@
             const endpoint = is1s ? 'uiKlines' : 'klines';
             const apiInterval = is1s ? '1s' : interval;
 
-            const res = await fetch(`https://api.binance.com/api/v3/${endpoint}?symbol=BTCUSDT&interval=${apiInterval}&limit=${limit}`);
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            const data = await res.json();
+            const urls = [
+                `https://api.binance.com/api/v3/${endpoint}?symbol=BTCUSDT&interval=${apiInterval}&limit=${limit}`,
+                `https://data-api.binance.vision/api/v3/${endpoint}?symbol=BTCUSDT&interval=${apiInterval}&limit=${limit}`
+            ];
+
+            let data = null;
+            for (const url of urls) {
+                try {
+                    const res = await fetch(url);
+                    if (res.ok) {
+                        data = await res.json();
+                        break;
+                    }
+                } catch (e) {
+                    console.warn(`Falló endpoint ${url}, intentando siguiente...`);
+                }
+            }
+
+            if (!data) throw new Error("No se pudo conectar a la API de Binance");
 
             const formatted = data.map(d => ({
                 time: Math.floor(d[0] / 1000), open: parseFloat(d[1]), high: parseFloat(d[2]), low: parseFloat(d[3]), close: parseFloat(d[4]), volume: parseFloat(d[5])
@@ -538,6 +552,7 @@
 
         async function renderChart() {
             statusEl.style.display = "block";
+            statusEl.style.color = "#2962ff";
             statusEl.innerText = "Cargando datos...";
             clearActiveLines();
 
@@ -601,7 +616,8 @@
                 connectWebSocket(selectedInterval);
             } catch (err) {
                 console.error(err);
-                statusEl.innerText = "Error al cargar datos";
+                statusEl.innerText = "Error de Conexión API";
+                statusEl.style.color = "#ff5252";
             }
         }
 
@@ -622,7 +638,11 @@
                 candlestickSeries.update(updatedCandle);
                 updateRealtimeAnalysis(updatedCandle.close);
             };
-            wsConnection.onerror = () => { statusEl.innerText = "Error WebSocket"; statusEl.style.display = "block"; };
+            wsConnection.onerror = () => { 
+                statusEl.innerText = "Error WebSocket"; 
+                statusEl.style.color = "#ff5252";
+                statusEl.style.display = "block"; 
+            };
         }
 
         function setupToggleBtn(btn, getVal, setVal) {
