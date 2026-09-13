@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bitcoin Trading Terminal - Multi TF Pivots</title>
+    <title>Bitcoin Trading Terminal - Multi TF Pivots & Global Trend</title>
     <!-- Lightweight Charts Library CDN (v4) -->
     <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
     <style>
@@ -24,7 +24,7 @@
         #chart { flex: 1; height: 100%; width: 100%; min-width: 0; min-height: 0; position: relative; }
         
         #dashboard { 
-            width: 270px; 
+            width: 280px; 
             background-color: #1e222d; 
             border-left: 1px solid #2a2e39; 
             padding: 8px; 
@@ -71,6 +71,10 @@
         
         .txt-buy { color: #00e676; font-weight: bold; }
         .txt-sell { color: #ff1744; font-weight: bold; }
+        
+        /* Estilos de barra de puntuación de Tendencia */
+        .trend-bar-bg { width: 100%; height: 6px; background-color: #2a2e39; border-radius: 3px; overflow: hidden; margin: 3px 0; position: relative; }
+        .trend-bar-fill { height: 100%; width: 50%; background-color: #787b86; transition: all 0.5s ease; }
     </style>
 </head>
 <body>
@@ -120,6 +124,26 @@
                 </div>
             </div>
 
+            <!-- MÓDULO NUEVO: TENDENCIA GLOBAL Y DIARIA -->
+            <div id="dash-module-global-trend" class="dash-module" style="border: 1px solid #2962ff;">
+                <h4>Tendencia Global Integrada</h4>
+                <div class="dash-row">
+                    <span>Tendencia TF Actual:</span>
+                    <span id="dash-trend-tf" class="dash-val">--</span>
+                </div>
+                <div class="trend-bar-bg"><div id="trend-bar-tf" class="trend-bar-fill"></div></div>
+
+                <div class="dash-row" style="margin-top: 4px;">
+                    <span>Tendencia del Día (1D):</span>
+                    <span id="dash-trend-day" class="dash-val">--</span>
+                </div>
+                <div class="trend-bar-bg"><div id="trend-bar-day" class="trend-bar-fill"></div></div>
+                <div class="dash-row" style="font-size: 9px; color: #787b86;">
+                    <span>Fuerza / Confluencia:</span>
+                    <span id="dash-trend-score" class="dash-val">0%</span>
+                </div>
+            </div>
+
             <div id="dash-module-vsa" class="dash-module">
                 <h4>S/R VSA Ballenas % Vol MTF</h4>
                 <table class="vsa-table">
@@ -138,7 +162,7 @@
                         <tr><td>4 Horas</td><td><span class="vsa-badge vsa-buy">BUY</span></td><td>0.99</td><td class="txt-buy">100%</td><td class="txt-sell">0%</td></tr>
                         <tr><td>1 Diario</td><td><span class="vsa-badge vsa-sell">SELL</span></td><td>7.23</td><td class="txt-buy">94.4%</td><td class="txt-sell">5.6%</td></tr>
                         <tr><td>1 Sem</td><td><span class="vsa-badge vsa-neutral">NEUTRAL</span></td><td>245.5</td><td class="txt-buy">31.8%</td><td class="txt-sell">68.2%</td></tr>
-                        <tr><td>1 Mes</td><td><span class="vsa-badge vsa-neutral">NEUTRAL</span></td><td>264.5</td><td class="txt-buy">21.9%</td><td class="txt-sell">78.1%</td></tr>
+                        <tr><td>1 Mes</td><td><span class="vsa-badge vsa-neutral">NEUTRAL</span></td><td>21.9%</td><td class="txt-buy">21.9%</td><td class="txt-sell">78.1%</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -216,6 +240,13 @@
         const modPivotsTf = document.getElementById("dash-module-pivots-tf");
         const modVsa = document.getElementById("dash-module-vsa");
 
+        // Elementos de Tendencia Global
+        const dashTrendTf = document.getElementById("dash-trend-tf");
+        const dashTrendDay = document.getElementById("dash-trend-day");
+        const trendBarTf = document.getElementById("trend-bar-tf");
+        const trendBarDay = document.getElementById("trend-bar-day");
+        const dashTrendScore = document.getElementById("dash-trend-score");
+
         let showPivots = true, showPivotsTf = true, showVsa = true;
         let showSupertrend = true, showFootprint = true, showMultiFootprint = false;
 
@@ -236,10 +267,11 @@
         let timerInterval = null;
         let currentFootprintRes = null;
         let currentMainTarget = null;
+        let currentSupertrendSignal = null;
+        let dailyCandlesCache = null;
 
         const klineCache = new Map();
 
-        // Configuración visual para cada Timeframe
         const multiTfConfig = [
             { tf: '15m', colorRes: '#ff9800', colorSup: '#2196f3', label: '15M' },
             { tf: '1h',  colorRes: '#e91e63', colorSup: '#00bcd4', label: '1H' },
@@ -308,6 +340,83 @@
             return { resPOC, supPOC };
         }
 
+        // MOTOR DE CÁLCULO DE TENDENCIA GLOBAL Y DIARIA
+        async function calculateGlobalTrend(lastPrice) {
+            let scoreTF = 0; // -100 (Muy Bajista) a +100 (Muy Alcista)
+            let maxScoreTF = 0;
+
+            // 1. Supertrend del TF actual
+            if (currentSupertrendSignal) {
+                maxScoreTF += 30;
+                scoreTF += currentSupertrendSignal.type === "BUY" ? 30 : -30;
+            }
+
+            // 2. Posición vs POC Footprint
+            if (currentFootprintRes) {
+                maxScoreTF += 30;
+                scoreTF += lastPrice >= currentFootprintRes ? 30 : -30;
+            }
+
+            // 3. Posición vs Pivot Target
+            if (currentMainTarget) {
+                maxScoreTF += 20;
+                scoreTF += lastPrice >= currentMainTarget ? 20 : -20;
+            }
+
+            // 4. Vela actual (Cierre vs Apertura)
+            if (currentCandleData && currentCandleData.length > 0) {
+                maxScoreTF += 20;
+                const lastCandle = currentCandleData[currentCandleData.length - 1];
+                scoreTF += lastCandle.close >= lastCandle.open ? 20 : -20;
+            }
+
+            const pctTF = maxScoreTF > 0 ? (scoreTF / maxScoreTF) * 100 : 0;
+            renderTrendUI(dashTrendTf, trendBarTf, pctTF);
+
+            // CÁLCULO TENDENCIA DEL DÍA (1D)
+            try {
+                if (!dailyCandlesCache) {
+                    dailyCandlesCache = await fetchKlines('1d', 100);
+                }
+                const dailyCandles = dailyCandlesCache;
+                const { lastSignal: dailySt } = getSupertrendMarkers(dailyCandles);
+                const lastDayCandle = dailyCandles[dailyCandles.length - 1];
+
+                let scoreDay = 0;
+                let maxScoreDay = 50;
+
+                if (dailySt) scoreDay += dailySt.type === "BUY" ? 25 : -25;
+                if (lastDayCandle) scoreDay += lastPrice >= lastDayCandle.open ? 25 : -25;
+
+                const pctDay = (scoreDay / maxScoreDay) * 100;
+                renderTrendUI(dashTrendDay, trendBarDay, pctDay);
+
+                const avgConfluence = Math.round((Math.abs(pctTF) + Math.abs(pctDay)) / 2);
+                dashTrendScore.innerText = `${avgConfluence}%`;
+
+            } catch(e) {
+                console.warn("Error evaluando tendencia diaria:", e);
+            }
+        }
+
+        function renderTrendUI(textEl, barEl, pct) {
+            let label = "NEUTRAL ⚖️";
+            let color = "#787b86";
+
+            if (pct >= 40) { label = "ALCISTA 🚀"; color = "#00e676"; }
+            else if (pct > 0) { label = "MOD. ALCISTA ↗️"; color = "#81c784"; }
+            else if (pct <= -40) { label = "BAJISTA 🐻"; color = "#ff1744"; }
+            else if (pct < 0) { label = "MOD. BAJISTA ↘️"; color = "#e57373"; }
+
+            textEl.innerText = label;
+            textEl.style.color = color;
+            barEl.style.backgroundColor = color;
+            
+            // Convertir porcentaje de -100..100 a escala de ancho 0%..100%
+            const fillWidth = Math.min(Math.max(((pct + 100) / 2), 5), 100);
+            barEl.style.width = `${fillWidth}%`;
+        }
+
         function updateRealtimeAnalysis(lastClosePrice) {
             if (!lastClosePrice) return;
             let isBullish = false;
@@ -348,6 +457,8 @@
                 dashTp.innerText = "--";
                 dashSl.innerText = "--";
             }
+
+            calculateGlobalTrend(lastClosePrice);
         }
 
         function getIntervalInSeconds(interval) {
@@ -605,6 +716,7 @@
             statusEl.style.color = "#2962ff";
             statusEl.innerText = "Cargando datos...";
             clearActiveLines();
+            dailyCandlesCache = null;
 
             const selectedInterval = timeframeSelect.value;
             startCandleTimer(selectedInterval);
@@ -627,11 +739,13 @@
             let allMarkers = [];
             currentMainTarget = null;
             currentFootprintRes = null;
+            currentSupertrendSignal = null;
 
             if (showSupertrend) {
                 const { stMarkers, lastSignal } = getSupertrendMarkers(currentCandleData);
                 allMarkers = allMarkers.concat(stMarkers);
                 if (lastSignal) {
+                    currentSupertrendSignal = lastSignal;
                     dashStSignal.innerText = lastSignal.type;
                     dashStSignal.style.color = lastSignal.type === "BUY" ? "#00e676" : "#ff5252";
                     dashStPrice.innerText = `$${lastSignal.price.toFixed(2)}`;
@@ -686,7 +800,6 @@
                 }
             }
 
-            // Dibuja los Pivots de MÚLTIPLES temporalidades (15M, 1H, 4H, 1D)
             await processMultiTfPivots();
 
             allMarkers.sort((a, b) => a.time - b.time);
