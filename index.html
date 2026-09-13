@@ -124,7 +124,7 @@
                 </div>
             </div>
 
-            <!-- MÓDULO NUEVO: TENDENCIA GLOBAL Y DIARIA -->
+            <!-- MÓDULO: TENDENCIA GLOBAL Y DIARIA -->
             <div id="dash-module-global-trend" class="dash-module" style="border: 1px solid #2962ff;">
                 <h4>Tendencia Global Integrada</h4>
                 <div class="dash-row">
@@ -223,6 +223,75 @@
 
     <script>
     document.addEventListener("DOMContentLoaded", function () {
+        // --- CONFIGURACIÓN DE NOTIFICACIONES WHATSAPP ---
+        const WHATSAPP_CONFIG = {
+            enabled: true, // Cambia a false si quieres desactivar WhatsApp
+            phone: "TU_NUMERO_CON_CODIGO_PAIS", // Ej: 34600000000 o 5215500000000 (sin el signo +)
+            apiKey: "TU_API_KEY_CALLMEBOT"     // Inserta la API Key recibida por CallMeBot
+        };
+
+        let lastNotifiedSignalTime = null; // Evita duplicar alertas para la misma vela
+
+        // --- SISTEMA DE AUDIO (Web Audio API) ---
+        function playBeepSound(type) {
+            try {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                if (!AudioContext) return;
+                const ctx = new AudioContext();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+
+                if (type === "BUY") {
+                    osc.frequency.setValueAtTime(800, ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(1200, ctx.currentTime + 0.3);
+                } else {
+                    osc.frequency.setValueAtTime(600, ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(300, ctx.currentTime + 0.3);
+                }
+
+                gain.gain.setValueAtTime(0.3, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+
+                osc.start(ctx.currentTime);
+                osc.stop(ctx.currentTime + 0.3);
+            } catch (e) {
+                console.warn("No se pudo reproducir el audio:", e);
+            }
+        }
+
+        // --- ENVÍO DE MENSAJE A WHATSAPP ---
+        function sendWhatsAppAlert(signalType, price, timeframe) {
+            if (!WHATSAPP_CONFIG.enabled || WHATSAPP_CONFIG.phone.includes("TU_NUMERO")) return;
+
+            const icon = signalType === "BUY" ? "🟢🚀" : "🔴🐻";
+            const message = `*ALERT SUPERTREND BTCUSDT*\n\n` +
+                            `Señal: *${signalType}* ${icon}\n` +
+                            `Precio: *$${price.toFixed(2)}*\n` +
+                            `Timeframe: *${timeframe}*`;
+
+            const encodedMsg = encodeURIComponent(message);
+            const url = `https://api.callmebot.com/whatsapp.php?phone=${WHATSAPP_CONFIG.phone}&text=${encodedMsg}&apikey=${WHATSAPP_CONFIG.apiKey}`;
+
+            fetch(url, { mode: 'no-cors' })
+                .then(() => console.log(`Alerta WhatsApp enviada: ${signalType}`))
+                .catch(err => console.error("Error enviando WhatsApp:", err));
+        }
+
+        // --- MANEJO DE ALERTAS EN TIEMPO REAL ---
+        function triggerSupertrendAlert(signal, timeframe) {
+            if (!signal || !signal.time) return;
+
+            if (lastNotifiedSignalTime !== signal.time) {
+                lastNotifiedSignalTime = signal.time;
+                playBeepSound(signal.type);
+                sendWhatsAppAlert(signal.type, signal.price, timeframe);
+            }
+        }
+
+        // --- LÓGICA PRINCIPAL DEL DASHBOARD ---
         const statusEl = document.getElementById("status");
         const timeframeSelect = document.getElementById("timeframe");
         const chartContainer = document.getElementById("chart");
@@ -240,7 +309,6 @@
         const modPivotsTf = document.getElementById("dash-module-pivots-tf");
         const modVsa = document.getElementById("dash-module-vsa");
 
-        // Elementos de Tendencia Global
         const dashTrendTf = document.getElementById("dash-trend-tf");
         const dashTrendDay = document.getElementById("dash-trend-day");
         const trendBarTf = document.getElementById("trend-bar-tf");
@@ -340,30 +408,25 @@
             return { resPOC, supPOC };
         }
 
-        // MOTOR DE CÁLCULO DE TENDENCIA GLOBAL Y DIARIA
         async function calculateGlobalTrend(lastPrice) {
-            let scoreTF = 0; // -100 (Muy Bajista) a +100 (Muy Alcista)
+            let scoreTF = 0;
             let maxScoreTF = 0;
 
-            // 1. Supertrend del TF actual
             if (currentSupertrendSignal) {
                 maxScoreTF += 30;
                 scoreTF += currentSupertrendSignal.type === "BUY" ? 30 : -30;
             }
 
-            // 2. Posición vs POC Footprint
             if (currentFootprintRes) {
                 maxScoreTF += 30;
                 scoreTF += lastPrice >= currentFootprintRes ? 30 : -30;
             }
 
-            // 3. Posición vs Pivot Target
             if (currentMainTarget) {
                 maxScoreTF += 20;
                 scoreTF += lastPrice >= currentMainTarget ? 20 : -20;
             }
 
-            // 4. Vela actual (Cierre vs Apertura)
             if (currentCandleData && currentCandleData.length > 0) {
                 maxScoreTF += 20;
                 const lastCandle = currentCandleData[currentCandleData.length - 1];
@@ -373,7 +436,6 @@
             const pctTF = maxScoreTF > 0 ? (scoreTF / maxScoreTF) * 100 : 0;
             renderTrendUI(dashTrendTf, trendBarTf, pctTF);
 
-            // CÁLCULO TENDENCIA DEL DÍA (1D)
             try {
                 if (!dailyCandlesCache) {
                     dailyCandlesCache = await fetchKlines('1d', 100);
@@ -412,7 +474,6 @@
             textEl.style.color = color;
             barEl.style.backgroundColor = color;
             
-            // Convertir porcentaje de -100..100 a escala de ancho 0%..100%
             const fillWidth = Math.min(Math.max(((pct + 100) / 2), 5), 100);
             barEl.style.width = `${fillWidth}%`;
         }
@@ -597,10 +658,10 @@
             for (let i = 1; i < len; i++) {
                 if (trend[i] === 1 && trend[i - 1] === -1) {
                     stMarkers.push({ time: candles[i].time, position: 'belowBar', color: '#00e676', shape: 'arrowUp', text: 'ST BUY' });
-                    lastSignal = { type: 'BUY', price: candles[i].close };
+                    lastSignal = { type: 'BUY', price: candles[i].close, time: candles[i].time };
                 } else if (trend[i] === -1 && trend[i - 1] === 1) {
                     stMarkers.push({ time: candles[i].time, position: 'aboveBar', color: '#ff1744', shape: 'arrowDown', text: 'ST SELL' });
-                    lastSignal = { type: 'SELL', price: candles[i].close };
+                    lastSignal = { type: 'SELL', price: candles[i].close, time: candles[i].time };
                 }
             }
             return { stMarkers, lastSignal };
@@ -749,6 +810,9 @@
                     dashStSignal.innerText = lastSignal.type;
                     dashStSignal.style.color = lastSignal.type === "BUY" ? "#00e676" : "#ff5252";
                     dashStPrice.innerText = `$${lastSignal.price.toFixed(2)}`;
+                    
+                    // Activa alertas de sonido y WhatsApp
+                    triggerSupertrendAlert(lastSignal, timeframeSelect.value);
                 }
             }
 
@@ -822,7 +886,7 @@
             wsConnection = new WebSocket(`wss://stream.binance.com:9443/ws/btcusdt@kline_${wsInterval}`);
 
             wsConnection.onopen = () => { statusEl.style.display = "none"; };
-            wsConnection.onmessage = (event) => {
+            wsConnection.onmessage = async (event) => {
                 const message = JSON.parse(event.data);
                 const k = message.k;
                 const updatedCandle = {
@@ -831,6 +895,13 @@
 
                 candlestickSeries.update(updatedCandle);
                 updateRealtimeAnalysis(updatedCandle.close);
+
+                // Re-evaluar indicadores cuando se cierra una vela
+                if (k.x && currentCandleData.length > 0) {
+                    currentCandleData.push(updatedCandle);
+                    if (currentCandleData.length > 500) currentCandleData.shift();
+                    await processIndicators();
+                }
 
                 if (statusEl.style.display !== "none") {
                     statusEl.style.display = "none";
