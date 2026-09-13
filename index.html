@@ -123,7 +123,6 @@
                 </div>
             </div>
 
-            <!-- MÓDULO: TENDENCIA GLOBAL Y DIARIA -->
             <div id="dash-module-global-trend" class="dash-module" style="border: 1px solid #2962ff;">
                 <h4>Tendencia Global Integrada</h4>
                 <div class="dash-row">
@@ -225,10 +224,12 @@
         // --- CONFIGURACIÓN DE TELEGRAM ---
         const TELEGRAM_CONFIG = {
             enabled: true,
-            username: "ERC1670" // Tu usuario de Telegram configurado
+            username: "ERC1670"
         };
 
+        // Variables para controlar únicamente el cambio real de señal
         let lastNotifiedSignalTime = null;
+        let lastNotifiedSignalType = null;
 
         // --- SISTEMA DE AUDIO (Web Audio API) ---
         function playBeepSound(type) {
@@ -279,14 +280,16 @@
                 .catch(err => console.error("Error enviando Telegram:", err));
         }
 
-        // --- MANEJO DE ALERTAS EN TIEMPO REAL ---
-        function triggerSupertrendAlert(signal, timeframe) {
-            if (!signal || !signal.time) return;
+        // --- EVALUACIÓN DE ALERTAS (CORREGIDO: SOLO CAMBIOS DE SEÑAL EN VELAS NUEVAS) ---
+        function evaluateSupertrendAlert(lastSignal, timeframe) {
+            if (!lastSignal || !lastSignal.time) return;
 
-            if (lastNotifiedSignalTime !== signal.time) {
-                lastNotifiedSignalTime = signal.time;
-                playBeepSound(signal.type);
-                sendTelegramAlert(signal.type, signal.price, timeframe);
+            if (lastSignal.time !== lastNotifiedSignalTime && lastSignal.type !== lastNotifiedSignalType) {
+                lastNotifiedSignalTime = lastSignal.time;
+                lastNotifiedSignalType = lastSignal.type;
+                
+                playBeepSound(lastSignal.type);
+                sendTelegramAlert(lastSignal.type, lastSignal.price, timeframe);
             }
         }
 
@@ -778,13 +781,17 @@
             clearActiveLines();
             dailyCandlesCache = null;
 
+            // Resetear rastreadores al cambiar de temporalidad
+            lastNotifiedSignalTime = null;
+            lastNotifiedSignalType = null;
+
             const selectedInterval = timeframeSelect.value;
             startCandleTimer(selectedInterval);
 
             try {
                 currentCandleData = await fetchKlines(selectedInterval, 500);
                 candlestickSeries.setData(currentCandleData);
-                await processIndicators();
+                await processIndicators(true); // Carga inicial silenciosa
                 connectWebSocket(selectedInterval);
             } catch (err) {
                 console.warn("Fallo REST API, alternando a WebSocket directo.");
@@ -794,7 +801,7 @@
             }
         }
 
-        async function processIndicators() {
+        async function processIndicators(isInitialLoad = false) {
             if (!currentCandleData || currentCandleData.length === 0) return;
             let allMarkers = [];
             currentMainTarget = null;
@@ -810,8 +817,13 @@
                     dashStSignal.style.color = lastSignal.type === "BUY" ? "#00e676" : "#ff5252";
                     dashStPrice.innerText = `$${lastSignal.price.toFixed(2)}`;
                     
-                    // Alerta por Telegram y Sonido en la web
-                    triggerSupertrendAlert(lastSignal, timeframeSelect.value);
+                    // Manejo de alertas de Telegram
+                    if (isInitialLoad) {
+                        lastNotifiedSignalTime = lastSignal.time;
+                        lastNotifiedSignalType = lastSignal.type;
+                    } else {
+                        evaluateSupertrendAlert(lastSignal, timeframeSelect.value);
+                    }
                 }
             }
 
@@ -870,12 +882,14 @@
 
             updateRealtimeAnalysis(currentCandleData[currentCandleData.length - 1].close);
 
-            const totalBars = currentCandleData.length;
-            chart.priceScale('right').resetPriceScale();
-            chart.timeScale().setVisibleLogicalRange({
-                from: totalBars - 60,
-                to: totalBars + 5
-            });
+            if (isInitialLoad) {
+                const totalBars = currentCandleData.length;
+                chart.priceScale('right').resetPriceScale();
+                chart.timeScale().setVisibleLogicalRange({
+                    from: totalBars - 60,
+                    to: totalBars + 5
+                });
+            }
         }
 
         function connectWebSocket(interval) {
@@ -895,10 +909,11 @@
                 candlestickSeries.update(updatedCandle);
                 updateRealtimeAnalysis(updatedCandle.close);
 
+                // Evalúa alertas únicamente cuando CIERRA la vela (k.x es true)
                 if (k.x && currentCandleData.length > 0) {
                     currentCandleData.push(updatedCandle);
                     if (currentCandleData.length > 500) currentCandleData.shift();
-                    await processIndicators();
+                    await processIndicators(false);
                 }
 
                 if (statusEl.style.display !== "none") {
@@ -914,7 +929,7 @@
                 btn.classList.toggle('inactive', !getVal());
                 updateDashboardModulesVisibility();
                 clearActiveLines();
-                await processIndicators();
+                await processIndicators(false);
             });
         }
 
