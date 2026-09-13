@@ -519,7 +519,8 @@
 
             const urls = [
                 `https://api.binance.com/api/v3/${endpoint}?symbol=BTCUSDT&interval=${apiInterval}&limit=${limit}`,
-                `https://data-api.binance.vision/api/v3/${endpoint}?symbol=BTCUSDT&interval=${apiInterval}&limit=${limit}`
+                `https://data-api.binance.vision/api/v3/${endpoint}?symbol=BTCUSDT&interval=${apiInterval}&limit=${limit}`,
+                `https://corsproxy.io/?https://api.binance.com/api/v3/${endpoint}?symbol=BTCUSDT&interval=${apiInterval}&limit=${limit}`
             ];
 
             let data = null;
@@ -606,8 +607,6 @@
                     updateRealtimeAnalysis(currentCandleData[currentCandleData.length - 1].close);
                 }
 
-                // CORRECCIÓN DE ENFOQUE Y ZOOM AL CAMBIAR DE TIMEFRAME:
-                // Muestra únicamente las últimas 60 velas en pantalla con un margen limpio a la derecha
                 const totalBars = currentCandleData.length;
                 chart.priceScale('right').resetPriceScale();
                 chart.timeScale().setVisibleLogicalRange({
