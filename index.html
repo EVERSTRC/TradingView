@@ -574,6 +574,7 @@
         function processIndicators() {
             if (!currentCandleData || currentCandleData.length === 0) return;
             let allMarkers = [];
+            currentMainTarget = null;
 
             if (showSupertrend) {
                 const { stMarkers, lastSignal } = getSupertrendMarkers(currentCandleData);
@@ -601,17 +602,40 @@
                 }
             }
 
+            // Calculo para "Pivots" (Objetivo Principal)
+            if (showPivots) {
+                const { pivotHigh, pivotLow } = calculatePivots(currentCandleData, 20, 20);
+                if (pivotHigh) {
+                    currentMainTarget = pivotHigh.high;
+                    activePriceLines.push(candlestickSeries.createPriceLine({
+                        price: pivotHigh.high, color: '#e040fb', lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Dashed, title: 'Pivot Main Target'
+                    }));
+                } else if (pivotLow) {
+                    currentMainTarget = pivotLow.low;
+                    activePriceLines.push(candlestickSeries.createPriceLine({
+                        price: pivotLow.low, color: '#00e5ff', lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Dashed, title: 'Pivot Main Support'
+                    }));
+                }
+            }
+
+            // Calculo para "Pivots TF" (Rango Estructura)
             if (showPivotsTf) {
-                const { pivotHigh, pivotLow } = calculatePivots(currentCandleData);
+                const { pivotHigh, pivotLow } = calculatePivots(currentCandleData, 10, 10);
                 if (pivotHigh) {
                     dashPivotTfRes.innerText = `$${pivotHigh.high.toFixed(2)}`;
-                    currentMainTarget = pivotHigh.high;
                     activePriceLines.push(candlestickSeries.createPriceLine({ price: pivotHigh.high, color: '#ff9100', lineWidth: 1, title: 'Res TF' }));
+                } else {
+                    dashPivotTfRes.innerText = "--";
                 }
                 if (pivotLow) {
                     dashPivotTfSup.innerText = `$${pivotLow.low.toFixed(2)}`;
                     activePriceLines.push(candlestickSeries.createPriceLine({ price: pivotLow.low, color: '#2979ff', lineWidth: 1, title: 'Sop TF' }));
+                } else {
+                    dashPivotTfSup.innerText = "--";
                 }
+            } else {
+                dashPivotTfRes.innerText = "--";
+                dashPivotTfSup.innerText = "--";
             }
 
             allMarkers.sort((a, b) => a.time - b.time);
@@ -656,7 +680,8 @@
                 btn.classList.toggle('active', getVal());
                 btn.classList.toggle('inactive', !getVal());
                 updateDashboardModulesVisibility();
-                renderChart();
+                clearActiveLines();
+                processIndicators();
             });
         }
 
