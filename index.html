@@ -72,7 +72,6 @@
         .txt-buy { color: #00e676; font-weight: bold; }
         .txt-sell { color: #ff1744; font-weight: bold; }
         
-        /* Estilos de barra de puntuación de Tendencia */
         .trend-bar-bg { width: 100%; height: 6px; background-color: #2a2e39; border-radius: 3px; overflow: hidden; margin: 3px 0; position: relative; }
         .trend-bar-fill { height: 100%; width: 50%; background-color: #787b86; transition: all 0.5s ease; }
     </style>
@@ -223,14 +222,13 @@
 
     <script>
     document.addEventListener("DOMContentLoaded", function () {
-        // --- CONFIGURACIÓN DE NOTIFICACIONES WHATSAPP ---
-        const WHATSAPP_CONFIG = {
-            enabled: true, // Cambia a false si quieres desactivar WhatsApp
-            phone: "TU_NUMERO_CON_CODIGO_PAIS", // Ej: 34600000000 o 5215500000000 (sin el signo +)
-            apiKey: "TU_API_KEY_CALLMEBOT"     // Inserta la API Key recibida por CallMeBot
+        // --- CONFIGURACIÓN DE TELEGRAM ---
+        const TELEGRAM_CONFIG = {
+            enabled: true,
+            username: "ERC1670" // Tu usuario de Telegram configurado
         };
 
-        let lastNotifiedSignalTime = null; // Evita duplicar alertas para la misma vela
+        let lastNotifiedSignalTime = null;
 
         // --- SISTEMA DE AUDIO (Web Audio API) ---
         function playBeepSound(type) {
@@ -262,22 +260,23 @@
             }
         }
 
-        // --- ENVÍO DE MENSAJE A WHATSAPP ---
-        function sendWhatsAppAlert(signalType, price, timeframe) {
-            if (!WHATSAPP_CONFIG.enabled || WHATSAPP_CONFIG.phone.includes("TU_NUMERO")) return;
+        // --- ENVÍO DE MENSAJE A TELEGRAM VIA CALLMEBOT ---
+        function sendTelegramAlert(signalType, price, timeframe) {
+            if (!TELEGRAM_CONFIG.enabled || !TELEGRAM_CONFIG.username) return;
 
             const icon = signalType === "BUY" ? "🟢🚀" : "🔴🐻";
-            const message = `*ALERT SUPERTREND BTCUSDT*\n\n` +
-                            `Señal: *${signalType}* ${icon}\n` +
-                            `Precio: *$${price.toFixed(2)}*\n` +
-                            `Timeframe: *${timeframe}*`;
+            const message = `ALERT SUPERTREND BTCUSDT\n\n` +
+                            `Señal: ${signalType} ${icon}\n` +
+                            `Precio: $${price.toFixed(2)}\n` +
+                            `Timeframe: ${timeframe}`;
 
+            const userClean = TELEGRAM_CONFIG.username.replace("@", "");
             const encodedMsg = encodeURIComponent(message);
-            const url = `https://api.callmebot.com/whatsapp.php?phone=${WHATSAPP_CONFIG.phone}&text=${encodedMsg}&apikey=${WHATSAPP_CONFIG.apiKey}`;
+            const url = `https://api.callmebot.com/text.php?user=@${userClean}&text=${encodedMsg}`;
 
             fetch(url, { mode: 'no-cors' })
-                .then(() => console.log(`Alerta WhatsApp enviada: ${signalType}`))
-                .catch(err => console.error("Error enviando WhatsApp:", err));
+                .then(() => console.log(`Alerta enviada a Telegram: ${signalType}`))
+                .catch(err => console.error("Error enviando Telegram:", err));
         }
 
         // --- MANEJO DE ALERTAS EN TIEMPO REAL ---
@@ -287,7 +286,7 @@
             if (lastNotifiedSignalTime !== signal.time) {
                 lastNotifiedSignalTime = signal.time;
                 playBeepSound(signal.type);
-                sendWhatsAppAlert(signal.type, signal.price, timeframe);
+                sendTelegramAlert(signal.type, signal.price, timeframe);
             }
         }
 
@@ -811,7 +810,7 @@
                     dashStSignal.style.color = lastSignal.type === "BUY" ? "#00e676" : "#ff5252";
                     dashStPrice.innerText = `$${lastSignal.price.toFixed(2)}`;
                     
-                    // Activa alertas de sonido y WhatsApp
+                    // Alerta por Telegram y Sonido en la web
                     triggerSupertrendAlert(lastSignal, timeframeSelect.value);
                 }
             }
@@ -896,7 +895,6 @@
                 candlestickSeries.update(updatedCandle);
                 updateRealtimeAnalysis(updatedCandle.close);
 
-                // Re-evaluar indicadores cuando se cierra una vela
                 if (k.x && currentCandleData.length > 0) {
                     currentCandleData.push(updatedCandle);
                     if (currentCandleData.length > 500) currentCandleData.shift();
