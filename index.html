@@ -258,11 +258,6 @@
             ? chart.addSeries(LightweightCharts.CandlestickSeries, { upColor: '#089981', downColor: '#f23645', borderVisible: false, wickUpColor: '#089981', wickDownColor: '#f23645' })
             : chart.addCandlestickSeries({ upColor: '#089981', downColor: '#f23645', borderVisible: false, wickUpColor: '#089981', wickDownColor: '#f23645' });
 
-        // Serie superpuesta de línea continua para el Poc Footprint en vivo
-        const pocLineSeries = chart.addSeries 
-            ? chart.addSeries(LightweightCharts.LineSeries, { color: '#b388ff', lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Solid, crosshairMarkerVisible: true })
-            : chart.addLineSeries({ color: '#b388ff', lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Solid, crosshairMarkerVisible: true });
-
         const resizeObserver = new ResizeObserver(entries => {
             if (!entries || entries.length === 0) return;
             const { width, height } = entries[0].contentRect;
@@ -283,9 +278,41 @@
             activePriceLines = [];
         }
 
-        function calculateCandlePOC(candle) {
-            // Estima el centro neurálgico del volumen dentro del rango de la vela (High, Low, Close, Open)
-            return (candle.high + candle.low + (candle.close * 2)) / 4;
+        // Algoritmo para obtener soportes y resistencias por Footprint POC (acumulado de volumen)
+        function calculateFootprintSR(candles, lookback = 50) {
+            if (!candles || candles.length === 0) return { resPOC: null, supPOC: null };
+            
+            const recent = candles.slice(-lookback);
+            const currentPrice = candles[candles.length - 1].close;
+            const volumeMap = {};
+
+            // Agrupa el volumen en escalones de precio (Ticks)
+            recent.forEach(c => {
+                const pocLevel = Math.round(c.close / 5) * 5; 
+                volumeMap[pocLevel] = (volumeMap[pocLevel] || 0) + c.volume;
+            });
+
+            let resPOC = null, supPOC = null;
+            let maxResVol = 0, maxSupVol = 0;
+
+            for (const priceStr in volumeMap) {
+                const price = parseFloat(priceStr);
+                const vol = volumeMap[priceStr];
+
+                if (price >= currentPrice) {
+                    if (vol > maxResVol) {
+                        maxResVol = vol;
+                        resPOC = price;
+                    }
+                } else {
+                    if (vol > maxSupVol) {
+                        maxSupVol = vol;
+                        supPOC = price;
+                    }
+                }
+            }
+
+            return { resPOC, supPOC };
         }
 
         function updateRealtimeAnalysis(lastClosePrice) {
@@ -397,22 +424,10 @@
 
                 if (isWhaleVol) {
                     if (c.close > c.open) {
-                        markers.push({ 
-                            time: c.time, 
-                            position: 'belowBar', 
-                            color: '#00e676', 
-                            shape: 'circle', 
-                            text: 'W-BUY' 
-                        });
+                        markers.push({ time: c.time, position: 'belowBar', color: '#00e676', shape: 'circle', text: 'W-BUY' });
                         lastWhaleBuyPrice = c.low;
                     } else if (c.close < c.open) {
-                        markers.push({ 
-                            time: c.time, 
-                            position: 'aboveBar', 
-                            color: '#ff1744', 
-                            shape: 'circle', 
-                            text: 'W-SELL' 
-                        });
+                        markers.push({ time: c.time, position: 'aboveBar', color: '#ff1744', shape: 'circle', text: 'W-SELL' });
                         lastWhaleSellPrice = c.high;
                     }
                 }
@@ -589,16 +604,22 @@
                 }
             }
 
-            // Dibuja la línea POC paso a paso sobre el gráfico por cada vela
+            // Dibuja los niveles S/R del Footprint POC
             if (showFootprint) {
-                const pocData = currentCandleData.map(c => ({
-                    time: c.time,
-                    value: calculateCandlePOC(c)
-                }));
-                pocLineSeries.setData(pocData);
-                currentFootprintRes = pocData[pocData.length - 1].value;
-            } else {
-                pocLineSeries.setData([]);
+                const { resPOC, supPOC } = calculateFootprintSR(currentCandleData, 60);
+                
+                if (resPOC) {
+                    currentFootprintRes = resPOC;
+                    activePriceLines.push(candlestickSeries.createPriceLine({
+                        price: resPOC, color: '#e040fb', lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Solid, title: 'FP POC Res'
+                    }));
+                }
+                
+                if (supPOC) {
+                    activePriceLines.push(candlestickSeries.createPriceLine({
+                        price: supPOC, color: '#00e5ff', lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Solid, title: 'FP POC Sop'
+                    }));
+                }
             }
 
             if (showVsa) {
@@ -679,13 +700,6 @@
                 };
 
                 candlestickSeries.update(updatedCandle);
-
-                if (showFootprint) {
-                    const candlePoc = calculateCandlePOC(updatedCandle);
-                    pocLineSeries.update({ time: updatedCandle.time, value: candlePoc });
-                    currentFootprintRes = candlePoc;
-                }
-
                 updateRealtimeAnalysis(updatedCandle.close);
 
                 if (statusEl.style.display !== "none") {
