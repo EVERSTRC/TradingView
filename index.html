@@ -286,6 +286,29 @@
             activePriceLines = [];
         }
 
+        function calculateFootprintPOC(candles, lookback = 30) {
+            if (!candles || candles.length === 0) return null;
+            const recent = candles.slice(-lookback);
+            const volumeMap = {};
+
+            recent.forEach(c => {
+                const typicalPrice = (Math.floor((c.high + c.low + c.close) / 10) * 10);
+                volumeMap[typicalPrice] = (volumeMap[typicalPrice] || 0) + (c.volume || 1);
+            });
+
+            let pocPrice = null;
+            let maxVol = 0;
+
+            for (const price in volumeMap) {
+                if (volumeMap[price] > maxVol) {
+                    maxVol = volumeMap[price];
+                    pocPrice = parseFloat(price);
+                }
+            }
+
+            return pocPrice;
+        }
+
         function updateRealtimeAnalysis(lastClosePrice) {
             if (!lastClosePrice) return;
             let isBullish = false;
@@ -304,7 +327,7 @@
                     isBullish = true;
                 }
             } else {
-                dashBias.innerText = "NEUTRO";
+                dashBias.innerText = "--";
                 dashBias.style.color = "#d1d4dc";
                 dashInvalid.innerText = "--";
             }
@@ -575,6 +598,7 @@
             if (!currentCandleData || currentCandleData.length === 0) return;
             let allMarkers = [];
             currentMainTarget = null;
+            currentFootprintRes = null;
 
             if (showSupertrend) {
                 const { stMarkers, lastSignal } = getSupertrendMarkers(currentCandleData);
@@ -583,6 +607,16 @@
                     dashStSignal.innerText = lastSignal.type;
                     dashStSignal.style.color = lastSignal.type === "BUY" ? "#00e676" : "#ff5252";
                     dashStPrice.innerText = `$${lastSignal.price.toFixed(2)}`;
+                }
+            }
+
+            // Calculo para "Footprint POC"
+            if (showFootprint) {
+                currentFootprintRes = calculateFootprintPOC(currentCandleData, 40);
+                if (currentFootprintRes) {
+                    activePriceLines.push(candlestickSeries.createPriceLine({
+                        price: currentFootprintRes, color: '#b388ff', lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Solid, title: 'POC Footprint'
+                    }));
                 }
             }
 
