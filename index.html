@@ -1,366 +1,478 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Gráfico Técnico + Indicador VSA Ballenas MTF</title>
-  <style>
-    :root {
-      --bg-color: #131722;
-      --panel-bg: #1e222d;
-      --border-color: #2a2e39;
-      --text-color: #d1d4dc;
-      --green-color: #00e676;
-      --red-color: #ff1744;
-      --blue-color: #2962ff;
-    }
-
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif; background-color: var(--bg-color); color: var(--text-color); overflow: hidden; }
-
-    /* Layout Principal */
-    .app-container { display: flex; flex-direction: column; height: 100vh; }
-    
-    /* Toolbar Superior */
-    .toolbar { display: flex; align-items: center; gap: 10px; padding: 8px 16px; background-color: var(--panel-bg); border-bottom: 1px solid var(--border-color); }
-    .btn { background: var(--border-color); color: var(--text-color); border: 1px solid transparent; padding: 6px 12px; border-radius: 4px; font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.2s ease; }
-    .btn:hover { background: #363c4e; }
-    .btn.active { background: rgba(41, 98, 255, 0.2); color: #2962ff; border-color: var(--blue-color); }
-
-    /* Contenedor del Gráfico */
-    .chart-wrapper { position: relative; flex: 1; width: 100%; height: 100%; }
-    canvas { display: block; width: 100%; height: 100%; }
-
-    /* Dashboard MTF Superpuesto */
-    .vsa-dashboard-panel { position: absolute; top: 15px; right: 15px; background: rgba(19, 23, 34, 0.95); border: 1px solid var(--border-color); border-radius: 6px; padding: 10px; z-index: 10; font-size: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); display: none; }
-    .vsa-dashboard-panel table { border-collapse: collapse; text-align: left; width: 100%; }
-    .vsa-dashboard-panel th { padding: 6px 10px; background-color: #000080; color: #ffffff; font-weight: 600; text-transform: uppercase; font-size: 10px; }
-    .vsa-dashboard-panel td { padding: 6px 10px; border-bottom: 1px solid var(--border-color); }
-    .vsa-dashboard-panel tr:last-child td { border-bottom: none; }
-    
-    .badge { padding: 2px 6px; border-radius: 3px; font-weight: bold; font-size: 10px; text-transform: uppercase; color: #fff; }
-    .badge.buy { background-color: var(--green-color); }
-    .badge.sell { background-color: var(--red-color); }
-    .badge.neutral { background-color: #5d6d7e; }
-  </style>
-</head>
-<body>
-
-<div class="app-container">
-  <!-- Toolbar -->
-  <div class="toolbar">
-    <button id="btn-vsa-whales" class="btn">S/R VSA Ballenas</button>
-  </div>
-
-  <!-- Vista Principal del Gráfico -->
-  <div class="chart-wrapper" id="chart-container">
-    <canvas id="mainChart"></canvas>
-
-    <!-- Dashboard Flotante MTF -->
-    <div id="vsa-mtf-dashboard" class="vsa-dashboard-panel">
-      <table>
-        <thead>
-          <tr>
-            <th>Timeframe</th>
-            <th>Señal VSA</th>
-            <th>Vol. Transado</th>
-            <th>% Compra</th>
-            <th>% Venta</th>
-          </tr>
-        </thead>
-        <tbody id="vsa-dashboard-body"></tbody>
-      </table>
-    </div>
-  </div>
-</div>
-
 <script>
-// ==========================================
-// 1. ESTADO GLOBAL Y CONFIGURACIÓN
-// ==========================================
-const state = {
-  indicators: {
-    vsaWhales: false,
-    vsaParams: {
-      period: 20,
-      factor: 1.8,
-      maxDistancePct: 0.005 // 0.5%
-    }
-  }
-};
+document.addEventListener("DOMContentLoaded", function () {
+    const statusEl = document.getElementById("status");
+    const timeframeSelect = document.getElementById("timeframe");
+    const chartContainer = document.getElementById("chart");
 
-// Generador de Velas Sintéticas para Pruebas
-function generateMockCandles(count = 100) {
-  let candles = [];
-  let price = 100;
-  let now = new Date();
-  
-  for (let i = 0; i < count; i++) {
-    let open = price + (Math.random() - 0.5) * 2;
-    let high = open + Math.random() * 3;
-    let low = open - Math.random() * 3;
-    let close = (open > high) ? low : (open < low) ? high : open + (Math.random() - 0.5) * 2;
-    let volume = Math.floor(Math.random() * 5000) + 1000;
+    const btnPivots = document.getElementById("toggle-pivots");
+    const btnPivotsTf = document.getElementById("toggle-pivots-tf");
+    const btnVsa = document.getElementById("toggle-vsa");
+    const btnSupertrend = document.getElementById("toggle-supertrend");
+    const btnFootprint = document.getElementById("toggle-footprint");
+    const btnMultiFp = document.getElementById("toggle-multi-fp");
 
-    // Simular volumen spike (Ballena)
-    if (i % 15 === 0) volume *= 3.5;
+    const modSupertrend = document.getElementById("dash-module-supertrend");
+    const modFootprint = document.getElementById("dash-module-footprint");
+    const modPivots = document.getElementById("dash-module-pivots");
+    const modPivotsTf = document.getElementById("dash-module-pivots-tf");
+    const modVsa = document.getElementById("dash-module-vsa");
 
-    candles.push({ time: new Date(now.getTime() + i * 60000), open, high, low, close, volume });
-    price = close;
-  }
-  return candles;
-}
+    let showPivots = true, showPivotsTf = true, showVsa = true;
+    let showSupertrend = true, showFootprint = true, showMultiFootprint = false;
 
-const candles = generateMockCandles(120);
+    const timerDisplay = document.getElementById("timer-display");
+    const timerProgress = document.getElementById("timer-progress");
+    const dashStSignal = document.getElementById("dash-st-signal");
+    const dashStPrice = document.getElementById("dash-st-price");
+    const dashBias = document.getElementById("dash-bias");
+    const dashTarget = document.getElementById("dash-target");
+    const dashInvalid = document.getElementById("dash-invalid");
+    const dashPivotTfRes = document.getElementById("dash-pivot-tf-res");
+    const dashPivotTfSup = document.getElementById("dash-pivot-tf-sup");
+    const dashEntry = document.getElementById("dash-entry");
+    const dashTp = document.getElementById("dash-tp");
+    const dashSl = document.getElementById("dash-sl");
 
-// ==========================================
-// 2. MOTOR DE CÁLCULO VSA (CORREGIDO)
-// ==========================================
-function calculateVSA(candles, period = 20, factor = 1.8) {
-  let results = [];
-  
-  for (let i = 0; i < candles.length; i++) {
-    const candle = candles[i];
-    
-    // Normalización flexible de propiedades
-    const open = candle.open ?? candle.o ?? 0;
-    const high = candle.high ?? candle.h ?? 0;
-    const low = candle.low ?? candle.l ?? 0;
-    const close = candle.close ?? candle.c ?? 0;
-    const volume = candle.volume ?? candle.v ?? 1.0;
-    
-    const range = high - low;
-    
-    // Promedio de Volumen (SMA)
-    let sumVol = 0;
-    let count = 0;
-    for (let j = Math.max(0, i - period + 1); j <= i; j++) {
-      sumVol += (candles[j].volume ?? candles[j].v ?? 1.0);
-      count++;
-    }
-    const avgVol = sumVol / (count || 1);
-    const isWhale = volume > (avgVol * factor);
+    const dashWhale1dPct = document.getElementById("dash-whale-1d-pct");
+    const dashWhale1dNet = document.getElementById("dash-whale-1d-net");
+    const dashWhale1wPct = document.getElementById("dash-whale-1w-pct");
+    const dashWhale1wNet = document.getElementById("dash-whale-1w-net");
+    const dashWhale1mPct = document.getElementById("dash-whale-1m-pct");
+    const dashWhale1mNet = document.getElementById("dash-whale-1m-net");
 
-    // Relación Compra / Venta acotada entre 0 y 1
-    let buyRatio = 0.5;
-    if (range > 0) {
-      buyRatio = Math.max(0, Math.min(1, (close - low) / range));
-    }
-    
-    const buyVol = volume * buyRatio;
-    const sellVol = volume - buyVol;
-    const netDelta = buyVol - sellVol;
+    let activePriceLines = [];
+    let wsConnection = null;
+    let currentCandleData = [];
+    let timerInterval = null;
+    let currentFootprintRes = null;
+    let currentMainTarget = null;
 
-    const lowerShadow = Math.min(open, close) - low;
-    const upperShadow = high - Math.max(open, close);
+    const klineCache = new Map();
 
-    const isBuyVSA = isWhale && (netDelta > 0 || lowerShadow > (range * 0.35));
-    const isSellVSA = isWhale && (netDelta < 0 || upperShadow > (range * 0.35));
-
-    results.push({
-      time: candle.time ?? candle.t,
-      close,
-      isWhale,
-      buyVol,
-      sellVol,
-      pctBuy: buyRatio * 100,
-      pctSell: (1 - buyRatio) * 100,
-      support: isBuyVSA ? low : null,
-      resistance: isSellVSA ? high : null,
-      isBuyVSA,
-      isSellVSA
+    const chart = LightweightCharts.createChart(chartContainer, {
+        width: chartContainer.clientWidth,
+        height: chartContainer.clientHeight,
+        layout: { background: { type: 'solid', color: '#131722' }, textColor: '#d1d4dc' },
+        grid: { vertLines: { color: 'rgba(42, 46, 57, 0.5)' }, horzLines: { color: 'rgba(42, 46, 57, 0.5)' } },
+        timeScale: { borderColor: 'rgba(197, 203, 206, 0.8)', timeVisible: true, secondsVisible: true },
+        rightPriceScale: { autoScale: true }
     });
-  }
-  return results;
-}
 
-// ==========================================
-// 3. RENDERIZADO DEL GRÁFICO
-// ==========================================
-const canvas = document.getElementById('mainChart');
-const ctx = canvas.getContext('2d');
+    const candlestickSeries = chart.addCandlestickSeries({
+        upColor: '#089981', downColor: '#f23645', borderVisible: false, wickUpColor: '#089981', wickDownColor: '#f23645'
+    });
 
-function fitCanvas() {
-  const container = document.getElementById('chart-container');
-  canvas.width = container.clientWidth;
-  canvas.height = container.clientHeight;
-  renderChart();
-}
+    window.addEventListener('resize', () => {
+        chart.applyOptions({ width: chartContainer.clientWidth, height: chartContainer.clientHeight });
+    });
 
-window.addEventListener('resize', fitCanvas);
-
-function renderChart() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  const padding = 40;
-  const chartWidth = canvas.width - padding * 2;
-  const chartHeight = canvas.height - padding * 2;
-
-  let minPrice = Math.min(...candles.map(c => c.low ?? c.l));
-  let maxPrice = Math.max(...candles.map(c => c.high ?? c.h));
-  const priceRange = maxPrice - minPrice || 1;
-
-  const candleWidth = chartWidth / candles.length;
-
-  const getX = (index) => padding + index * candleWidth + candleWidth / 2;
-  const getY = (price) => canvas.height - padding - ((price - minPrice) / priceRange) * chartHeight;
-
-  // Dibujar Velas
-  candles.forEach((c, i) => {
-    const x = getX(i);
-    const open = c.open ?? c.o;
-    const high = c.high ?? c.h;
-    const low = c.low ?? c.l;
-    const close = c.close ?? c.c;
-
-    const openY = getY(open);
-    const closeY = getY(close);
-    const highY = getY(high);
-    const lowY = getY(low);
-    const isGreen = close >= open;
-
-    ctx.strokeStyle = isGreen ? '#089981' : '#f23645';
-    ctx.fillStyle = isGreen ? '#089981' : '#f23645';
-
-    // Mecha
-    ctx.beginPath();
-    ctx.moveTo(x, highY);
-    ctx.lineTo(x, lowY);
-    ctx.stroke();
-
-    // Cuerpo
-    const bodyHeight = Math.max(Math.abs(closeY - openY), 1);
-    ctx.fillRect(x - candleWidth * 0.3, Math.min(openY, closeY), candleWidth * 0.6, bodyHeight);
-  });
-
-  // Dibujar VSA si está encendido
-  if (state.indicators.vsaWhales) {
-    renderVSAIndicator(ctx, candles, { getX, getY, canvasWidth: canvas.width, padding });
-  }
-}
-
-function renderVSAIndicator(ctx, candles, chartProps) {
-  const { period, factor, maxDistancePct } = state.indicators.vsaParams;
-  const vsaData = calculateVSA(candles, period, factor);
-
-  let activeSupport = null;
-  let activeResistance = null;
-
-  for (let i = vsaData.length - 1; i >= 0; i--) {
-    if (!activeSupport && vsaData[i].support !== null) activeSupport = vsaData[i].support;
-    if (!activeResistance && vsaData[i].resistance !== null) activeResistance = vsaData[i].resistance;
-    if (activeSupport && activeResistance) break;
-  }
-
-  // Dibujar Soportes / Resistencias
-  if (activeSupport) drawLineLevel(ctx, chartProps, activeSupport, '#0052cc', 'Sop Chart');
-  if (activeResistance) drawLineLevel(ctx, chartProps, activeResistance, '#ff1744', 'Res Chart');
-
-  // Evaluar Proximidad
-  vsaData.forEach((d, idx) => {
-    const candle = candles[idx];
-    const close = candle.close ?? candle.c;
-    const low = candle.low ?? candle.l;
-    const high = candle.high ?? candle.h;
-
-    const isNearSupport = activeSupport && Math.abs(close - activeSupport) / close <= maxDistancePct;
-    const isNearResistance = activeResistance && Math.abs(close - activeResistance) / close <= maxDistancePct;
-
-    if (d.isBuyVSA && isNearSupport) {
-      drawSignalShape(ctx, chartProps, idx, low, 'BUY', '#00e676', 'below');
+    function updateDashboardModulesVisibility() {
+        modSupertrend.style.display = showSupertrend ? "flex" : "none";
+        modFootprint.style.display = showFootprint ? "flex" : "none";
+        modPivots.style.display = showPivots ? "flex" : "none";
+        modPivotsTf.style.display = showPivotsTf ? "flex" : "none";
+        modVsa.style.display = showVsa ? "flex" : "none";
     }
-    if (d.isSellVSA && isNearResistance) {
-      drawSignalShape(ctx, chartProps, idx, high, 'SELL', '#ff1744', 'above');
+
+    function clearActiveLines() {
+        activePriceLines.forEach(line => candlestickSeries.removePriceLine(line));
+        activePriceLines = [];
     }
-  });
 
-  updateMTFDashboard(vsaData[vsaData.length - 1]);
-}
+    function updateRealtimeAnalysis(lastClosePrice) {
+        if (!lastClosePrice) return;
+        let isBullish = false;
 
-function drawLineLevel(ctx, { getY, canvasWidth, padding }, price, color, label) {
-  const y = getY(price);
-  ctx.save();
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 1.5;
-  ctx.setLineDash([4, 4]);
+        if (currentFootprintRes && showFootprint) {
+            const invalidLevel = currentFootprintRes + 35;
+            dashInvalid.innerText = `$${invalidLevel.toFixed(2)}`;
 
-  ctx.beginPath();
-  ctx.moveTo(padding, y);
-  ctx.lineTo(canvasWidth - padding, y);
-  ctx.stroke();
+            if (lastClosePrice < currentFootprintRes) {
+                dashBias.innerText = "BAJISTA 🐻";
+                dashBias.style.color = "#ff5252";
+                isBullish = false;
+            } else {
+                dashBias.innerText = "ALCISTA 🚀";
+                dashBias.style.color = "#00e676";
+                isBullish = true;
+            }
+        } else {
+            dashBias.innerText = "NEUTRO";
+            dashBias.style.color = "#d1d4dc";
+            dashInvalid.innerText = "--";
+        }
 
-  ctx.fillStyle = color;
-  ctx.font = '10px sans-serif';
-  ctx.fillText(`${label}: ${price.toFixed(2)}`, canvasWidth - padding + 5, y + 3);
-  ctx.restore();
-}
+        dashTarget.innerText = (currentMainTarget && showPivots) ? `$${currentMainTarget.toFixed(2)}` : "--";
 
-function drawSignalShape(ctx, { getX, getY }, index, price, text, color, position) {
-  const x = getX(index);
-  const y = getY(price) + (position === 'below' ? 18 : -18);
+        if (currentFootprintRes && showFootprint) {
+            let entryPrice = lastClosePrice; 
+            let slPrice = isBullish ? currentFootprintRes * 0.997 : currentFootprintRes * 1.003; 
+            let tpPrice = (currentMainTarget && showPivots && ((isBullish && currentMainTarget > entryPrice) || (!isBullish && currentMainTarget < entryPrice)))
+                ? currentMainTarget 
+                : (isBullish ? entryPrice + (Math.abs(entryPrice - slPrice) * 2) : entryPrice - (Math.abs(entryPrice - slPrice) * 2));
 
-  ctx.save();
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  if (position === 'below') {
-    ctx.moveTo(x - 5, y + 5);
-    ctx.lineTo(x + 5, y + 5);
-    ctx.lineTo(x, y - 5);
-  } else {
-    ctx.moveTo(x - 5, y - 5);
-    ctx.lineTo(x + 5, y - 5);
-    ctx.lineTo(x, y + 5);
-  }
-  ctx.fill();
+            dashEntry.innerText = `$${entryPrice.toFixed(2)}`;
+            dashTp.innerText = `$${tpPrice.toFixed(2)}`;
+            dashSl.innerText = `$${slPrice.toFixed(2)}`;
+        } else {
+            dashEntry.innerText = "--";
+            dashTp.innerText = "--";
+            dashSl.innerText = "--";
+        }
+    }
 
-  ctx.font = 'bold 9px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText(text, x, y + (position === 'below' ? 15 : -10));
-  ctx.restore();
-}
+    function calculateWhaleMetrics(candles, thresholdMultiplier = 1.5) {
+        if (!candles || candles.length < 20) return { buyVol: 0, sellVol: 0 };
+        let buyVol = 0, sellVol = 0, rollingVolumeSum = 0;
 
-// ==========================================
-// 4. ACTUALIZACIÓN DASHBOARD MTF HTML
-// ==========================================
-function updateMTFDashboard(lastMetric) {
-  const tbody = document.getElementById('vsa-dashboard-body');
-  if (!tbody || !lastMetric) return;
+        for (let i = 0; i < 20; i++) rollingVolumeSum += (candles[i].volume || 1);
 
-  const formatVol = (val) => val >= 1e6 ? (val/1e6).toFixed(2) + 'M' : val >= 1e3 ? (val/1e3).toFixed(2) + 'K' : val.toFixed(2);
-  const statusClass = lastMetric.isBuyVSA ? 'buy' : lastMetric.isSellVSA ? 'sell' : 'neutral';
-  const statusText = lastMetric.isBuyVSA ? 'BUY' : lastMetric.isSellVSA ? 'SELL' : 'NEUTRAL';
+        for (let i = 20; i < candles.length; i++) {
+            const c = candles[i];
+            const avgVol = rollingVolumeSum / 20;
+            rollingVolumeSum += (c.volume || 1) - (candles[i - 20].volume || 1);
 
-  const tfs = ['15 Minutos', '1 Hora', '4 Horas', '1 Diario', '1 Semana', '1 Mes'];
-  
-  tbody.innerHTML = tfs.map((tf, i) => `
-    <tr>
-      <td>${tf}</td>
-      <td><span class="badge ${i === 0 ? statusClass : 'neutral'}">${i === 0 ? statusText : 'NEUTRAL'}</span></td>
-      <td>${formatVol(lastMetric.buyVol + lastMetric.sellVol)}</td>
-      <td style="color: #00e676;">${lastMetric.pctBuy.toFixed(1)}%</td>
-      <td style="color: #ff1744;">${lastMetric.pctSell.toFixed(1)}%</td>
-    </tr>
-  `).join('');
-}
+            if ((c.volume || 0) > (avgVol * thresholdMultiplier)) {
+                if (c.close > c.open) buyVol += c.volume;
+                else if (c.close < c.open) sellVol += c.volume;
+                else { buyVol += c.volume / 2; sellVol += c.volume / 2; }
+            }
+        }
+        return { buyVol, sellVol };
+    }
 
-// ==========================================
-// 5. CONTROLADOR DEL BOTÓN
-// ==========================================
-document.getElementById('btn-vsa-whales').addEventListener('click', (e) => {
-  state.indicators.vsaWhales = !state.indicators.vsaWhales;
-  e.currentTarget.classList.toggle('active', state.indicators.vsaWhales);
-  
-  const dashboard = document.getElementById('vsa-mtf-dashboard');
-  if (dashboard) {
-    dashboard.style.display = state.indicators.vsaWhales ? 'block' : 'none';
-  }
-  
-  renderChart();
+    async function updateWhaleDashboard() {
+        try {
+            const [raw1d, raw1w, raw1m] = await Promise.all([
+                fetchKlines('1d', 100), fetchKlines('1w', 100), fetchKlines('1M', 60)
+            ]);
+
+            const periods = [
+                { data: raw1d, elPct: dashWhale1dPct, elNet: dashWhale1dNet, multiplier: 1.4 },
+                { data: raw1w, elPct: dashWhale1wPct, elNet: dashWhale1wNet, multiplier: 1.3 },
+                { data: raw1m, elPct: dashWhale1mPct, elNet: dashWhale1mNet, multiplier: 1.2 }
+            ];
+
+            periods.forEach(({ data, elPct, elNet, multiplier }) => {
+                const { buyVol, sellVol } = calculateWhaleMetrics(data, multiplier);
+                const total = buyVol + sellVol;
+                const netBtc = buyVol - sellVol;
+
+                if (total === 0) {
+                    elPct.innerText = "50%C/50%V";
+                    elPct.style.color = "#d1d4dc";
+                    elNet.innerText = "(0 BTC)";
+                    return;
+                }
+
+                const buyPct = Math.round((buyVol / total) * 100);
+                const sellPct = 100 - buyPct;
+                elPct.innerText = `${buyPct}%C/${sellPct}%V`;
+                elPct.style.color = buyPct > 50 ? "#00e676" : buyPct < 50 ? "#ff5252" : "#d1d4dc";
+
+                const formattedNet = netBtc >= 0 ? `(+${Math.round(netBtc)} BTC)` : `(${Math.round(netBtc)} BTC)`;
+                elNet.innerText = formattedNet;
+                elNet.style.color = netBtc >= 0 ? "#00e676" : "#ff5252";
+            });
+        } catch (e) {
+            console.error("Error en métricas de ballenas:", e);
+        }
+    }
+
+    function getIntervalInSeconds(interval) {
+        const unit = interval.slice(-1);
+        const val = parseInt(interval);
+        if (unit === 's') return val;
+        if (unit === 'm') return val * 60;
+        if (unit === 'h') return val * 3600;
+        if (unit === 'd') return val * 86400;
+        if (unit === 'w') return val * 604800;
+        return 60;
+    }
+
+    function startCandleTimer(interval) {
+        if (timerInterval) clearInterval(timerInterval);
+        const intervalSecs = getIntervalInSeconds(interval);
+
+        function updateTimer() {
+            const nowSecs = Math.floor(Date.now() / 1000);
+            const elapsed = nowSecs % intervalSecs;
+            const remaining = intervalSecs - elapsed;
+            const mins = Math.floor(remaining / 60);
+            const secs = remaining % 60;
+
+            if (intervalSecs < 60) {
+                timerDisplay.innerText = `${remaining}s`;
+            } else if (mins >= 60) {
+                timerDisplay.innerText = `${Math.floor(mins / 60)}h ${(mins % 60).toString().padStart(2, '0')}m`;
+            } else {
+                timerDisplay.innerText = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+            }
+
+            timerProgress.style.width = `${(elapsed / intervalSecs) * 100}%`;
+        }
+
+        updateTimer();
+        timerInterval = setInterval(updateTimer, 1000);
+    }
+
+    function calculateFootprintLevels(candles) {
+        if (!candles || candles.length < 20) return { footprintPOCs: [] };
+        const footprintPOCs = [];
+        let rollingVolumeSum = 0;
+        for (let i = 0; i < 20; i++) rollingVolumeSum += (candles[i].volume || 1);
+
+        for (let i = 20; i < candles.length; i++) {
+            const c = candles[i];
+            const avgVol = rollingVolumeSum / 20;
+            rollingVolumeSum += (c.volume || 1) - (candles[i - 20].volume || 1);
+
+            if ((c.volume || 0) > (avgVol * 2.2)) {
+                const isBullishCandle = c.close > c.open;
+                const upperWick = c.high - Math.max(c.open, c.close);
+                const lowerWick = Math.min(c.open, c.close) - c.low;
+                const isBullishPOC = lowerWick >= upperWick ? isBullishCandle : false;
+
+                const footprintPOC = isBullishPOC 
+                    ? c.open + ((c.close - c.open) * 0.70)
+                    : c.open - ((c.open - c.close) * 0.70);
+
+                footprintPOCs.push({ price: footprintPOC, isBullish: isBullishPOC, time: c.time });
+            }
+        }
+        return { footprintPOCs: footprintPOCs.slice(-2) };
+    }
+
+    function getSupertrendMarkers(candles, atrPeriods = 14, multiplier = 2.0) {
+        if (!candles || candles.length < atrPeriods + 1) return { stMarkers: [], lastSignal: null };
+        const len = candles.length;
+        const tr = new Float64Array(len);
+        tr[0] = candles[0].high - candles[0].low;
+
+        for (let i = 1; i < len; i++) {
+            tr[i] = Math.max(
+                candles[i].high - candles[i].low,
+                Math.abs(candles[i].high - candles[i - 1].close),
+                Math.abs(candles[i].low - candles[i - 1].close)
+            );
+        }
+
+        const atr = new Float64Array(len);
+        let sumTR = 0;
+        for (let i = 0; i < atrPeriods; i++) sumTR += tr[i];
+        atr[atrPeriods - 1] = sumTR / atrPeriods;
+        for (let i = atrPeriods; i < len; i++) atr[i] = (atr[i - 1] * (atrPeriods - 1) + tr[i]) / atrPeriods;
+
+        const up = new Float64Array(len), dn = new Float64Array(len), trend = new Int32Array(len);
+        let currentTrend = 1;
+
+        for (let i = 0; i < len; i++) {
+            const src = (candles[i].high + candles[i].low) / 2;
+            let basicUp = src - (multiplier * atr[i]), basicDn = src + (multiplier * atr[i]);
+
+            if (i === 0) { up[i] = basicUp; dn[i] = basicDn; trend[i] = 1; continue; }
+
+            up[i] = candles[i - 1].close > up[i - 1] ? Math.max(basicUp, up[i - 1]) : basicUp;
+            dn[i] = candles[i - 1].close < dn[i - 1] ? Math.min(basicDn, dn[i - 1]) : basicDn;
+
+            if (trend[i - 1] === -1 && candles[i].close > dn[i - 1]) currentTrend = 1;
+            else if (trend[i - 1] === 1 && candles[i].close < up[i - 1]) currentTrend = -1;
+            else currentTrend = trend[i - 1];
+
+            trend[i] = currentTrend;
+        }
+
+        const stMarkers = [];
+        let lastSignal = null;
+
+        for (let i = 1; i < len; i++) {
+            if (trend[i] === 1 && trend[i - 1] === -1) {
+                stMarkers.push({ time: candles[i].time, position: 'belowBar', color: '#00e676', shape: 'arrowUp', text: 'Buy' });
+                lastSignal = { type: 'BUY', price: candles[i].close };
+            } else if (trend[i] === -1 && trend[i - 1] === 1) {
+                stMarkers.push({ time: candles[i].time, position: 'aboveBar', color: '#ff1744', shape: 'arrowDown', text: 'Sell' });
+                lastSignal = { type: 'SELL', price: candles[i].close };
+            }
+        }
+        return { stMarkers, lastSignal };
+    }
+
+    function calculatePivots(candles, leftBars = 15, rightBars = 15) {
+        let lastPivotHigh = null, lastPivotLow = null;
+        const len = candles.length;
+        if (len < leftBars + rightBars + 1) return { pivotHigh: null, pivotLow: null };
+
+        for (let i = len - rightBars - 1; i >= leftBars; i--) {
+            let isHighPivot = true, isLowPivot = true;
+            for (let j = i - leftBars; j <= i + rightBars; j++) {
+                if (j === i) continue;
+                if (candles[j].high >= candles[i].high) isHighPivot = false;
+                if (candles[j].low <= candles[i].low) isLowPivot = false;
+            }
+            if (isHighPivot && !lastPivotHigh) lastPivotHigh = candles[i];
+            if (isLowPivot && !lastPivotLow) lastPivotLow = candles[i];
+            if (lastPivotHigh && lastPivotLow) break;
+        }
+        return { pivotHigh: lastPivotHigh, pivotLow: lastPivotLow };
+    }
+
+    function processWhaleData(candles) {
+        const markers = [];
+        if (!candles || candles.length < 20) return { markers };
+        let rollingVolumeSum = 0;
+        for (let i = 0; i < 20; i++) rollingVolumeSum += (candles[i].volume || 1);
+
+        for (let i = 20; i < candles.length; i++) {
+            const currentCandle = candles[i];
+            const avgVol = rollingVolumeSum / 20;
+            const isHighVolume = (currentCandle.volume || 0) > (avgVol * 2.2);
+            rollingVolumeSum += (currentCandle.volume || 1) - (candles[i - 20].volume || 1);
+
+            if (isHighVolume) {
+                if (currentCandle.close > currentCandle.open) {
+                    markers.push({ time: currentCandle.time, position: 'belowBar', color: '#00b0ff', shape: 'circle', text: 'BUY' });
+                } else if (currentCandle.close < currentCandle.open) {
+                    markers.push({ time: currentCandle.time, position: 'aboveBar', color: '#ff4081', shape: 'circle', text: 'SELL' });
+                }
+            }
+        }
+        return { markers };
+    }
+
+    async function fetchKlines(interval, limit = 500) {
+        const cacheKey = `${interval}_${limit}`;
+        const now = Date.now();
+
+        if (klineCache.has(cacheKey)) {
+            const cached = klineCache.get(cacheKey);
+            if (now - cached.timestamp < 5000) return cached.data;
+        }
+
+        const is1s = interval === "1s";
+        const endpoint = is1s ? 'uiKlines' : 'klines';
+        const apiInterval = is1s ? '1s' : interval;
+
+        const res = await fetch(`https://api.binance.com/api/v3/${endpoint}?symbol=BTCUSDT&interval=${apiInterval}&limit=${limit}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+
+        const formatted = data.map(d => ({
+            time: Math.floor(d[0] / 1000), open: parseFloat(d[1]), high: parseFloat(d[2]), low: parseFloat(d[3]), close: parseFloat(d[4]), volume: parseFloat(d[5])
+        }));
+
+        klineCache.set(cacheKey, { timestamp: now, data: formatted });
+        return formatted;
+    }
+
+    async function renderChart() {
+        statusEl.style.display = "block";
+        statusEl.innerText = "Cargando datos...";
+        clearActiveLines();
+
+        const selectedInterval = timeframeSelect.value;
+        startCandleTimer(selectedInterval);
+
+        try {
+            currentCandleData = await fetchKlines(selectedInterval, 500);
+            candlestickSeries.setData(currentCandleData);
+
+            let allMarkers = [];
+
+            if (showSupertrend) {
+                const { stMarkers, lastSignal } = getSupertrendMarkers(currentCandleData);
+                allMarkers = allMarkers.concat(stMarkers);
+                if (lastSignal) {
+                    dashStSignal.innerText = lastSignal.type;
+                    dashStSignal.style.color = lastSignal.type === "BUY" ? "#00e676" : "#ff5252";
+                    dashStPrice.innerText = `$${lastSignal.price.toFixed(2)}`;
+                }
+            }
+
+            if (showVsa) {
+                const { markers: whaleMarkers } = processWhaleData(currentCandleData);
+                allMarkers = allMarkers.concat(whaleMarkers);
+            }
+
+            if (showFootprint) {
+                const { footprintPOCs } = calculateFootprintLevels(currentCandleData);
+                if (footprintPOCs.length > 0) {
+                    const lastPOC = footprintPOCs[footprintPOCs.length - 1];
+                    currentFootprintRes = lastPOC.price;
+                    const line = candlestickSeries.createPriceLine({
+                        price: lastPOC.price, color: lastPOC.isBullish ? '#00e676' : '#ff5252', lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Dashed, title: 'Footprint POC'
+                    });
+                    activePriceLines.push(line);
+                }
+            }
+
+            if (showPivotsTf) {
+                const { pivotHigh, pivotLow } = calculatePivots(currentCandleData);
+                if (pivotHigh) {
+                    dashPivotTfRes.innerText = `$${pivotHigh.high.toFixed(2)}`;
+                    activePriceLines.push(candlestickSeries.createPriceLine({ price: pivotHigh.high, color: '#ff1744', lineWidth: 1, title: 'Resistencia TF' }));
+                }
+                if (pivotLow) {
+                    dashPivotTfSup.innerText = `$${pivotLow.low.toFixed(2)}`;
+                    activePriceLines.push(candlestickSeries.createPriceLine({ price: pivotLow.low, color: '#00e676', lineWidth: 1, title: 'Soporte TF' }));
+                }
+            }
+
+            allMarkers.sort((a, b) => a.time - b.time);
+            candlestickSeries.setMarkers(allMarkers);
+
+            if (currentCandleData.length > 0) {
+                updateRealtimeAnalysis(currentCandleData[currentCandleData.length - 1].close);
+            }
+
+            statusEl.style.display = "none";
+            connectWebSocket(selectedInterval);
+        } catch (err) {
+            console.error(err);
+            statusEl.innerText = "Error al cargar datos";
+        }
+    }
+
+    function connectWebSocket(interval) {
+        if (wsConnection) wsConnection.close();
+
+        const wsInterval = interval === "1s" ? "1s" : interval;
+        wsConnection = new WebSocket(`wss://stream.binance.com:9443/ws/btcusdt@kline_${wsInterval}`);
+
+        wsConnection.onopen = () => { statusEl.style.display = "none"; };
+        wsConnection.onmessage = (event) => {
+            const message = JSON.parse(event.data);
+            const k = message.k;
+            const updatedCandle = {
+                time: Math.floor(k.t / 1000), open: parseFloat(k.o), high: parseFloat(k.h), low: parseFloat(k.l), close: parseFloat(k.c), volume: parseFloat(k.v)
+            };
+
+            candlestickSeries.update(updatedCandle);
+            updateRealtimeAnalysis(updatedCandle.close);
+        };
+        wsConnection.onerror = () => { statusEl.innerText = "Error WebSocket"; statusEl.style.display = "block"; };
+    }
+
+    function setupToggleBtn(btn, getVal, setVal) {
+        btn.addEventListener('click', () => {
+            setVal(!getVal());
+            btn.classList.toggle('active', getVal());
+            btn.classList.toggle('inactive', !getVal());
+            updateDashboardModulesVisibility();
+            renderChart();
+        });
+    }
+
+    setupToggleBtn(btnPivots, () => showPivots, v => showPivots = v);
+    setupToggleBtn(btnPivotsTf, () => showPivotsTf, v => showPivotsTf = v);
+    setupToggleBtn(btnVsa, () => showVsa, v => showVsa = v);
+    setupToggleBtn(btnSupertrend, () => showSupertrend, v => showSupertrend = v);
+    setupToggleBtn(btnFootprint, () => showFootprint, v => showFootprint = v);
+    setupToggleBtn(btnMultiFp, () => showMultiFootprint, v => showMultiFootprint = v);
+
+    timeframeSelect.addEventListener('change', renderChart);
+
+    updateDashboardModulesVisibility();
+    updateWhaleDashboard();
+    renderChart();
 });
-
-// Inicialización
-fitCanvas();
 </script>
-
-</body>
-</html>
