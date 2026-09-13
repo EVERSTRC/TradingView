@@ -74,7 +74,6 @@
         #chart-wrapper { flex: 1; width: 100%; position: relative; }
         #chart { width: 100%; height: 100%; }
 
-        /* DASHBOARD PRINCIPAL Y SUS MÓDULOS DINÁMICOS */
         #candle-dashboard {
             position: absolute;
             top: 16px;
@@ -92,31 +91,15 @@
             box-shadow: 0 4px 16px rgba(0,0,0,0.5);
         }
         
-        .dash-module {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-
+        .dash-module { display: flex; flex-direction: column; gap: 8px; }
         .dash-row { display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 600; }
         .dash-label { color: #787b86; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px; }
         .dash-value { font-family: monospace; font-size: 13px; }
         .dash-subvalue { font-family: monospace; font-size: 11px; opacity: 0.85; margin-left: 4px; }
         .dash-divider { height: 1px; background-color: #2a2e39; margin: 2px 0; }
         
-        .progress-bar-bg {
-            width: 100%;
-            height: 4px;
-            background-color: #2a2e39;
-            border-radius: 2px;
-            overflow: hidden;
-        }
-        .progress-bar-fill {
-            height: 100%;
-            width: 0%;
-            background: linear-gradient(90deg, #2962ff, #00e5ff);
-            transition: width 0.3s ease;
-        }
+        .progress-bar-bg { width: 100%; height: 4px; background-color: #2a2e39; border-radius: 2px; overflow: hidden; }
+        .progress-bar-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #2962ff, #00e5ff); transition: width 0.3s ease; }
 
         #status { 
             position: absolute; 
@@ -323,6 +306,9 @@
             let currentWhaleBuyAvg = null;
             let currentMainTarget = null;
 
+            // Cache global de Klines para evitar re-fetch constante
+            const klineCache = new Map();
+
             const chart = LightweightCharts.createChart(chartContainer, {
                 width: chartContainer.clientWidth,
                 height: chartContainer.clientHeight,
@@ -518,6 +504,7 @@
                 timerInterval = setInterval(updateTimer, 1000);
             }
 
+            // OPTIMIZACIÓN: Detección Real de POC basada en mechones y dirección de la presión de volumen
             function calculateFootprintLevels(candles) {
                 if (!candles || candles.length < 20) return { footprintPOCs: [] };
 
@@ -531,13 +518,20 @@
                     rollingVolumeSum += (c.volume || 1) - (candles[i - 20].volume || 1);
 
                     if ((c.volume || 0) > (avgVol * 2.2)) {
-                        const footprintPOC = c.open < c.close 
+                        const isBullishCandle = c.close > c.open;
+                        const upperWick = c.high - Math.max(c.open, c.close);
+                        const lowerWick = Math.min(c.open, c.close) - c.low;
+
+                        // Si el mechón superior es mayor que el inferior, hay absorción vendedora (Resistencia)
+                        const isBullishPOC = lowerWick >= upperWick ? isBullishCandle : false;
+
+                        const footprintPOC = isBullishPOC 
                             ? c.open + ((c.close - c.open) * 0.70)
                             : c.open - ((c.open - c.close) * 0.70);
 
                         footprintPOCs.push({
                             price: footprintPOC,
-                            isBullish: c.close > c.open,
+                            isBullish: isBullishPOC,
                             time: c.time
                         });
                     }
@@ -667,17 +661,26 @@
                 return { stMarkers, lastSignal };
             }
 
+            // OPTIMIZACIÓN: Detección de pivotes no repintados (confirmados por la derecha)
             function calculatePivots(candles, leftBars = 15, rightBars = 15) {
                 let lastPivotHigh = null, lastPivotLow = null;
-                for (let i = leftBars; i < candles.length - rightBars; i++) {
+                const len = candles.length;
+                
+                if (len < leftBars + rightBars + 1) return { pivotHigh: null, pivotLow: null };
+
+                for (let i = len - rightBars - 1; i >= leftBars; i--) {
                     let isHighPivot = true, isLowPivot = true;
+                    
                     for (let j = i - leftBars; j <= i + rightBars; j++) {
                         if (j === i) continue;
                         if (candles[j].high >= candles[i].high) isHighPivot = false;
                         if (candles[j].low <= candles[i].low) isLowPivot = false;
                     }
-                    if (isHighPivot) lastPivotHigh = candles[i];
-                    if (isLowPivot) lastPivotLow = candles[i];
+                    
+                    if (isHighPivot && !lastPivotHigh) lastPivotHigh = candles[i];
+                    if (isLowPivot && !lastPivotLow) lastPivotLow = candles[i];
+
+                    if (lastPivotHigh && lastPivotLow) break;
                 }
                 return { pivotHigh: lastPivotHigh, pivotLow: lastPivotLow };
             }
@@ -710,7 +713,19 @@
                 return { markers, buyPrices, sellPrices };
             }
 
+            // OPTIMIZACIÓN: Fetch con Sistema de Caché Interno
             async function fetchKlines(interval, limit = 500) {
+                const cacheKey = `${interval}_${limit}`;
+                const now = Date.now();
+                
+                if (klineCache.has(cacheKey)) {
+                    const cached = klineCache.get(cacheKey);
+                    // Retener caché por 5 segundos para evitar llamadas simultáneas al cambiar UI
+                    if (now - cached.timestamp < 5000) {
+                        return cached.data;
+                    }
+                }
+
                 const is1s = interval === "1s";
                 const endpoint = is1s ? 'uiKlines' : 'klines';
                 const apiInterval = is1s ? '1s' : interval;
@@ -718,9 +733,13 @@
                 const res = await fetch(`https://api.binance.com/api/v3/${endpoint}?symbol=BTCUSDT&interval=${apiInterval}&limit=${limit}`);
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 const data = await res.json();
-                return data.map(d => ({
+                
+                const formatted = data.map(d => ({
                     time: Math.floor(d[0] / 1000), open: parseFloat(d[1]), high: parseFloat(d[2]), low: parseFloat(d[3]), close: parseFloat(d[4]), volume: parseFloat(d[5])
                 }));
+
+                klineCache.set(cacheKey, { timestamp: now, data: formatted });
+                return formatted;
             }
 
             async function renderSRVisuals(currentFormattedData) {
