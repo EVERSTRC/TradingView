@@ -10,30 +10,57 @@
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #131722; color: #d1d4dc; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
         
-        /* Top Navigation Bar */
-        #top-bar { display: flex; align-items: center; justify-content: space-between; padding: 10px 20px; background-color: #1e222d; border-bottom: 1px solid #2a2e39; flex-shrink: 0; }
-        .controls-group { display: flex; align-items: center; gap: 10px; }
-        label { font-size: 14px; color: #787b86; }
-        select, button { background-color: #2a2e39; color: #d1d4dc; border: 1px solid #363c4e; padding: 6px 12px; border-radius: 4px; font-size: 13px; cursor: pointer; transition: all 0.2s; }
+        /* Barra Superior */
+        #top-bar { display: flex; align-items: center; justify-content: space-between; padding: 6px 14px; background-color: #1e222d; border-bottom: 1px solid #2a2e39; flex-shrink: 0; }
+        .controls-group { display: flex; align-items: center; gap: 8px; }
+        label { font-size: 12px; color: #787b86; }
+        select, button { background-color: #2a2e39; color: #d1d4dc; border: 1px solid #363c4e; padding: 4px 8px; border-radius: 4px; font-size: 12px; cursor: pointer; transition: all 0.2s; }
         select:hover, button:hover { background-color: #363c4e; }
         button.active { background-color: #2962ff; color: #ffffff; border-color: #2962ff; }
         button.inactive { opacity: 0.6; }
         
-        #status { font-size: 12px; color: #2962ff; font-weight: bold; }
+        #status { font-size: 11px; color: #2962ff; font-weight: bold; }
         
-        /* Main Layout */
+        /* Contenedor Principal */
         #main-container { display: flex; flex: 1; position: relative; overflow: hidden; width: 100%; height: 100%; }
         #chart { flex: 1; height: 100%; width: 100%; min-width: 0; min-height: 0; position: relative; }
         
-        /* Side Dashboard */
-        #dashboard { width: 300px; background-color: #1e222d; border-left: 1px solid #2a2e39; padding: 15px; display: flex; flex-direction: column; gap: 15px; overflow-y: auto; flex-shrink: 0; }
-        .dash-module { background-color: #131722; border-radius: 6px; padding: 12px; border: 1px solid #2a2e39; display: flex; flex-direction: column; gap: 8px; }
-        .dash-module h4 { font-size: 12px; color: #787b86; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
-        .dash-row { display: flex; justify-content: space-between; font-size: 13px; }
+        /* Dashboard Lateral Compacto */
+        #dashboard { 
+            width: 230px; 
+            background-color: #1e222d; 
+            border-left: 1px solid #2a2e39; 
+            padding: 8px; 
+            display: flex; 
+            flex-direction: column; 
+            gap: 6px; 
+            overflow-y: auto; 
+            flex-shrink: 0; 
+        }
+        
+        .dash-module { 
+            background-color: #131722; 
+            border-radius: 4px; 
+            padding: 6px 8px; 
+            border: 1px solid #2a2e39; 
+            display: flex; 
+            flex-direction: column; 
+            gap: 3px; 
+        }
+        
+        .dash-module h4 { 
+            font-size: 10px; 
+            color: #787b86; 
+            text-transform: uppercase; 
+            letter-spacing: 0.5px; 
+            margin-bottom: 1px; 
+        }
+        
+        .dash-row { display: flex; justify-content: space-between; font-size: 11px; }
         .dash-val { font-weight: bold; }
         
-        /* Timer & Progress Bar */
-        #timer-progress-container { width: 100%; height: 4px; background-color: #2a2e39; border-radius: 2px; overflow: hidden; margin-top: 4px; }
+        /* Barra de Progreso y Timer */
+        #timer-progress-container { width: 100%; height: 3px; background-color: #2a2e39; border-radius: 2px; overflow: hidden; margin-top: 2px; }
         #timer-progress { height: 100%; width: 0%; background-color: #2962ff; transition: width 1s linear; }
     </style>
 </head>
@@ -143,7 +170,7 @@
                 </div>
                 <div class="dash-row">
                     <span></span>
-                    <span id="dash-whale-1d-net" class="dash-val" style="font-size: 11px;">--</span>
+                    <span id="dash-whale-1d-net" class="dash-val" style="font-size: 10px;">--</span>
                 </div>
                 <div class="dash-row">
                     <span>1 Semana:</span>
@@ -151,7 +178,7 @@
                 </div>
                 <div class="dash-row">
                     <span></span>
-                    <span id="dash-whale-1w-net" class="dash-val" style="font-size: 11px;">--</span>
+                    <span id="dash-whale-1w-net" class="dash-val" style="font-size: 10px;">--</span>
                 </div>
                 <div class="dash-row">
                     <span>1 Mes:</span>
@@ -159,7 +186,7 @@
                 </div>
                 <div class="dash-row">
                     <span></span>
-                    <span id="dash-whale-1m-net" class="dash-val" style="font-size: 11px;">--</span>
+                    <span id="dash-whale-1m-net" class="dash-val" style="font-size: 10px;">--</span>
                 </div>
             </div>
         </div>
@@ -216,7 +243,7 @@
 
         const klineCache = new Map();
 
-        // 1. Inicialización del Gráfico
+        // 1. Crear el Gráfico
         const chart = LightweightCharts.createChart(chartContainer, {
             width: chartContainer.clientWidth,
             height: chartContainer.clientHeight,
@@ -230,7 +257,7 @@
             ? chart.addCandlestickSeries({ upColor: '#089981', downColor: '#f23645', borderVisible: false, wickUpColor: '#089981', wickDownColor: '#f23645' })
             : chart.addSeries(LightweightCharts.CandlestickSeries, { upColor: '#089981', downColor: '#f23645', borderVisible: false, wickUpColor: '#089981', wickDownColor: '#f23645' });
 
-        // 2. ResizeObserver: Autoajuste dinámico al 100% de la pantalla sin cortes
+        // 2. ResizeObserver: Autoajuste en tiempo real de ancho y alto
         const resizeObserver = new ResizeObserver(entries => {
             if (!entries || entries.length === 0) return;
             const { width, height } = entries[0].contentRect;
@@ -614,7 +641,6 @@
                     updateRealtimeAnalysis(currentCandleData[currentCandleData.length - 1].close);
                 }
 
-                // Ajusta la visualización para mostrar todo el contenido cargado correctamente
                 chart.timeScale().fitContent();
 
                 statusEl.style.display = "none";
