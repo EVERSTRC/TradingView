@@ -1,478 +1,653 @@
-<script>
-document.addEventListener("DOMContentLoaded", function () {
-    const statusEl = document.getElementById("status");
-    const timeframeSelect = document.getElementById("timeframe");
-    const chartContainer = document.getElementById("chart");
-
-    const btnPivots = document.getElementById("toggle-pivots");
-    const btnPivotsTf = document.getElementById("toggle-pivots-tf");
-    const btnVsa = document.getElementById("toggle-vsa");
-    const btnSupertrend = document.getElementById("toggle-supertrend");
-    const btnFootprint = document.getElementById("toggle-footprint");
-    const btnMultiFp = document.getElementById("toggle-multi-fp");
-
-    const modSupertrend = document.getElementById("dash-module-supertrend");
-    const modFootprint = document.getElementById("dash-module-footprint");
-    const modPivots = document.getElementById("dash-module-pivots");
-    const modPivotsTf = document.getElementById("dash-module-pivots-tf");
-    const modVsa = document.getElementById("dash-module-vsa");
-
-    let showPivots = true, showPivotsTf = true, showVsa = true;
-    let showSupertrend = true, showFootprint = true, showMultiFootprint = false;
-
-    const timerDisplay = document.getElementById("timer-display");
-    const timerProgress = document.getElementById("timer-progress");
-    const dashStSignal = document.getElementById("dash-st-signal");
-    const dashStPrice = document.getElementById("dash-st-price");
-    const dashBias = document.getElementById("dash-bias");
-    const dashTarget = document.getElementById("dash-target");
-    const dashInvalid = document.getElementById("dash-invalid");
-    const dashPivotTfRes = document.getElementById("dash-pivot-tf-res");
-    const dashPivotTfSup = document.getElementById("dash-pivot-tf-sup");
-    const dashEntry = document.getElementById("dash-entry");
-    const dashTp = document.getElementById("dash-tp");
-    const dashSl = document.getElementById("dash-sl");
-
-    const dashWhale1dPct = document.getElementById("dash-whale-1d-pct");
-    const dashWhale1dNet = document.getElementById("dash-whale-1d-net");
-    const dashWhale1wPct = document.getElementById("dash-whale-1w-pct");
-    const dashWhale1wNet = document.getElementById("dash-whale-1w-net");
-    const dashWhale1mPct = document.getElementById("dash-whale-1m-pct");
-    const dashWhale1mNet = document.getElementById("dash-whale-1m-net");
-
-    let activePriceLines = [];
-    let wsConnection = null;
-    let currentCandleData = [];
-    let timerInterval = null;
-    let currentFootprintRes = null;
-    let currentMainTarget = null;
-
-    const klineCache = new Map();
-
-    const chart = LightweightCharts.createChart(chartContainer, {
-        width: chartContainer.clientWidth,
-        height: chartContainer.clientHeight,
-        layout: { background: { type: 'solid', color: '#131722' }, textColor: '#d1d4dc' },
-        grid: { vertLines: { color: 'rgba(42, 46, 57, 0.5)' }, horzLines: { color: 'rgba(42, 46, 57, 0.5)' } },
-        timeScale: { borderColor: 'rgba(197, 203, 206, 0.8)', timeVisible: true, secondsVisible: true },
-        rightPriceScale: { autoScale: true }
-    });
-
-    const candlestickSeries = chart.addCandlestickSeries({
-        upColor: '#089981', downColor: '#f23645', borderVisible: false, wickUpColor: '#089981', wickDownColor: '#f23645'
-    });
-
-    window.addEventListener('resize', () => {
-        chart.applyOptions({ width: chartContainer.clientWidth, height: chartContainer.clientHeight });
-    });
-
-    function updateDashboardModulesVisibility() {
-        modSupertrend.style.display = showSupertrend ? "flex" : "none";
-        modFootprint.style.display = showFootprint ? "flex" : "none";
-        modPivots.style.display = showPivots ? "flex" : "none";
-        modPivotsTf.style.display = showPivotsTf ? "flex" : "none";
-        modVsa.style.display = showVsa ? "flex" : "none";
-    }
-
-    function clearActiveLines() {
-        activePriceLines.forEach(line => candlestickSeries.removePriceLine(line));
-        activePriceLines = [];
-    }
-
-    function updateRealtimeAnalysis(lastClosePrice) {
-        if (!lastClosePrice) return;
-        let isBullish = false;
-
-        if (currentFootprintRes && showFootprint) {
-            const invalidLevel = currentFootprintRes + 35;
-            dashInvalid.innerText = `$${invalidLevel.toFixed(2)}`;
-
-            if (lastClosePrice < currentFootprintRes) {
-                dashBias.innerText = "BAJISTA 🐻";
-                dashBias.style.color = "#ff5252";
-                isBullish = false;
-            } else {
-                dashBias.innerText = "ALCISTA 🚀";
-                dashBias.style.color = "#00e676";
-                isBullish = true;
-            }
-        } else {
-            dashBias.innerText = "NEUTRO";
-            dashBias.style.color = "#d1d4dc";
-            dashInvalid.innerText = "--";
-        }
-
-        dashTarget.innerText = (currentMainTarget && showPivots) ? `$${currentMainTarget.toFixed(2)}` : "--";
-
-        if (currentFootprintRes && showFootprint) {
-            let entryPrice = lastClosePrice; 
-            let slPrice = isBullish ? currentFootprintRes * 0.997 : currentFootprintRes * 1.003; 
-            let tpPrice = (currentMainTarget && showPivots && ((isBullish && currentMainTarget > entryPrice) || (!isBullish && currentMainTarget < entryPrice)))
-                ? currentMainTarget 
-                : (isBullish ? entryPrice + (Math.abs(entryPrice - slPrice) * 2) : entryPrice - (Math.abs(entryPrice - slPrice) * 2));
-
-            dashEntry.innerText = `$${entryPrice.toFixed(2)}`;
-            dashTp.innerText = `$${tpPrice.toFixed(2)}`;
-            dashSl.innerText = `$${slPrice.toFixed(2)}`;
-        } else {
-            dashEntry.innerText = "--";
-            dashTp.innerText = "--";
-            dashSl.innerText = "--";
-        }
-    }
-
-    function calculateWhaleMetrics(candles, thresholdMultiplier = 1.5) {
-        if (!candles || candles.length < 20) return { buyVol: 0, sellVol: 0 };
-        let buyVol = 0, sellVol = 0, rollingVolumeSum = 0;
-
-        for (let i = 0; i < 20; i++) rollingVolumeSum += (candles[i].volume || 1);
-
-        for (let i = 20; i < candles.length; i++) {
-            const c = candles[i];
-            const avgVol = rollingVolumeSum / 20;
-            rollingVolumeSum += (c.volume || 1) - (candles[i - 20].volume || 1);
-
-            if ((c.volume || 0) > (avgVol * thresholdMultiplier)) {
-                if (c.close > c.open) buyVol += c.volume;
-                else if (c.close < c.open) sellVol += c.volume;
-                else { buyVol += c.volume / 2; sellVol += c.volume / 2; }
-            }
-        }
-        return { buyVol, sellVol };
-    }
-
-    async function updateWhaleDashboard() {
-        try {
-            const [raw1d, raw1w, raw1m] = await Promise.all([
-                fetchKlines('1d', 100), fetchKlines('1w', 100), fetchKlines('1M', 60)
-            ]);
-
-            const periods = [
-                { data: raw1d, elPct: dashWhale1dPct, elNet: dashWhale1dNet, multiplier: 1.4 },
-                { data: raw1w, elPct: dashWhale1wPct, elNet: dashWhale1wNet, multiplier: 1.3 },
-                { data: raw1m, elPct: dashWhale1mPct, elNet: dashWhale1mNet, multiplier: 1.2 }
-            ];
-
-            periods.forEach(({ data, elPct, elNet, multiplier }) => {
-                const { buyVol, sellVol } = calculateWhaleMetrics(data, multiplier);
-                const total = buyVol + sellVol;
-                const netBtc = buyVol - sellVol;
-
-                if (total === 0) {
-                    elPct.innerText = "50%C/50%V";
-                    elPct.style.color = "#d1d4dc";
-                    elNet.innerText = "(0 BTC)";
-                    return;
-                }
-
-                const buyPct = Math.round((buyVol / total) * 100);
-                const sellPct = 100 - buyPct;
-                elPct.innerText = `${buyPct}%C/${sellPct}%V`;
-                elPct.style.color = buyPct > 50 ? "#00e676" : buyPct < 50 ? "#ff5252" : "#d1d4dc";
-
-                const formattedNet = netBtc >= 0 ? `(+${Math.round(netBtc)} BTC)` : `(${Math.round(netBtc)} BTC)`;
-                elNet.innerText = formattedNet;
-                elNet.style.color = netBtc >= 0 ? "#00e676" : "#ff5252";
-            });
-        } catch (e) {
-            console.error("Error en métricas de ballenas:", e);
-        }
-    }
-
-    function getIntervalInSeconds(interval) {
-        const unit = interval.slice(-1);
-        const val = parseInt(interval);
-        if (unit === 's') return val;
-        if (unit === 'm') return val * 60;
-        if (unit === 'h') return val * 3600;
-        if (unit === 'd') return val * 86400;
-        if (unit === 'w') return val * 604800;
-        return 60;
-    }
-
-    function startCandleTimer(interval) {
-        if (timerInterval) clearInterval(timerInterval);
-        const intervalSecs = getIntervalInSeconds(interval);
-
-        function updateTimer() {
-            const nowSecs = Math.floor(Date.now() / 1000);
-            const elapsed = nowSecs % intervalSecs;
-            const remaining = intervalSecs - elapsed;
-            const mins = Math.floor(remaining / 60);
-            const secs = remaining % 60;
-
-            if (intervalSecs < 60) {
-                timerDisplay.innerText = `${remaining}s`;
-            } else if (mins >= 60) {
-                timerDisplay.innerText = `${Math.floor(mins / 60)}h ${(mins % 60).toString().padStart(2, '0')}m`;
-            } else {
-                timerDisplay.innerText = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-            }
-
-            timerProgress.style.width = `${(elapsed / intervalSecs) * 100}%`;
-        }
-
-        updateTimer();
-        timerInterval = setInterval(updateTimer, 1000);
-    }
-
-    function calculateFootprintLevels(candles) {
-        if (!candles || candles.length < 20) return { footprintPOCs: [] };
-        const footprintPOCs = [];
-        let rollingVolumeSum = 0;
-        for (let i = 0; i < 20; i++) rollingVolumeSum += (candles[i].volume || 1);
-
-        for (let i = 20; i < candles.length; i++) {
-            const c = candles[i];
-            const avgVol = rollingVolumeSum / 20;
-            rollingVolumeSum += (c.volume || 1) - (candles[i - 20].volume || 1);
-
-            if ((c.volume || 0) > (avgVol * 2.2)) {
-                const isBullishCandle = c.close > c.open;
-                const upperWick = c.high - Math.max(c.open, c.close);
-                const lowerWick = Math.min(c.open, c.close) - c.low;
-                const isBullishPOC = lowerWick >= upperWick ? isBullishCandle : false;
-
-                const footprintPOC = isBullishPOC 
-                    ? c.open + ((c.close - c.open) * 0.70)
-                    : c.open - ((c.open - c.close) * 0.70);
-
-                footprintPOCs.push({ price: footprintPOC, isBullish: isBullishPOC, time: c.time });
-            }
-        }
-        return { footprintPOCs: footprintPOCs.slice(-2) };
-    }
-
-    function getSupertrendMarkers(candles, atrPeriods = 14, multiplier = 2.0) {
-        if (!candles || candles.length < atrPeriods + 1) return { stMarkers: [], lastSignal: null };
-        const len = candles.length;
-        const tr = new Float64Array(len);
-        tr[0] = candles[0].high - candles[0].low;
-
-        for (let i = 1; i < len; i++) {
-            tr[i] = Math.max(
-                candles[i].high - candles[i].low,
-                Math.abs(candles[i].high - candles[i - 1].close),
-                Math.abs(candles[i].low - candles[i - 1].close)
-            );
-        }
-
-        const atr = new Float64Array(len);
-        let sumTR = 0;
-        for (let i = 0; i < atrPeriods; i++) sumTR += tr[i];
-        atr[atrPeriods - 1] = sumTR / atrPeriods;
-        for (let i = atrPeriods; i < len; i++) atr[i] = (atr[i - 1] * (atrPeriods - 1) + tr[i]) / atrPeriods;
-
-        const up = new Float64Array(len), dn = new Float64Array(len), trend = new Int32Array(len);
-        let currentTrend = 1;
-
-        for (let i = 0; i < len; i++) {
-            const src = (candles[i].high + candles[i].low) / 2;
-            let basicUp = src - (multiplier * atr[i]), basicDn = src + (multiplier * atr[i]);
-
-            if (i === 0) { up[i] = basicUp; dn[i] = basicDn; trend[i] = 1; continue; }
-
-            up[i] = candles[i - 1].close > up[i - 1] ? Math.max(basicUp, up[i - 1]) : basicUp;
-            dn[i] = candles[i - 1].close < dn[i - 1] ? Math.min(basicDn, dn[i - 1]) : basicDn;
-
-            if (trend[i - 1] === -1 && candles[i].close > dn[i - 1]) currentTrend = 1;
-            else if (trend[i - 1] === 1 && candles[i].close < up[i - 1]) currentTrend = -1;
-            else currentTrend = trend[i - 1];
-
-            trend[i] = currentTrend;
-        }
-
-        const stMarkers = [];
-        let lastSignal = null;
-
-        for (let i = 1; i < len; i++) {
-            if (trend[i] === 1 && trend[i - 1] === -1) {
-                stMarkers.push({ time: candles[i].time, position: 'belowBar', color: '#00e676', shape: 'arrowUp', text: 'Buy' });
-                lastSignal = { type: 'BUY', price: candles[i].close };
-            } else if (trend[i] === -1 && trend[i - 1] === 1) {
-                stMarkers.push({ time: candles[i].time, position: 'aboveBar', color: '#ff1744', shape: 'arrowDown', text: 'Sell' });
-                lastSignal = { type: 'SELL', price: candles[i].close };
-            }
-        }
-        return { stMarkers, lastSignal };
-    }
-
-    function calculatePivots(candles, leftBars = 15, rightBars = 15) {
-        let lastPivotHigh = null, lastPivotLow = null;
-        const len = candles.length;
-        if (len < leftBars + rightBars + 1) return { pivotHigh: null, pivotLow: null };
-
-        for (let i = len - rightBars - 1; i >= leftBars; i--) {
-            let isHighPivot = true, isLowPivot = true;
-            for (let j = i - leftBars; j <= i + rightBars; j++) {
-                if (j === i) continue;
-                if (candles[j].high >= candles[i].high) isHighPivot = false;
-                if (candles[j].low <= candles[i].low) isLowPivot = false;
-            }
-            if (isHighPivot && !lastPivotHigh) lastPivotHigh = candles[i];
-            if (isLowPivot && !lastPivotLow) lastPivotLow = candles[i];
-            if (lastPivotHigh && lastPivotLow) break;
-        }
-        return { pivotHigh: lastPivotHigh, pivotLow: lastPivotLow };
-    }
-
-    function processWhaleData(candles) {
-        const markers = [];
-        if (!candles || candles.length < 20) return { markers };
-        let rollingVolumeSum = 0;
-        for (let i = 0; i < 20; i++) rollingVolumeSum += (candles[i].volume || 1);
-
-        for (let i = 20; i < candles.length; i++) {
-            const currentCandle = candles[i];
-            const avgVol = rollingVolumeSum / 20;
-            const isHighVolume = (currentCandle.volume || 0) > (avgVol * 2.2);
-            rollingVolumeSum += (currentCandle.volume || 1) - (candles[i - 20].volume || 1);
-
-            if (isHighVolume) {
-                if (currentCandle.close > currentCandle.open) {
-                    markers.push({ time: currentCandle.time, position: 'belowBar', color: '#00b0ff', shape: 'circle', text: 'BUY' });
-                } else if (currentCandle.close < currentCandle.open) {
-                    markers.push({ time: currentCandle.time, position: 'aboveBar', color: '#ff4081', shape: 'circle', text: 'SELL' });
-                }
-            }
-        }
-        return { markers };
-    }
-
-    async function fetchKlines(interval, limit = 500) {
-        const cacheKey = `${interval}_${limit}`;
-        const now = Date.now();
-
-        if (klineCache.has(cacheKey)) {
-            const cached = klineCache.get(cacheKey);
-            if (now - cached.timestamp < 5000) return cached.data;
-        }
-
-        const is1s = interval === "1s";
-        const endpoint = is1s ? 'uiKlines' : 'klines';
-        const apiInterval = is1s ? '1s' : interval;
-
-        const res = await fetch(`https://api.binance.com/api/v3/${endpoint}?symbol=BTCUSDT&interval=${apiInterval}&limit=${limit}`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-
-        const formatted = data.map(d => ({
-            time: Math.floor(d[0] / 1000), open: parseFloat(d[1]), high: parseFloat(d[2]), low: parseFloat(d[3]), close: parseFloat(d[4]), volume: parseFloat(d[5])
-        }));
-
-        klineCache.set(cacheKey, { timestamp: now, data: formatted });
-        return formatted;
-    }
-
-    async function renderChart() {
-        statusEl.style.display = "block";
-        statusEl.innerText = "Cargando datos...";
-        clearActiveLines();
-
-        const selectedInterval = timeframeSelect.value;
-        startCandleTimer(selectedInterval);
-
-        try {
-            currentCandleData = await fetchKlines(selectedInterval, 500);
-            candlestickSeries.setData(currentCandleData);
-
-            let allMarkers = [];
-
-            if (showSupertrend) {
-                const { stMarkers, lastSignal } = getSupertrendMarkers(currentCandleData);
-                allMarkers = allMarkers.concat(stMarkers);
-                if (lastSignal) {
-                    dashStSignal.innerText = lastSignal.type;
-                    dashStSignal.style.color = lastSignal.type === "BUY" ? "#00e676" : "#ff5252";
-                    dashStPrice.innerText = `$${lastSignal.price.toFixed(2)}`;
-                }
-            }
-
-            if (showVsa) {
-                const { markers: whaleMarkers } = processWhaleData(currentCandleData);
-                allMarkers = allMarkers.concat(whaleMarkers);
-            }
-
-            if (showFootprint) {
-                const { footprintPOCs } = calculateFootprintLevels(currentCandleData);
-                if (footprintPOCs.length > 0) {
-                    const lastPOC = footprintPOCs[footprintPOCs.length - 1];
-                    currentFootprintRes = lastPOC.price;
-                    const line = candlestickSeries.createPriceLine({
-                        price: lastPOC.price, color: lastPOC.isBullish ? '#00e676' : '#ff5252', lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Dashed, title: 'Footprint POC'
-                    });
-                    activePriceLines.push(line);
-                }
-            }
-
-            if (showPivotsTf) {
-                const { pivotHigh, pivotLow } = calculatePivots(currentCandleData);
-                if (pivotHigh) {
-                    dashPivotTfRes.innerText = `$${pivotHigh.high.toFixed(2)}`;
-                    activePriceLines.push(candlestickSeries.createPriceLine({ price: pivotHigh.high, color: '#ff1744', lineWidth: 1, title: 'Resistencia TF' }));
-                }
-                if (pivotLow) {
-                    dashPivotTfSup.innerText = `$${pivotLow.low.toFixed(2)}`;
-                    activePriceLines.push(candlestickSeries.createPriceLine({ price: pivotLow.low, color: '#00e676', lineWidth: 1, title: 'Soporte TF' }));
-                }
-            }
-
-            allMarkers.sort((a, b) => a.time - b.time);
-            candlestickSeries.setMarkers(allMarkers);
-
-            if (currentCandleData.length > 0) {
-                updateRealtimeAnalysis(currentCandleData[currentCandleData.length - 1].close);
-            }
-
-            statusEl.style.display = "none";
-            connectWebSocket(selectedInterval);
-        } catch (err) {
-            console.error(err);
-            statusEl.innerText = "Error al cargar datos";
-        }
-    }
-
-    function connectWebSocket(interval) {
-        if (wsConnection) wsConnection.close();
-
-        const wsInterval = interval === "1s" ? "1s" : interval;
-        wsConnection = new WebSocket(`wss://stream.binance.com:9443/ws/btcusdt@kline_${wsInterval}`);
-
-        wsConnection.onopen = () => { statusEl.style.display = "none"; };
-        wsConnection.onmessage = (event) => {
-            const message = JSON.parse(event.data);
-            const k = message.k;
-            const updatedCandle = {
-                time: Math.floor(k.t / 1000), open: parseFloat(k.o), high: parseFloat(k.h), low: parseFloat(k.l), close: parseFloat(k.c), volume: parseFloat(k.v)
-            };
-
-            candlestickSeries.update(updatedCandle);
-            updateRealtimeAnalysis(updatedCandle.close);
-        };
-        wsConnection.onerror = () => { statusEl.innerText = "Error WebSocket"; statusEl.style.display = "block"; };
-    }
-
-    function setupToggleBtn(btn, getVal, setVal) {
-        btn.addEventListener('click', () => {
-            setVal(!getVal());
-            btn.classList.toggle('active', getVal());
-            btn.classList.toggle('inactive', !getVal());
-            updateDashboardModulesVisibility();
-            renderChart();
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bitcoin Trading Terminal</title>
+    <!-- Lightweight Charts Library -->
+    <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #131722; color: #d1d4dc; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        
+        /* Top Navigation Bar */
+        #top-bar { display: flex; align-items: center; justify-content: space-between; padding: 10px 20px; background-color: #1e222d; border-bottom: 1px solid #2a2e39; }
+        .controls-group { display: flex; align-items: center; gap: 10px; }
+        label { font-size: 14px; color: #787b86; }
+        select, button { background-color: #2a2e39; color: #d1d4dc; border: 1px solid #363c4e; padding: 6px 12px; border-radius: 4px; font-size: 13px; cursor: pointer; transition: all 0.2s; }
+        select:hover, button:hover { background-color: #363c4e; }
+        button.active { background-color: #2962ff; color: #ffffff; border-color: #2962ff; }
+        button.inactive { opacity: 0.6; }
+        
+        #status { font-size: 12px; color: #2962ff; font-weight: bold; }
+        
+        /* Main Layout */
+        #main-container { display: flex; flex: 1; position: relative; }
+        #chart { flex: 1; height: 100%; }
+        
+        /* Side Dashboard */
+        #dashboard { width: 300px; background-color: #1e222d; border-left: 1px solid #2a2e39; padding: 15px; display: flex; flex-direction: column; gap: 15px; overflow-y: auto; }
+        .dash-module { background-color: #131722; border-radius: 6px; padding: 12px; border: 1px solid #2a2e39; display: flex; flex-direction: column; gap: 8px; }
+        .dash-module h4 { font-size: 12px; color: #787b86; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+        .dash-row { display: flex; justify-content: space-between; font-size: 13px; }
+        .dash-val { font-weight: bold; }
+        
+        /* Timer & Progress Bar */
+        #timer-box { margin-top: 5px; }
+        #timer-progress-container { width: 100%; height: 4px; background-color: #2a2e39; border-radius: 2px; overflow: hidden; margin-top: 4px; }
+        #timer-progress { height: 100%; width: 0%; background-color: #2962ff; transition: width 1s linear; }
+    </style>
+</head>
+<body>
+
+    <!-- Bara Superior -->
+    <div id="top-bar">
+        <div class="controls-group">
+            <label for="timeframe">Timeframe:</label>
+            <select id="timeframe">
+                <option value="1s">1 Sec</option>
+                <option value="1m">1 Min</option>
+                <option value="5m">5 Min</option>
+                <option value="15m" selected>15 Min</option>
+                <option value="1h">1 Hour</option>
+                <option value="4h">4 Hours</option>
+                <option value="1d">1 Day</option>
+            </select>
+            <div id="status">Cargando...</div>
+        </div>
+
+        <div class="controls-group">
+            <button id="toggle-supertrend" class="active">Supertrend</button>
+            <button id="toggle-footprint" class="active">Footprint POC</button>
+            <button id="toggle-pivots" class="active">Pivots</button>
+            <button id="toggle-pivots-tf" class="active">Pivots TF</button>
+            <button id="toggle-vsa" class="active">VSA / Ballenas</button>
+            <button id="toggle-multi-fp" class="inactive">Multi-FP</button>
+        </div>
+    </div>
+
+    <!-- Áreas Principales -->
+    <div id="main-container">
+        <div id="chart"></div>
+
+        <!-- Dashboard Latveral -->
+        <div id="dashboard">
+            <div class="dash-module">
+                <h4>Vela Actual</h4>
+                <div class="dash-row">
+                    <span>Cierre en:</span>
+                    <span id="timer-display" class="dash-val">00:00</span>
+                </div>
+                <div id="timer-progress-container">
+                    <div id="timer-progress"></div>
+                </div>
+            </div>
+
+            <div id="dash-module-supertrend" class="dash-module">
+                <h4>Supertrend</h4>
+                <div class="dash-row">
+                    <span>Señal:</span>
+                    <span id="dash-st-signal" class="dash-val">--</span>
+                </div>
+                <div class="dash-row">
+                    <span>Precio Señal:</span>
+                    <span id="dash-st-price" class="dash-val">--</span>
+                </div>
+            </div>
+
+            <div id="dash-module-footprint" class="dash-module">
+                <h4>Sesgo de Mercado</h4>
+                <div class="dash-row">
+                    <span>Tendencia:</span>
+                    <span id="dash-bias" class="dash-val">--</span>
+                </div>
+                <div class="dash-row">
+                    <span>Invalidez:</span>
+                    <span id="dash-invalid" class="dash-val">--</span>
+                </div>
+                <div class="dash-row">
+                    <span>Entrada Sugerida:</span>
+                    <span id="dash-entry" class="dash-val">--</span>
+                </div>
+                <div class="dash-row">
+                    <span>Take Profit (TP):</span>
+                    <span id="dash-tp" class="dash-val">--</span>
+                </div>
+                <div class="dash-row">
+                    <span>Stop Loss (SL):</span>
+                    <span id="dash-sl" class="dash-val">--</span>
+                </div>
+            </div>
+
+            <div id="dash-module-pivots" class="dash-module">
+                <h4>Objetivo Principal</h4>
+                <div class="dash-row">
+                    <span>Target Pivot:</span>
+                    <span id="dash-target" class="dash-val">--</span>
+                </div>
+            </div>
+
+            <div id="dash-module-pivots-tf" class="dash-module">
+                <h4>Rango Estructura TF</h4>
+                <div class="dash-row">
+                    <span>Resistencia:</span>
+                    <span id="dash-pivot-tf-res" class="dash-val">--</span>
+                </div>
+                <div class="dash-row">
+                    <span>Soporte:</span>
+                    <span id="dash-pivot-tf-sup" class="dash-val">--</span>
+                </div>
+            </div>
+
+            <div id="dash-module-vsa" class="dash-module">
+                <h4>Flujo Volumétrico Ballenas</h4>
+                <div class="dash-row">
+                    <span>1 Día:</span>
+                    <span id="dash-whale-1d-pct" class="dash-val">--</span>
+                </div>
+                <div class="dash-row">
+                    <span></span>
+                    <span id="dash-whale-1d-net" class="dash-val" style="font-size: 11px;">--</span>
+                </div>
+                <div class="dash-row">
+                    <span>1 Semana:</span>
+                    <span id="dash-whale-1w-pct" class="dash-val">--</span>
+                </div>
+                <div class="dash-row">
+                    <span></span>
+                    <span id="dash-whale-1w-net" class="dash-val" style="font-size: 11px;">--</span>
+                </div>
+                <div class="dash-row">
+                    <span>1 Mes:</span>
+                    <span id="dash-whale-1m-pct" class="dash-val">--</span>
+                </div>
+                <div class="dash-row">
+                    <span></span>
+                    <span id="dash-whale-1m-net" class="dash-val" style="font-size: 11px;">--</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Script Principal -->
+    <script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const statusEl = document.getElementById("status");
+        const timeframeSelect = document.getElementById("timeframe");
+        const chartContainer = document.getElementById("chart");
+
+        const btnPivots = document.getElementById("toggle-pivots");
+        const btnPivotsTf = document.getElementById("toggle-pivots-tf");
+        const btnVsa = document.getElementById("toggle-vsa");
+        const btnSupertrend = document.getElementById("toggle-supertrend");
+        const btnFootprint = document.getElementById("toggle-footprint");
+        const btnMultiFp = document.getElementById("toggle-multi-fp");
+
+        const modSupertrend = document.getElementById("dash-module-supertrend");
+        const modFootprint = document.getElementById("dash-module-footprint");
+        const modPivots = document.getElementById("dash-module-pivots");
+        const modPivotsTf = document.getElementById("dash-module-pivots-tf");
+        const modVsa = document.getElementById("dash-module-vsa");
+
+        let showPivots = true, showPivotsTf = true, showVsa = true;
+        let showSupertrend = true, showFootprint = true, showMultiFootprint = false;
+
+        const timerDisplay = document.getElementById("timer-display");
+        const timerProgress = document.getElementById("timer-progress");
+        const dashStSignal = document.getElementById("dash-st-signal");
+        const dashStPrice = document.getElementById("dash-st-price");
+        const dashBias = document.getElementById("dash-bias");
+        const dashTarget = document.getElementById("dash-target");
+        const dashInvalid = document.getElementById("dash-invalid");
+        const dashPivotTfRes = document.getElementById("dash-pivot-tf-res");
+        const dashPivotTfSup = document.getElementById("dash-pivot-tf-sup");
+        const dashEntry = document.getElementById("dash-entry");
+        const dashTp = document.getElementById("dash-tp");
+        const dashSl = document.getElementById("dash-sl");
+
+        const dashWhale1dPct = document.getElementById("dash-whale-1d-pct");
+        const dashWhale1dNet = document.getElementById("dash-whale-1d-net");
+        const dashWhale1wPct = document.getElementById("dash-whale-1w-pct");
+        const dashWhale1wNet = document.getElementById("dash-whale-1w-net");
+        const dashWhale1mPct = document.getElementById("dash-whale-1m-pct");
+        const dashWhale1mNet = document.getElementById("dash-whale-1m-net");
+
+        let activePriceLines = [];
+        let wsConnection = null;
+        let currentCandleData = [];
+        let timerInterval = null;
+        let currentFootprintRes = null;
+        let currentMainTarget = null;
+
+        const klineCache = new Map();
+
+        const chart = LightweightCharts.createChart(chartContainer, {
+            width: chartContainer.clientWidth,
+            height: chartContainer.clientHeight,
+            layout: { background: { type: 'solid', color: '#131722' }, textColor: '#d1d4dc' },
+            grid: { vertLines: { color: 'rgba(42, 46, 57, 0.5)' }, horzLines: { color: 'rgba(42, 46, 57, 0.5)' } },
+            timeScale: { borderColor: 'rgba(197, 203, 206, 0.8)', timeVisible: true, secondsVisible: true },
+            rightPriceScale: { autoScale: true }
         });
-    }
 
-    setupToggleBtn(btnPivots, () => showPivots, v => showPivots = v);
-    setupToggleBtn(btnPivotsTf, () => showPivotsTf, v => showPivotsTf = v);
-    setupToggleBtn(btnVsa, () => showVsa, v => showVsa = v);
-    setupToggleBtn(btnSupertrend, () => showSupertrend, v => showSupertrend = v);
-    setupToggleBtn(btnFootprint, () => showFootprint, v => showFootprint = v);
-    setupToggleBtn(btnMultiFp, () => showMultiFootprint, v => showMultiFootprint = v);
+        const candlestickSeries = chart.addCandlestickSeries({
+            upColor: '#089981', downColor: '#f23645', borderVisible: false, wickUpColor: '#089981', wickDownColor: '#f23645'
+        });
 
-    timeframeSelect.addEventListener('change', renderChart);
+        window.addEventListener('resize', () => {
+            chart.applyOptions({ width: chartContainer.clientWidth, height: chartContainer.clientHeight });
+        });
 
-    updateDashboardModulesVisibility();
-    updateWhaleDashboard();
-    renderChart();
-});
-</script>
+        function updateDashboardModulesVisibility() {
+            modSupertrend.style.display = showSupertrend ? "flex" : "none";
+            modFootprint.style.display = showFootprint ? "flex" : "none";
+            modPivots.style.display = showPivots ? "flex" : "none";
+            modPivotsTf.style.display = showPivotsTf ? "flex" : "none";
+            modVsa.style.display = showVsa ? "flex" : "none";
+        }
+
+        function clearActiveLines() {
+            activePriceLines.forEach(line => candlestickSeries.removePriceLine(line));
+            activePriceLines = [];
+        }
+
+        function updateRealtimeAnalysis(lastClosePrice) {
+            if (!lastClosePrice) return;
+            let isBullish = false;
+
+            if (currentFootprintRes && showFootprint) {
+                const invalidLevel = currentFootprintRes + 35;
+                dashInvalid.innerText = `$${invalidLevel.toFixed(2)}`;
+
+                if (lastClosePrice < currentFootprintRes) {
+                    dashBias.innerText = "BAJISTA 🐻";
+                    dashBias.style.color = "#ff5252";
+                    isBullish = false;
+                } else {
+                    dashBias.innerText = "ALCISTA 🚀";
+                    dashBias.style.color = "#00e676";
+                    isBullish = true;
+                }
+            } else {
+                dashBias.innerText = "NEUTRO";
+                dashBias.style.color = "#d1d4dc";
+                dashInvalid.innerText = "--";
+            }
+
+            dashTarget.innerText = (currentMainTarget && showPivots) ? `$${currentMainTarget.toFixed(2)}` : "--";
+
+            if (currentFootprintRes && showFootprint) {
+                let entryPrice = lastClosePrice; 
+                let slPrice = isBullish ? currentFootprintRes * 0.997 : currentFootprintRes * 1.003; 
+                let tpPrice = (currentMainTarget && showPivots && ((isBullish && currentMainTarget > entryPrice) || (!isBullish && currentMainTarget < entryPrice)))
+                    ? currentMainTarget 
+                    : (isBullish ? entryPrice + (Math.abs(entryPrice - slPrice) * 2) : entryPrice - (Math.abs(entryPrice - slPrice) * 2));
+
+                dashEntry.innerText = `$${entryPrice.toFixed(2)}`;
+                dashTp.innerText = `$${tpPrice.toFixed(2)}`;
+                dashSl.innerText = `$${slPrice.toFixed(2)}`;
+            } else {
+                dashEntry.innerText = "--";
+                dashTp.innerText = "--";
+                dashSl.innerText = "--";
+            }
+        }
+
+        function calculateWhaleMetrics(candles, thresholdMultiplier = 1.5) {
+            if (!candles || candles.length < 20) return { buyVol: 0, sellVol: 0 };
+            let buyVol = 0, sellVol = 0, rollingVolumeSum = 0;
+
+            for (let i = 0; i < 20; i++) rollingVolumeSum += (candles[i].volume || 1);
+
+            for (let i = 20; i < candles.length; i++) {
+                const c = candles[i];
+                const avgVol = rollingVolumeSum / 20;
+                rollingVolumeSum += (c.volume || 1) - (candles[i - 20].volume || 1);
+
+                if ((c.volume || 0) > (avgVol * thresholdMultiplier)) {
+                    if (c.close > c.open) buyVol += c.volume;
+                    else if (c.close < c.open) sellVol += c.volume;
+                    else { buyVol += c.volume / 2; sellVol += c.volume / 2; }
+                }
+            }
+            return { buyVol, sellVol };
+        }
+
+        async function updateWhaleDashboard() {
+            try {
+                const [raw1d, raw1w, raw1m] = await Promise.all([
+                    fetchKlines('1d', 100), fetchKlines('1w', 100), fetchKlines('1M', 60)
+                ]);
+
+                const periods = [
+                    { data: raw1d, elPct: dashWhale1dPct, elNet: dashWhale1dNet, multiplier: 1.4 },
+                    { data: raw1w, elPct: dashWhale1wPct, elNet: dashWhale1wNet, multiplier: 1.3 },
+                    { data: raw1m, elPct: dashWhale1mPct, elNet: dashWhale1mNet, multiplier: 1.2 }
+                ];
+
+                periods.forEach(({ data, elPct, elNet, multiplier }) => {
+                    const { buyVol, sellVol } = calculateWhaleMetrics(data, multiplier);
+                    const total = buyVol + sellVol;
+                    const netBtc = buyVol - sellVol;
+
+                    if (total === 0) {
+                        elPct.innerText = "50%C/50%V";
+                        elPct.style.color = "#d1d4dc";
+                        elNet.innerText = "(0 BTC)";
+                        return;
+                    }
+
+                    const buyPct = Math.round((buyVol / total) * 100);
+                    const sellPct = 100 - buyPct;
+                    elPct.innerText = `${buyPct}%C/${sellPct}%V`;
+                    elPct.style.color = buyPct > 50 ? "#00e676" : buyPct < 50 ? "#ff5252" : "#d1d4dc";
+
+                    const formattedNet = netBtc >= 0 ? `(+${Math.round(netBtc)} BTC)` : `(${Math.round(netBtc)} BTC)`;
+                    elNet.innerText = formattedNet;
+                    elNet.style.color = netBtc >= 0 ? "#00e676" : "#ff5252";
+                });
+            } catch (e) {
+                console.error("Error en métricas de ballenas:", e);
+            }
+        }
+
+        function getIntervalInSeconds(interval) {
+            const unit = interval.slice(-1);
+            const val = parseInt(interval);
+            if (unit === 's') return val;
+            if (unit === 'm') return val * 60;
+            if (unit === 'h') return val * 3600;
+            if (unit === 'd') return val * 86400;
+            if (unit === 'w') return val * 604800;
+            return 60;
+        }
+
+        function startCandleTimer(interval) {
+            if (timerInterval) clearInterval(timerInterval);
+            const intervalSecs = getIntervalInSeconds(interval);
+
+            function updateTimer() {
+                const nowSecs = Math.floor(Date.now() / 1000);
+                const elapsed = nowSecs % intervalSecs;
+                const remaining = intervalSecs - elapsed;
+                const mins = Math.floor(remaining / 60);
+                const secs = remaining % 60;
+
+                if (intervalSecs < 60) {
+                    timerDisplay.innerText = `${remaining}s`;
+                } else if (mins >= 60) {
+                    timerDisplay.innerText = `${Math.floor(mins / 60)}h ${(mins % 60).toString().padStart(2, '0')}m`;
+                } else {
+                    timerDisplay.innerText = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+                }
+
+                timerProgress.style.width = `${(elapsed / intervalSecs) * 100}%`;
+            }
+
+            updateTimer();
+            timerInterval = setInterval(updateTimer, 1000);
+        }
+
+        function calculateFootprintLevels(candles) {
+            if (!candles || candles.length < 20) return { footprintPOCs: [] };
+            const footprintPOCs = [];
+            let rollingVolumeSum = 0;
+            for (let i = 0; i < 20; i++) rollingVolumeSum += (candles[i].volume || 1);
+
+            for (let i = 20; i < candles.length; i++) {
+                const c = candles[i];
+                const avgVol = rollingVolumeSum / 20;
+                rollingVolumeSum += (c.volume || 1) - (candles[i - 20].volume || 1);
+
+                if ((c.volume || 0) > (avgVol * 2.2)) {
+                    const isBullishCandle = c.close > c.open;
+                    const upperWick = c.high - Math.max(c.open, c.close);
+                    const lowerWick = Math.min(c.open, c.close) - c.low;
+                    const isBullishPOC = lowerWick >= upperWick ? isBullishCandle : false;
+
+                    const footprintPOC = isBullishPOC 
+                        ? c.open + ((c.close - c.open) * 0.70)
+                        : c.open - ((c.open - c.close) * 0.70);
+
+                    footprintPOCs.push({ price: footprintPOC, isBullish: isBullishPOC, time: c.time });
+                }
+            }
+            return { footprintPOCs: footprintPOCs.slice(-2) };
+        }
+
+        function getSupertrendMarkers(candles, atrPeriods = 14, multiplier = 2.0) {
+            if (!candles || candles.length < atrPeriods + 1) return { stMarkers: [], lastSignal: null };
+            const len = candles.length;
+            const tr = new Float64Array(len);
+            tr[0] = candles[0].high - candles[0].low;
+
+            for (let i = 1; i < len; i++) {
+                tr[i] = Math.max(
+                    candles[i].high - candles[i].low,
+                    Math.abs(candles[i].high - candles[i - 1].close),
+                    Math.abs(candles[i].low - candles[i - 1].close)
+                );
+            }
+
+            const atr = new Float64Array(len);
+            let sumTR = 0;
+            for (let i = 0; i < atrPeriods; i++) sumTR += tr[i];
+            atr[atrPeriods - 1] = sumTR / atrPeriods;
+            for (let i = atrPeriods; i < len; i++) atr[i] = (atr[i - 1] * (atrPeriods - 1) + tr[i]) / atrPeriods;
+
+            const up = new Float64Array(len), dn = new Float64Array(len), trend = new Int32Array(len);
+            let currentTrend = 1;
+
+            for (let i = 0; i < len; i++) {
+                const src = (candles[i].high + candles[i].low) / 2;
+                let basicUp = src - (multiplier * atr[i]), basicDn = src + (multiplier * atr[i]);
+
+                if (i === 0) { up[i] = basicUp; dn[i] = basicDn; trend[i] = 1; continue; }
+
+                up[i] = candles[i - 1].close > up[i - 1] ? Math.max(basicUp, up[i - 1]) : basicUp;
+                dn[i] = candles[i - 1].close < dn[i - 1] ? Math.min(basicDn, dn[i - 1]) : basicDn;
+
+                if (trend[i - 1] === -1 && candles[i].close > dn[i - 1]) currentTrend = 1;
+                else if (trend[i - 1] === 1 && candles[i].close < up[i - 1]) currentTrend = -1;
+                else currentTrend = trend[i - 1];
+
+                trend[i] = currentTrend;
+            }
+
+            const stMarkers = [];
+            let lastSignal = null;
+
+            for (let i = 1; i < len; i++) {
+                if (trend[i] === 1 && trend[i - 1] === -1) {
+                    stMarkers.push({ time: candles[i].time, position: 'belowBar', color: '#00e676', shape: 'arrowUp', text: 'Buy' });
+                    lastSignal = { type: 'BUY', price: candles[i].close };
+                } else if (trend[i] === -1 && trend[i - 1] === 1) {
+                    stMarkers.push({ time: candles[i].time, position: 'aboveBar', color: '#ff1744', shape: 'arrowDown', text: 'Sell' });
+                    lastSignal = { type: 'SELL', price: candles[i].close };
+                }
+            }
+            return { stMarkers, lastSignal };
+        }
+
+        function calculatePivots(candles, leftBars = 15, rightBars = 15) {
+            let lastPivotHigh = null, lastPivotLow = null;
+            const len = candles.length;
+            if (len < leftBars + rightBars + 1) return { pivotHigh: null, pivotLow: null };
+
+            for (let i = len - rightBars - 1; i >= leftBars; i--) {
+                let isHighPivot = true, isLowPivot = true;
+                for (let j = i - leftBars; j <= i + rightBars; j++) {
+                    if (j === i) continue;
+                    if (candles[j].high >= candles[i].high) isHighPivot = false;
+                    if (candles[j].low <= candles[i].low) isLowPivot = false;
+                }
+                if (isHighPivot && !lastPivotHigh) lastPivotHigh = candles[i];
+                if (isLowPivot && !lastPivotLow) lastPivotLow = candles[i];
+                if (lastPivotHigh && lastPivotLow) break;
+            }
+            return { pivotHigh: lastPivotHigh, pivotLow: lastPivotLow };
+        }
+
+        function processWhaleData(candles) {
+            const markers = [];
+            if (!candles || candles.length < 20) return { markers };
+            let rollingVolumeSum = 0;
+            for (let i = 0; i < 20; i++) rollingVolumeSum += (candles[i].volume || 1);
+
+            for (let i = 20; i < candles.length; i++) {
+                const currentCandle = candles[i];
+                const avgVol = rollingVolumeSum / 20;
+                const isHighVolume = (currentCandle.volume || 0) > (avgVol * 2.2);
+                rollingVolumeSum += (currentCandle.volume || 1) - (candles[i - 20].volume || 1);
+
+                if (isHighVolume) {
+                    if (currentCandle.close > currentCandle.open) {
+                        markers.push({ time: currentCandle.time, position: 'belowBar', color: '#00b0ff', shape: 'circle', text: 'BUY' });
+                    } else if (currentCandle.close < currentCandle.open) {
+                        markers.push({ time: currentCandle.time, position: 'aboveBar', color: '#ff4081', shape: 'circle', text: 'SELL' });
+                    }
+                }
+            }
+            return { markers };
+        }
+
+        async function fetchKlines(interval, limit = 500) {
+            const cacheKey = `${interval}_${limit}`;
+            const now = Date.now();
+
+            if (klineCache.has(cacheKey)) {
+                const cached = klineCache.get(cacheKey);
+                if (now - cached.timestamp < 5000) return cached.data;
+            }
+
+            const is1s = interval === "1s";
+            const endpoint = is1s ? 'uiKlines' : 'klines';
+            const apiInterval = is1s ? '1s' : interval;
+
+            const res = await fetch(`https://api.binance.com/api/v3/${endpoint}?symbol=BTCUSDT&interval=${apiInterval}&limit=${limit}`);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+
+            const formatted = data.map(d => ({
+                time: Math.floor(d[0] / 1000), open: parseFloat(d[1]), high: parseFloat(d[2]), low: parseFloat(d[3]), close: parseFloat(d[4]), volume: parseFloat(d[5])
+            }));
+
+            klineCache.set(cacheKey, { timestamp: now, data: formatted });
+            return formatted;
+        }
+
+        async function renderChart() {
+            statusEl.style.display = "block";
+            statusEl.innerText = "Cargando datos...";
+            clearActiveLines();
+
+            const selectedInterval = timeframeSelect.value;
+            startCandleTimer(selectedInterval);
+
+            try {
+                currentCandleData = await fetchKlines(selectedInterval, 500);
+                candlestickSeries.setData(currentCandleData);
+
+                let allMarkers = [];
+
+                if (showSupertrend) {
+                    const { stMarkers, lastSignal } = getSupertrendMarkers(currentCandleData);
+                    allMarkers = allMarkers.concat(stMarkers);
+                    if (lastSignal) {
+                        dashStSignal.innerText = lastSignal.type;
+                        dashStSignal.style.color = lastSignal.type === "BUY" ? "#00e676" : "#ff5252";
+                        dashStPrice.innerText = `$${lastSignal.price.toFixed(2)}`;
+                    }
+                }
+
+                if (showVsa) {
+                    const { markers: whaleMarkers } = processWhaleData(currentCandleData);
+                    allMarkers = allMarkers.concat(whaleMarkers);
+                }
+
+                if (showFootprint) {
+                    const { footprintPOCs } = calculateFootprintLevels(currentCandleData);
+                    if (footprintPOCs.length > 0) {
+                        const lastPOC = footprintPOCs[footprintPOCs.length - 1];
+                        currentFootprintRes = lastPOC.price;
+                        const line = candlestickSeries.createPriceLine({
+                            price: lastPOC.price, color: lastPOC.isBullish ? '#00e676' : '#ff5252', lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Dashed, title: 'Footprint POC'
+                        });
+                        activePriceLines.push(line);
+                    }
+                }
+
+                if (showPivotsTf) {
+                    const { pivotHigh, pivotLow } = calculatePivots(currentCandleData);
+                    if (pivotHigh) {
+                        dashPivotTfRes.innerText = `$${pivotHigh.high.toFixed(2)}`;
+                        currentMainTarget = pivotHigh.high;
+                        activePriceLines.push(candlestickSeries.createPriceLine({ price: pivotHigh.high, color: '#ff1744', lineWidth: 1, title: 'Resistencia TF' }));
+                    }
+                    if (pivotLow) {
+                        dashPivotTfSup.innerText = `$${pivotLow.low.toFixed(2)}`;
+                        activePriceLines.push(candlestickSeries.createPriceLine({ price: pivotLow.low, color: '#00e676', lineWidth: 1, title: 'Soporte TF' }));
+                    }
+                }
+
+                allMarkers.sort((a, b) => a.time - b.time);
+                candlestickSeries.setMarkers(allMarkers);
+
+                if (currentCandleData.length > 0) {
+                    updateRealtimeAnalysis(currentCandleData[currentCandleData.length - 1].close);
+                }
+
+                statusEl.style.display = "none";
+                connectWebSocket(selectedInterval);
+            } catch (err) {
+                console.error(err);
+                statusEl.innerText = "Error al cargar datos";
+            }
+        }
+
+        function connectWebSocket(interval) {
+            if (wsConnection) wsConnection.close();
+
+            const wsInterval = interval === "1s" ? "1s" : interval;
+            wsConnection = new WebSocket(`wss://stream.binance.com:9443/ws/btcusdt@kline_${wsInterval}`);
+
+            wsConnection.onopen = () => { statusEl.style.display = "none"; };
+            wsConnection.onmessage = (event) => {
+                const message = JSON.parse(event.data);
+                const k = message.k;
+                const updatedCandle = {
+                    time: Math.floor(k.t / 1000), open: parseFloat(k.o), high: parseFloat(k.h), low: parseFloat(k.l), close: parseFloat(k.c), volume: parseFloat(k.v)
+                };
+
+                candlestickSeries.update(updatedCandle);
+                updateRealtimeAnalysis(updatedCandle.close);
+            };
+            wsConnection.onerror = () => { statusEl.innerText = "Error WebSocket"; statusEl.style.display = "block"; };
+        }
+
+        function setupToggleBtn(btn, getVal, setVal) {
+            btn.addEventListener('click', () => {
+                setVal(!getVal());
+                btn.classList.toggle('active', getVal());
+                btn.classList.toggle('inactive', !getVal());
+                updateDashboardModulesVisibility();
+                renderChart();
+            });
+        }
+
+        setupToggleBtn(btnPivots, () => showPivots, v => showPivots = v);
+        setupToggleBtn(btnPivotsTf, () => showPivotsTf, v => showPivotsTf = v);
+        setupToggleBtn(btnVsa, () => showVsa, v => showVsa = v);
+        setupToggleBtn(btnSupertrend, () => showSupertrend, v => showSupertrend = v);
+        setupToggleBtn(btnFootprint, () => showFootprint, v => showFootprint = v);
+        setupToggleBtn(btnMultiFp, () => showMultiFootprint, v => showMultiFootprint = v);
+
+        timeframeSelect.addEventListener('change', renderChart);
+
+        updateDashboardModulesVisibility();
+        updateWhaleDashboard();
+        renderChart();
+    });
+    </script>
+</body>
+</html>
