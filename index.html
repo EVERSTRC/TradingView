@@ -32,7 +32,7 @@
     canvas { display: block; width: 100%; height: 100%; }
 
     /* Dashboard MTF Superpuesto */
-    .vsa-dashboard-panel { position: absolute; top: 15px; right: 15px; background: rgba(19, 23, 34, 0.9); border: 1px solid var(--border-color); border-radius: 6px; padding: 10px; z-index: 10; font-size: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); display: none; }
+    .vsa-dashboard-panel { position: absolute; top: 15px; right: 15px; background: rgba(19, 23, 34, 0.95); border: 1px solid var(--border-color); border-radius: 6px; padding: 10px; z-index: 10; font-size: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); display: none; }
     .vsa-dashboard-panel table { border-collapse: collapse; text-align: left; width: 100%; }
     .vsa-dashboard-panel th { padding: 6px 10px; background-color: #000080; color: #ffffff; font-weight: 600; text-transform: uppercase; font-size: 10px; }
     .vsa-dashboard-panel td { padding: 6px 10px; border-bottom: 1px solid var(--border-color); }
@@ -114,45 +114,59 @@ function generateMockCandles(count = 100) {
 const candles = generateMockCandles(120);
 
 // ==========================================
-// 2. MOTOR DE CÁLCULO VSA
+// 2. MOTOR DE CÁLCULO VSA (CORREGIDO)
 // ==========================================
 function calculateVSA(candles, period = 20, factor = 1.8) {
   let results = [];
   
   for (let i = 0; i < candles.length; i++) {
     const candle = candles[i];
-    const range = candle.high - candle.low;
-    const volume = candle.volume || 1.0;
     
+    // Normalización flexible de propiedades
+    const open = candle.open ?? candle.o ?? 0;
+    const high = candle.high ?? candle.h ?? 0;
+    const low = candle.low ?? candle.l ?? 0;
+    const close = candle.close ?? candle.c ?? 0;
+    const volume = candle.volume ?? candle.v ?? 1.0;
+    
+    const range = high - low;
+    
+    // Promedio de Volumen (SMA)
     let sumVol = 0;
     let count = 0;
     for (let j = Math.max(0, i - period + 1); j <= i; j++) {
-      sumVol += candles[j].volume || 1.0;
+      sumVol += (candles[j].volume ?? candles[j].v ?? 1.0);
       count++;
     }
-    const avgVol = sumVol / count;
+    const avgVol = sumVol / (count || 1);
     const isWhale = volume > (avgVol * factor);
 
-    const buyVol = range === 0 ? volume / 2 : volume * ((candle.close - candle.low) / range);
+    // Relación Compra / Venta acotada entre 0 y 1
+    let buyRatio = 0.5;
+    if (range > 0) {
+      buyRatio = Math.max(0, Math.min(1, (close - low) / range));
+    }
+    
+    const buyVol = volume * buyRatio;
     const sellVol = volume - buyVol;
     const netDelta = buyVol - sellVol;
 
-    const lowerShadow = Math.min(candle.open, candle.close) - candle.low;
-    const upperShadow = candle.high - Math.max(candle.open, candle.close);
+    const lowerShadow = Math.min(open, close) - low;
+    const upperShadow = high - Math.max(open, close);
 
     const isBuyVSA = isWhale && (netDelta > 0 || lowerShadow > (range * 0.35));
     const isSellVSA = isWhale && (netDelta < 0 || upperShadow > (range * 0.35));
 
     results.push({
-      time: candle.time,
-      close: candle.close,
+      time: candle.time ?? candle.t,
+      close,
       isWhale,
       buyVol,
       sellVol,
-      pctBuy: (buyVol / volume) * 100,
-      pctSell: (sellVol / volume) * 100,
-      support: isBuyVSA ? candle.low : null,
-      resistance: isSellVSA ? candle.high : null,
+      pctBuy: buyRatio * 100,
+      pctSell: (1 - buyRatio) * 100,
+      support: isBuyVSA ? low : null,
+      resistance: isSellVSA ? high : null,
       isBuyVSA,
       isSellVSA
     });
@@ -161,7 +175,7 @@ function calculateVSA(candles, period = 20, factor = 1.8) {
 }
 
 // ==========================================
-// 3. RENDERIZADO DEL GRÁFICO Y EL INDICADOR
+// 3. RENDERIZADO DEL GRÁFICO
 // ==========================================
 const canvas = document.getElementById('mainChart');
 const ctx = canvas.getContext('2d');
@@ -182,25 +196,28 @@ function renderChart() {
   const chartWidth = canvas.width - padding * 2;
   const chartHeight = canvas.height - padding * 2;
 
-  // Rango de precios
-  let minPrice = Math.min(...candles.map(c => c.low));
-  let maxPrice = Math.max(...candles.map(c => c.high));
+  let minPrice = Math.min(...candles.map(c => c.low ?? c.l));
+  let maxPrice = Math.max(...candles.map(c => c.high ?? c.h));
   const priceRange = maxPrice - minPrice || 1;
 
   const candleWidth = chartWidth / candles.length;
 
-  // Función de mapeo de coordenadas
   const getX = (index) => padding + index * candleWidth + candleWidth / 2;
   const getY = (price) => canvas.height - padding - ((price - minPrice) / priceRange) * chartHeight;
 
   // Dibujar Velas
   candles.forEach((c, i) => {
     const x = getX(i);
-    const openY = getY(c.open);
-    const closeY = getY(c.close);
-    const highY = getY(c.high);
-    const lowY = getY(c.low);
-    const isGreen = c.close >= c.open;
+    const open = c.open ?? c.o;
+    const high = c.high ?? c.h;
+    const low = c.low ?? c.l;
+    const close = c.close ?? c.c;
+
+    const openY = getY(open);
+    const closeY = getY(close);
+    const highY = getY(high);
+    const lowY = getY(low);
+    const isGreen = close >= open;
 
     ctx.strokeStyle = isGreen ? '#089981' : '#f23645';
     ctx.fillStyle = isGreen ? '#089981' : '#f23645';
@@ -216,7 +233,7 @@ function renderChart() {
     ctx.fillRect(x - candleWidth * 0.3, Math.min(openY, closeY), candleWidth * 0.6, bodyHeight);
   });
 
-  // Dibujar Indicador VSA si está habilitado
+  // Dibujar VSA si está encendido
   if (state.indicators.vsaWhales) {
     renderVSAIndicator(ctx, candles, { getX, getY, canvasWidth: canvas.width, padding });
   }
@@ -235,21 +252,25 @@ function renderVSAIndicator(ctx, candles, chartProps) {
     if (activeSupport && activeResistance) break;
   }
 
-  // Dibujar Proyección de Líneas de Soporte y Resistencia
+  // Dibujar Soportes / Resistencias
   if (activeSupport) drawLineLevel(ctx, chartProps, activeSupport, '#0052cc', 'Sop Chart');
   if (activeResistance) drawLineLevel(ctx, chartProps, activeResistance, '#ff1744', 'Res Chart');
 
-  // Señales de Compra/Venta filtradas por proximidad Macro
+  // Evaluar Proximidad
   vsaData.forEach((d, idx) => {
     const candle = candles[idx];
-    const isNearSupport = activeSupport && Math.abs(candle.close - activeSupport) / candle.close <= maxDistancePct;
-    const isNearResistance = activeResistance && Math.abs(candle.close - activeResistance) / candle.close <= maxDistancePct;
+    const close = candle.close ?? candle.c;
+    const low = candle.low ?? candle.l;
+    const high = candle.high ?? candle.h;
+
+    const isNearSupport = activeSupport && Math.abs(close - activeSupport) / close <= maxDistancePct;
+    const isNearResistance = activeResistance && Math.abs(close - activeResistance) / close <= maxDistancePct;
 
     if (d.isBuyVSA && isNearSupport) {
-      drawSignalShape(ctx, chartProps, idx, candle.low, 'BUY', '#00e676', 'below');
+      drawSignalShape(ctx, chartProps, idx, low, 'BUY', '#00e676', 'below');
     }
     if (d.isSellVSA && isNearResistance) {
-      drawSignalShape(ctx, chartProps, idx, candle.high, 'SELL', '#ff1744', 'above');
+      drawSignalShape(ctx, chartProps, idx, high, 'SELL', '#ff1744', 'above');
     }
   });
 
@@ -268,7 +289,6 @@ function drawLineLevel(ctx, { getY, canvasWidth, padding }, price, color, label)
   ctx.lineTo(canvasWidth - padding, y);
   ctx.stroke();
 
-  // Etiqueta al final de la línea
   ctx.fillStyle = color;
   ctx.font = '10px sans-serif';
   ctx.fillText(`${label}: ${price.toFixed(2)}`, canvasWidth - padding + 5, y + 3);
@@ -310,7 +330,6 @@ function updateMTFDashboard(lastMetric) {
   const statusClass = lastMetric.isBuyVSA ? 'buy' : lastMetric.isSellVSA ? 'sell' : 'neutral';
   const statusText = lastMetric.isBuyVSA ? 'BUY' : lastMetric.isSellVSA ? 'SELL' : 'NEUTRAL';
 
-  // Temporalidades MTF simuladas a partir de la métrica base
   const tfs = ['15 Minutos', '1 Hora', '4 Horas', '1 Diario', '1 Semana', '1 Mes'];
   
   tbody.innerHTML = tfs.map((tf, i) => `
