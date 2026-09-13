@@ -78,8 +78,8 @@
                 <option value="1s">1 Sec</option>
                 <option value="1m">1 Min</option>
                 <option value="5m">5 Min</option>
-                <option value="15m" selected>15 Min</option>
-                <option value="1h">1 Hour</option>
+                <option value="15m">15 Min</option>
+                <option value="1h" selected>1 Hour</option>
                 <option value="4h">4 Hours</option>
                 <option value="1d">1 Day</option>
             </select>
@@ -221,7 +221,7 @@
 
         const klineCache = new Map();
 
-        // Inicialización
+        // Inicialización Chart
         const chart = LightweightCharts.createChart(chartContainer, {
             width: chartContainer.clientWidth,
             height: chartContainer.clientHeight,
@@ -333,7 +333,7 @@
             timerInterval = setInterval(updateTimer, 1000);
         }
 
-        // Algoritmo VSA + Soportes y Resistencias de Ballenas LuxAlgo Style
+        // Algoritmo VSA + Señales tipo CÍRCULO para no confundir con Supertrend
         function processWhaleVSA(candles) {
             const markers = [];
             let lastWhaleBuyPrice = null;
@@ -352,11 +352,23 @@
 
                 if (isWhaleVol) {
                     if (c.close > c.open) {
-                        markers.push({ time: c.time, position: 'belowBar', color: '#00e676', shape: 'arrowUp', text: 'BUY' });
-                        lastWhaleBuyPrice = c.low; // Soporte en el mínimo de la vela institucional
+                        markers.push({ 
+                            time: c.time, 
+                            position: 'belowBar', 
+                            color: '#00e676', 
+                            shape: 'circle', // Cambiado a círculo
+                            text: 'W-BUY' 
+                        });
+                        lastWhaleBuyPrice = c.low;
                     } else if (c.close < c.open) {
-                        markers.push({ time: c.time, position: 'aboveBar', color: '#ff1744', shape: 'arrowDown', text: 'SELL' });
-                        lastWhaleSellPrice = c.high; // Resistencia en el máximo de la vela institucional
+                        markers.push({ 
+                            time: c.time, 
+                            position: 'aboveBar', 
+                            color: '#ff1744', 
+                            shape: 'circle', // Cambiado a círculo
+                            text: 'W-SELL' 
+                        });
+                        lastWhaleSellPrice = c.high;
                     }
                 }
             }
@@ -407,10 +419,10 @@
 
             for (let i = 1; i < len; i++) {
                 if (trend[i] === 1 && trend[i - 1] === -1) {
-                    stMarkers.push({ time: candles[i].time, position: 'belowBar', color: '#00e676', shape: 'arrowUp', text: 'Buy' });
+                    stMarkers.push({ time: candles[i].time, position: 'belowBar', color: '#00e676', shape: 'arrowUp', text: 'ST BUY' });
                     lastSignal = { type: 'BUY', price: candles[i].close };
                 } else if (trend[i] === -1 && trend[i - 1] === 1) {
-                    stMarkers.push({ time: candles[i].time, position: 'aboveBar', color: '#ff1744', shape: 'arrowDown', text: 'Sell' });
+                    stMarkers.push({ time: candles[i].time, position: 'aboveBar', color: '#ff1744', shape: 'arrowDown', text: 'ST SELL' });
                     lastSignal = { type: 'SELL', price: candles[i].close };
                 }
             }
@@ -506,7 +518,6 @@
                     const { markers: whaleMarkers, lastWhaleBuyPrice, lastWhaleSellPrice } = processWhaleVSA(currentCandleData);
                     allMarkers = allMarkers.concat(whaleMarkers);
 
-                    // Trazado de Soportes y Resistencias de Ballenas LuxAlgo Style
                     if (lastWhaleSellPrice) {
                         activePriceLines.push(candlestickSeries.createPriceLine({
                             price: lastWhaleSellPrice, color: '#ff1744', lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Solid, title: 'Res Ballena'
