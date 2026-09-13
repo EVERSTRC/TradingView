@@ -88,9 +88,12 @@
             <select id="timeframe">
                 <option value="1s">1 Sec</option>
                 <option value="1m">1 Min</option>
+                <option value="3m">3 Min</option>
                 <option value="5m">5 Min</option>
-                <option value="15m">15 Min</option>
-                <option value="1h" selected>1 Hour</option>
+                <option value="15m" selected>15 Min</option>
+                <option value="30m">30 Min</option>
+                <option value="45m">45 Min</option>
+                <option value="1h">1 Hour</option>
                 <option value="4h">4 Hours</option>
                 <option value="1d">1 Day</option>
             </select>
@@ -137,7 +140,7 @@
                     </thead>
                     <tbody id="vsa-mtf-tbody">
                         <tr><td>15 Min</td><td><span class="vsa-badge vsa-buy">BUY</span></td><td>0.01</td><td class="txt-buy">100%</td><td class="txt-sell">0%</td></tr>
-                        <tr><td>1 Hora</td><td><span class="vsa-badge vsa-buy">BUY</span></td><td>0.01</td><td class="txt-buy">100%</td><td class="txt-sell">0%</td></tr>
+                        <tr><td>1 Hora</td><td><span class="vsa-badge vsa-buy">BUY</span></td><td>64.81</td><td class="txt-buy">48.9%</td><td class="txt-sell">51.1%</td></tr>
                         <tr><td>4 Horas</td><td><span class="vsa-badge vsa-buy">BUY</span></td><td>0.99</td><td class="txt-buy">100%</td><td class="txt-sell">0%</td></tr>
                         <tr><td>1 Diario</td><td><span class="vsa-badge vsa-sell">SELL</span></td><td>7.23</td><td class="txt-buy">94.4%</td><td class="txt-sell">5.6%</td></tr>
                         <tr><td>1 Sem</td><td><span class="vsa-badge vsa-neutral">NEUTRAL</span></td><td>245.5</td><td class="txt-buy">31.8%</td><td class="txt-sell">68.2%</td></tr>
@@ -405,12 +408,11 @@
                 }
             }
 
-            // Actualización dinámica de porcentajes en la tabla VSA
             const totalVol = totalBuyVol + totalSellVol;
             if (totalVol > 0) {
                 const buyPct = ((totalBuyVol / totalVol) * 100).toFixed(1);
                 const sellPct = ((totalSellVol / totalVol) * 100).toFixed(1);
-                const currentTfRow = document.querySelector('#vsa-mtf-tbody tr:nth-child(2)'); // 1 Horas ref
+                const currentTfRow = document.querySelector('#vsa-mtf-tbody tr:first-child');
                 if (currentTfRow) {
                     currentTfRow.children[2].innerText = (totalVol / 1000).toFixed(2);
                     currentTfRow.children[3].innerText = `${buyPct}%`;
