@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bitcoin Trading Terminal - Multi TF Pivots, OBs & Global Trend</title>
     <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/technicalindicators@3.1.0/dist/browser.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #131722; color: #d1d4dc; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
@@ -146,23 +145,6 @@
                 </div>
             </div>
 
-            <!-- MÓDULO RSI Y MACD -->
-            <div id="dash-module-rsi-macd" class="dash-module" style="border: 1px solid #ab47bc;">
-                <h4>Momentum (RSI & MACD)</h4>
-                <div class="dash-row">
-                    <span>RSI (14):</span>
-                    <span id="dash-rsi-val" class="dash-val">--</span>
-                </div>
-                <div class="dash-row">
-                    <span>Estado RSI:</span>
-                    <span id="dash-rsi-status" class="dash-val">--</span>
-                </div>
-                <div class="dash-row" style="margin-top: 2px;">
-                    <span>Hist. MACD:</span>
-                    <span id="dash-macd-hist" class="dash-val">--</span>
-                </div>
-            </div>
-
             <div id="dash-module-vsa" class="dash-module">
                 <h4>S/R VSA Ballenas % Vol MTF</h4>
                 <table class="vsa-table">
@@ -199,7 +181,7 @@
             </div>
 
             <div id="dash-module-footprint" class="dash-module">
-                <h4>Sesgo de Mercado</h4>
+                <h4>Sesgo de Mercado & Liquidez</h4>
                 <div class="dash-row">
                     <span>Tendencia:</span>
                     <span id="dash-bias" class="dash-val">--</span>
@@ -213,8 +195,8 @@
                     <span id="dash-entry" class="dash-val">--</span>
                 </div>
                 <div class="dash-row">
-                    <span>Take Profit (TP):</span>
-                    <span id="dash-tp" class="dash-val">--</span>
+                    <span>Próx Liquidez (TP):</span>
+                    <span id="dash-tp" class="dash-val" style="color: #00e5ff;">--</span>
                 </div>
                 <div class="dash-row">
                     <span>Stop Loss (SL):</span>
@@ -365,10 +347,13 @@
             }
         }
 
-        function sendTelegramAlert(signalType, price, timeframe) {
+        function sendTelegramAlert(signalType, price, timeframe, liquidityTarget, invalidationLevel) {
             if (!TELEGRAM_CONFIG.enabled || !TELEGRAM_CONFIG.username) return;
             const icon = signalType === "BUY" ? "🟢🚀" : "🔴🐻";
-            const message = `ALERT SUPERTREND BTCUSDT\n\nSeñal: ${signalType} ${icon}\nPrecio: $${price.toFixed(2)}\nTimeframe: ${timeframe}`;
+            const targetText = liquidityTarget ? `$${liquidityTarget.toFixed(2)}` : "No definido";
+            const invalidText = invalidationLevel ? `$${invalidationLevel.toFixed(2)}` : "No definido";
+            
+            const message = `ALERT SUPERTREND BTCUSDT\n\nSeñal: ${signalType} ${icon}\nPrecio Entrada: $${price.toFixed(2)}\nTimeframe: ${timeframe}\n\n🎯 Próxima Liquidez (TP): ${targetText}\n🛑 Invalidez (SL): ${invalidText}`;
             const userClean = TELEGRAM_CONFIG.username.replace("@", "");
             const encodedMsg = encodeURIComponent(message);
             fetch(`https://api.callmebot.com/text.php?user=@${userClean}&text=${encodedMsg}`, { mode: 'no-cors' })
@@ -380,8 +365,16 @@
             if (lastSignal.time !== lastNotifiedSignalTime && lastSignal.type !== lastNotifiedSignalType) {
                 lastNotifiedSignalTime = lastSignal.time;
                 lastNotifiedSignalType = lastSignal.type;
+                
+                const currentPrice = lastSignal.price;
+                const obs = calculateOrderBlocks(currentCandleData, 40);
+                const pivots = calculatePivots(currentCandleData, 20, 20);
+                
+                const liquidityTarget = getNextLiquidityTarget(currentPrice, lastSignal.type, pivots, obs);
+                const invalidationLevel = currentFootprintRes ? (lastSignal.type === "BUY" ? currentFootprintRes - 35 : currentFootprintRes + 35) : null;
+
                 playBeepSound(lastSignal.type);
-                sendTelegramAlert(lastSignal.type, lastSignal.price, timeframe);
+                sendTelegramAlert(lastSignal.type, lastSignal.price, timeframe, liquidityTarget, invalidationLevel);
             }
         }
 
@@ -412,10 +405,6 @@
 
         const dashObBearish = document.getElementById("dash-ob-bearish");
         const dashObBullish = document.getElementById("dash-ob-bullish");
-        
-        const dashRsiVal = document.getElementById("dash-rsi-val");
-        const dashRsiStatus = document.getElementById("dash-rsi-status");
-        const dashMacdHist = document.getElementById("dash-macd-hist");
 
         let showPivots = true, showPivotsTf = true, showVsa = true, showOb = true;
         let showSupertrend = true, showFootprint = true, showMultiFootprint = false;
@@ -485,48 +474,22 @@
             activePriceLines = [];
         }
 
-        function calculateTechnicalIndicators(candles) {
-            if (!candles || candles.length < 30 || typeof window.technicalindicators === 'undefined') return;
-
-            const closePrices = candles.map(c => c.close);
-
-            // RSI Calculation
-            const rsiInput = { values: closePrices, period: 14 };
-            const rsiArray = window.technicalindicators.rsi(rsiInput);
-            if (rsiArray && rsiArray.length > 0) {
-                const latestRSI = rsiArray[rsiArray.length - 1];
-                dashRsiVal.innerText = latestRSI.toFixed(1);
-
-                if (latestRSI >= 70) {
-                    dashRsiStatus.innerText = "SOBRECOMPRA ⚠️";
-                    dashRsiStatus.style.color = "#ff1744";
-                } else if (latestRSI <= 30) {
-                    dashRsiStatus.innerText = "SOBREVENTA 🟢";
-                    dashRsiStatus.style.color = "#00e676";
-                } else {
-                    dashRsiStatus.innerText = "NEUTRAL ⚖️";
-                    dashRsiStatus.style.color = "#787b86";
+        // --- CÁLCULO DE PRÓXIMA LIQUIDEZ (BSL / SSL) ---
+        function getNextLiquidityTarget(currentPrice, signalType, pivots, orderBlocks) {
+            if (signalType === "BUY") {
+                let target = orderBlocks.latestBearishOB ? orderBlocks.latestBearishOB.bottom : null;
+                if (pivots.pivotHigh && pivots.pivotHigh.high > currentPrice) {
+                    target = target ? Math.min(target, pivots.pivotHigh.high) : pivots.pivotHigh.high;
                 }
-            }
-
-            // MACD Calculation
-            const macdInput = {
-                values: closePrices,
-                fastPeriod: 12,
-                slowPeriod: 26,
-                signalPeriod: 9,
-                SimpleMAOscillator: false,
-                SimpleMASignal: false
-            };
-            const macdArray = window.technicalindicators.macd(macdInput);
-            if (macdArray && macdArray.length > 0) {
-                const latestMACD = macdArray[macdArray.length - 1];
-                if (latestMACD && latestMACD.histogram !== undefined) {
-                    const hist = latestMACD.histogram;
-                    dashMacdHist.innerText = hist.toFixed(2);
-                    dashMacdHist.style.color = hist >= 0 ? "#00e676" : "#ff1744";
+                return target || (currentPrice * 1.015);
+            } else if (signalType === "SELL") {
+                let target = orderBlocks.latestBullishOB ? orderBlocks.latestBullishOB.top : null;
+                if (pivots.pivotLow && pivots.pivotLow.low < currentPrice) {
+                    target = target ? Math.max(target, pivots.pivotLow.low) : pivots.pivotLow.low;
                 }
+                return target || (currentPrice * 0.985);
             }
+            return null;
         }
 
         // --- CÁLCULO DE ORDER BLOCKS (SMC / S/R INSTITUCIONAL) ---
@@ -675,12 +638,13 @@
             if (currentFootprintRes && showFootprint) {
                 let entryPrice = lastClosePrice; 
                 let slPrice = isBullish ? currentFootprintRes * 0.997 : currentFootprintRes * 1.003; 
-                let tpPrice = (currentMainTarget && showPivots && ((isBullish && currentMainTarget > entryPrice) || (!isBullish && currentMainTarget < entryPrice)))
-                    ? currentMainTarget 
-                    : (isBullish ? entryPrice + (Math.abs(entryPrice - slPrice) * 2) : entryPrice - (Math.abs(entryPrice - slPrice) * 2));
+                
+                const obs = calculateOrderBlocks(currentCandleData, 40);
+                const pivots = calculatePivots(currentCandleData, 20, 20);
+                const liquidityTarget = getNextLiquidityTarget(entryPrice, isBullish ? "BUY" : "SELL", pivots, obs);
 
                 dashEntry.innerText = `$${entryPrice.toFixed(2)}`;
-                dashTp.innerText = `$${tpPrice.toFixed(2)}`;
+                dashTp.innerText = liquidityTarget ? `$${liquidityTarget.toFixed(2)}` : "--";
                 dashSl.innerText = `$${slPrice.toFixed(2)}`;
             } else {
                 dashEntry.innerText = "--";
@@ -689,7 +653,6 @@
             }
 
             calculateGlobalTrend(lastClosePrice);
-            calculateTechnicalIndicators(currentCandleData);
         }
 
         function getIntervalInSeconds(interval) {
