@@ -37,6 +37,12 @@
         .txt-sell { color: #ff1744; font-weight: bold; }
         .trend-bar-bg { width: 100%; height: 6px; background-color: #2a2e39; border-radius: 3px; overflow: hidden; margin: 3px 0; position: relative; }
         .trend-bar-fill { height: 100%; width: 50%; background-color: #787b86; transition: all 0.5s ease; }
+        
+        /* Estilos específicos para el indicador de sesión */
+        .session-badge { padding: 2px 5px; border-radius: 3px; font-size: 9px; font-weight: bold; text-transform: uppercase; }
+        .session-active { background-color: rgba(0, 230, 118, 0.2); color: #00e676; border: 1px solid #00e676; }
+        .session-closed { background-color: rgba(120, 123, 134, 0.1); color: #5d606b; border: 1px solid #2a2e39; }
+        .session-overlap { background-color: rgba(255, 152, 0, 0.2); color: #ff9800; border: 1px solid #ff9800; }
     </style>
 </head>
 <body>
@@ -83,6 +89,27 @@
                 </div>
                 <div id="timer-progress-container">
                     <div id="timer-progress"></div>
+                </div>
+            </div>
+
+            <!-- MÓDULO DE SESIONES DE MERCADO -->
+            <div id="dash-module-sessions" class="dash-module" style="border: 1px solid #363c4e;">
+                <h4>Sesión de Mercado Activa (CR)</h4>
+                <div class="dash-row" style="margin-bottom: 2px;">
+                    <span>Estado Actual:</span>
+                    <span id="dash-active-session-text" class="dash-val" style="color: #00e676;">--</span>
+                </div>
+                <div class="dash-row">
+                    <span>Asian (Tokio):</span>
+                    <span id="sess-badge-tokyo" class="session-badge session-closed">CERRADO</span>
+                </div>
+                <div class="dash-row">
+                    <span>London (Londres):</span>
+                    <span id="sess-badge-london" class="session-badge session-closed">CERRADO</span>
+                </div>
+                <div class="dash-row">
+                    <span>New York (EE.UU.):</span>
+                    <span id="sess-badge-ny" class="session-badge session-closed">CERRADO</span>
                 </div>
             </div>
 
@@ -189,7 +216,7 @@
         let lastNotifiedSignalTime = null;
         let lastNotifiedSignalType = null;
 
-        // --- SISTEMA DE ALERTAS DE SESIÓN DE MERCADO (HORA DE COSTA RICA UTC-6) ---
+        // --- MONITOR Y ALERTAS DE SESIONES DE MERCADO (COSTA RICA UTC-6) ---
         const SESSION_ALERTS_CONFIG = {
             enabled: true,
             alerts: [
@@ -200,6 +227,51 @@
         };
 
         let notifiedSessionsToday = new Set();
+
+        function updateSessionsDashboard() {
+            const now = new Date();
+            const hour = now.getHours();
+            const min = now.getMinutes();
+            const timeVal = hour + (min / 60);
+
+            // Horarios aproximados de sesiones en hora de Costa Rica (UTC-6)
+            // Tokio: 18:00 a 03:00 (6 PM - 3 AM)
+            const isTokyo = (timeVal >= 18 || timeVal < 3);
+            // Londres: 02:00 a 10:00 (2 AM - 10 AM)
+            const isLondon = (timeVal >= 2 && timeVal < 10);
+            // Nueva York: 07:00 a 15:00 (7 AM - 3 PM)
+            const isNY = (timeVal >= 7 && timeVal < 15);
+
+            const badgeTokyo = document.getElementById("sess-badge-tokyo");
+            const badgeLondon = document.getElementById("sess-badge-london");
+            const badgeNY = document.getElementById("sess-badge-ny");
+            const activeText = document.getElementById("dash-active-session-text");
+
+            badgeTokyo.className = isTokyo ? "session-badge session-active" : "session-badge session-closed";
+            badgeTokyo.innerText = isTokyo ? "ABIERTO" : "CERRADO";
+
+            badgeLondon.className = isLondon ? "session-badge session-active" : "session-badge session-closed";
+            badgeLondon.innerText = isLondon ? "ABIERTO" : "CERRADO";
+
+            badgeNY.className = isNY ? "session-badge session-active" : "session-badge session-closed";
+            badgeNY.innerText = isNY ? "ABIERTO" : "CERRADO";
+
+            const activeNames = [];
+            if (isTokyo) activeNames.push("Tokio");
+            if (isLondon) activeNames.push("Londres");
+            if (isNY) activeNames.push("NY");
+
+            if (activeNames.length > 1) {
+                activeText.innerText = `TRASLAPE (${activeNames.join(" + ")}) 🔥`;
+                activeText.style.color = "#ff9800";
+            } else if (activeNames.length === 1) {
+                activeText.innerText = `${activeNames[0]} 🟢`;
+                activeText.style.color = "#00e676";
+            } else {
+                activeText.innerText = "ASIA TARDÍA / BAJO VOL 🌙";
+                activeText.style.color = "#787b86";
+            }
+        }
 
         function sendSessionTelegramAlert(sessionName) {
             if (!TELEGRAM_CONFIG.enabled || !TELEGRAM_CONFIG.username) return;
@@ -212,10 +284,12 @@
         }
 
         function checkSessionAlerts() {
+            updateSessionsDashboard();
+
             if (!SESSION_ALERTS_CONFIG.enabled) return;
 
             const now = new Date();
-            const currentDay = now.getDay(); // 0 = Domingo, 6 = Sábado
+            const currentDay = now.getDay(); 
             if (currentDay === 6) return; // Mercado cerrado los sábados
 
             const currentHour = now.getHours();
