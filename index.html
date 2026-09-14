@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bitcoin Trading Terminal - Multi TF Pivots, OBs & Global Trend</title>
     <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/technicalindicators@3.1.0/dist/browser.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #131722; color: #d1d4dc; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
@@ -142,6 +143,23 @@
                 <div class="dash-row">
                     <span>OB Soporte (Compra):</span>
                     <span id="dash-ob-bullish" class="dash-val" style="color: #00e676;">--</span>
+                </div>
+            </div>
+
+            <!-- MÓDULO RSI Y MACD -->
+            <div id="dash-module-rsi-macd" class="dash-module" style="border: 1px solid #ab47bc;">
+                <h4>Momentum (RSI & MACD)</h4>
+                <div class="dash-row">
+                    <span>RSI (14):</span>
+                    <span id="dash-rsi-val" class="dash-val">--</span>
+                </div>
+                <div class="dash-row">
+                    <span>Estado RSI:</span>
+                    <span id="dash-rsi-status" class="dash-val">--</span>
+                </div>
+                <div class="dash-row" style="margin-top: 2px;">
+                    <span>Hist. MACD:</span>
+                    <span id="dash-macd-hist" class="dash-val">--</span>
                 </div>
             </div>
 
@@ -394,6 +412,10 @@
 
         const dashObBearish = document.getElementById("dash-ob-bearish");
         const dashObBullish = document.getElementById("dash-ob-bullish");
+        
+        const dashRsiVal = document.getElementById("dash-rsi-val");
+        const dashRsiStatus = document.getElementById("dash-rsi-status");
+        const dashMacdHist = document.getElementById("dash-macd-hist");
 
         let showPivots = true, showPivotsTf = true, showVsa = true, showOb = true;
         let showSupertrend = true, showFootprint = true, showMultiFootprint = false;
@@ -463,6 +485,50 @@
             activePriceLines = [];
         }
 
+        function calculateTechnicalIndicators(candles) {
+            if (!candles || candles.length < 30 || typeof window.technicalindicators === 'undefined') return;
+
+            const closePrices = candles.map(c => c.close);
+
+            // RSI Calculation
+            const rsiInput = { values: closePrices, period: 14 };
+            const rsiArray = window.technicalindicators.rsi(rsiInput);
+            if (rsiArray && rsiArray.length > 0) {
+                const latestRSI = rsiArray[rsiArray.length - 1];
+                dashRsiVal.innerText = latestRSI.toFixed(1);
+
+                if (latestRSI >= 70) {
+                    dashRsiStatus.innerText = "SOBRECOMPRA ⚠️";
+                    dashRsiStatus.style.color = "#ff1744";
+                } else if (latestRSI <= 30) {
+                    dashRsiStatus.innerText = "SOBREVENTA 🟢";
+                    dashRsiStatus.style.color = "#00e676";
+                } else {
+                    dashRsiStatus.innerText = "NEUTRAL ⚖️";
+                    dashRsiStatus.style.color = "#787b86";
+                }
+            }
+
+            // MACD Calculation
+            const macdInput = {
+                values: closePrices,
+                fastPeriod: 12,
+                slowPeriod: 26,
+                signalPeriod: 9,
+                SimpleMAOscillator: false,
+                SimpleMASignal: false
+            };
+            const macdArray = window.technicalindicators.macd(macdInput);
+            if (macdArray && macdArray.length > 0) {
+                const latestMACD = macdArray[macdArray.length - 1];
+                if (latestMACD && latestMACD.histogram !== undefined) {
+                    const hist = latestMACD.histogram;
+                    dashMacdHist.innerText = hist.toFixed(2);
+                    dashMacdHist.style.color = hist >= 0 ? "#00e676" : "#ff1744";
+                }
+            }
+        }
+
         // --- CÁLCULO DE ORDER BLOCKS (SMC / S/R INSTITUCIONAL) ---
         function calculateOrderBlocks(candles, lookback = 40) {
             let latestBullishOB = null;
@@ -474,7 +540,6 @@
                 const next1 = candles[i + 1];
                 const next2 = candles[i + 2];
 
-                // OB Alcista (Soporte): Última vela bajista antes de un impulso alcista fuerte
                 if (!latestBullishOB && (current.close < current.open) && (next1.close > current.high) && (next2.close > next1.close)) {
                     latestBullishOB = {
                         top: Math.max(current.open, current.high),
@@ -483,7 +548,6 @@
                     };
                 }
 
-                // OB Bajista (Resistencia): Última vela alcista antes de un impulso bajista fuerte
                 if (!latestBearishOB && (current.close > current.open) && (next1.close < current.low) && (next2.close < next1.close)) {
                     latestBearishOB = {
                         top: current.high,
@@ -625,6 +689,7 @@
             }
 
             calculateGlobalTrend(lastClosePrice);
+            calculateTechnicalIndicators(currentCandleData);
         }
 
         function getIntervalInSeconds(interval) {
