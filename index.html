@@ -189,6 +189,57 @@
         let lastNotifiedSignalTime = null;
         let lastNotifiedSignalType = null;
 
+        // --- SISTEMA DE ALERTAS DE SESIÓN DE MERCADO (HORA DE COSTA RICA UTC-6) ---
+        const SESSION_ALERTS_CONFIG = {
+            enabled: true,
+            alerts: [
+                { name: "Tokio", hour: 17, minute: 55 },    // Abre a las 18:00 (6:00 PM)
+                { name: "Londres", hour: 1, minute: 55 },   // Abre a las 02:00 (2:00 AM)
+                { name: "Nueva York", hour: 6, minute: 55 } // Abre a las 07:00 (7:00 AM)
+            ]
+        };
+
+        let notifiedSessionsToday = new Set();
+
+        function sendSessionTelegramAlert(sessionName) {
+            if (!TELEGRAM_CONFIG.enabled || !TELEGRAM_CONFIG.username) return;
+            const message = `🚨 ALERTA DE MERCADO FOREX/CRIPTO\n\nLa sesión de *${sessionName}* abre en 5 minutos ⏰.\n¡Prepárate para el aumento de volatilidad! 📈📉`;
+            const userClean = TELEGRAM_CONFIG.username.replace("@", "");
+            const encodedMsg = encodeURIComponent(message);
+            fetch(`https://api.callmebot.com/text.php?user=@${userClean}&text=${encodedMsg}`, { mode: 'no-cors' })
+                .then(() => console.log(`Alerta enviada para la sesión de ${sessionName}`))
+                .catch(err => console.error("Error enviando alerta de sesión:", err));
+        }
+
+        function checkSessionAlerts() {
+            if (!SESSION_ALERTS_CONFIG.enabled) return;
+
+            const now = new Date();
+            const currentDay = now.getDay(); // 0 = Domingo, 6 = Sábado
+            if (currentDay === 6) return; // Mercado cerrado los sábados
+
+            const currentHour = now.getHours();
+            const currentMinute = now.getMinutes();
+            const timeKey = `${currentDay}-${currentHour}:${currentMinute}`;
+
+            SESSION_ALERTS_CONFIG.alerts.forEach(session => {
+                if (currentHour === session.hour && currentMinute === session.minute) {
+                    const uniqueAlertId = `${session.name}-${timeKey}`;
+                    if (!notifiedSessionsToday.has(uniqueAlertId)) {
+                        notifiedSessionsToday.add(uniqueAlertId);
+                        sendSessionTelegramAlert(session.name);
+                        playBeepSound("BUY");
+                    }
+                }
+            });
+
+            if (currentHour === 0 && currentMinute === 0) {
+                notifiedSessionsToday.clear();
+            }
+        }
+
+        setInterval(checkSessionAlerts, 1000);
+
         function playBeepSound(type) {
             try {
                 const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -686,7 +737,6 @@
         async function processIndicators(isInitialLoad = false) {
             if (!currentCandleData || currentCandleData.length === 0) return;
             
-            // LIMPIAR LÍNEAS PREVIAS OBLIGATORIAMENTE
             clearActiveLines();
 
             let allMarkers = [];
@@ -746,7 +796,6 @@
 
             if (showPivots) {
                 const { pivotHigh, pivotLow } = calculatePivots(currentCandleData, 20, 20);
-                // Si la tendencia actual o el sesgo es alcista, se busca target de resistencia sobre el precio.
                 if (pivotHigh && pivotHigh.high > currentPrice) {
                     currentMainTarget = pivotHigh.high;
                     activePriceLines.push(candlestickSeries.createPriceLine({
