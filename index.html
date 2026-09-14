@@ -893,7 +893,10 @@
         }
 
         function connectWebSocket(interval) {
-            if (wsConnection) wsConnection.close();
+            if (wsConnection) {
+                wsConnection.onclose = null; // Previene bucles al cerrar intencionalmente
+                wsConnection.close();
+            }
 
             const wsInterval = interval === "1s" ? "1s" : interval;
             wsConnection = new WebSocket(`wss://stream.binance.com:9443/ws/btcusdt@kline_${wsInterval}`);
@@ -921,6 +924,36 @@
                 }
             };
         }
+
+        // --- SISTEMA DE RECONEXIÓN AUTOMÁTICA EN TABLETS / SEGUNDO PLANO ---
+        document.addEventListener("visibilitychange", async function () {
+            if (document.visibilityState === "visible") {
+                console.log("Pestaña activa nuevamente. Resincronizando datos y conexión...");
+                statusEl.style.display = "block";
+                statusEl.innerText = "Resincronizando...";
+                statusEl.style.color = "#2962ff";
+
+                // Reconectar WebSocket si está cerrado o cerrándose
+                const isWsInactive = !wsConnection || wsConnection.readyState === WebSocket.CLOSED || wsConnection.readyState === WebSocket.CLOSING;
+                
+                try {
+                    // Refresca el historial de velas para no perder cambios ocurridos durante la suspensión
+                    const selectedInterval = timeframeSelect.value;
+                    currentCandleData = await fetchKlines(selectedInterval, 500);
+                    candlestickSeries.setData(currentCandleData);
+                    await processIndicators(false);
+
+                    if (isWsInactive) {
+                        connectWebSocket(selectedInterval);
+                    } else {
+                        statusEl.style.display = "none";
+                    }
+                } catch (err) {
+                    console.warn("Fallo al resincronizar datos al volver:", err);
+                    connectWebSocket(timeframeSelect.value);
+                }
+            }
+        });
 
         function setupToggleBtn(btn, getVal, setVal) {
             btn.addEventListener('click', async () => {
