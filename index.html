@@ -698,13 +698,14 @@
             timerInterval = setInterval(updateTimer, 1000);
         }
 
-        function processWhaleVSA(candles) {
+        // --- VSA BALLENAS & DASHBOARD MULTI-TF ACTUALIZADO ---
+        async function processWhaleVSA(candles) {
             const markers = [];
             let lastWhaleBuyPrice = null, lastWhaleSellPrice = null;
 
             if (!candles || candles.length < 20) return { markers, lastWhaleBuyPrice, lastWhaleSellPrice };
             
-            let rollingVolumeSum = 0, totalBuyVol = 0, totalSellVol = 0;
+            let rollingVolumeSum = 0;
             for (let i = 0; i < 20; i++) rollingVolumeSum += (candles[i].volume || 1);
 
             for (let i = 20; i < candles.length; i++) {
@@ -712,9 +713,6 @@
                 const avgVol = rollingVolumeSum / 20;
                 const isWhaleVol = (c.volume || 0) > (avgVol * 2.2);
                 rollingVolumeSum += (c.volume || 1) - (candles[i - 20].volume || 1);
-
-                if (c.close >= c.open) totalBuyVol += c.volume;
-                else totalSellVol += c.volume;
 
                 if (isWhaleVol) {
                     if (c.close > c.open) {
@@ -727,19 +725,49 @@
                 }
             }
 
-            const totalVol = totalBuyVol + totalSellVol;
-            if (totalVol > 0) {
-                const buyPct = ((totalBuyVol / totalVol) * 100).toFixed(1);
-                const sellPct = ((totalSellVol / totalVol) * 100).toFixed(1);
-                const currentTfRow = document.querySelector('#vsa-mtf-tbody tr:first-child');
-                if (currentTfRow) {
-                    currentTfRow.children[2].innerText = (totalVol / 1000).toFixed(2);
-                    currentTfRow.children[3].innerText = `${buyPct}%`;
-                    currentTfRow.children[4].innerText = `${sellPct}%`;
-                }
-            }
+            await updateVSADashboardTable();
 
             return { markers, lastWhaleBuyPrice, lastWhaleSellPrice };
+        }
+
+        async function updateVSADashboardTable() {
+            const vsaTfConfig = [
+                { tf: '15m', rowIndex: 0 },
+                { tf: '1h',  rowIndex: 1 },
+                { tf: '4h',  rowIndex: 2 },
+                { tf: '1d',  rowIndex: 3 },
+                { tf: '1w',  rowIndex: 4 },
+                { tf: '1M',  rowIndex: 5 }
+            ];
+
+            const tbody = document.getElementById('vsa-mtf-tbody');
+            if (!tbody) return;
+
+            for (const item of vsaTfConfig) {
+                try {
+                    const tfCandles = await fetchKlines(item.tf, 100);
+                    let totalBuyVol = 0, totalSellVol = 0;
+
+                    tfCandles.forEach(c => {
+                        if (c.close >= c.open) totalBuyVol += c.volume;
+                        else totalSellVol += c.volume;
+                    });
+
+                    const totalVol = totalBuyVol + totalSellVol;
+                    const row = tbody.children[item.rowIndex];
+
+                    if (row && totalVol > 0) {
+                        const buyPct = ((totalBuyVol / totalVol) * 100).toFixed(1);
+                        const sellPct = ((totalSellVol / totalVol) * 100).toFixed(1);
+                        
+                        row.children[2].innerText = (totalVol / 1000).toFixed(2);
+                        row.children[3].innerText = `${buyPct}%`;
+                        row.children[4].innerText = `${sellPct}%`;
+                    }
+                } catch (e) {
+                    console.warn(`Error procesando VSA para TF ${item.tf}:`, e);
+                }
+            }
         }
 
         function getSupertrendMarkers(candles, atrPeriods = 14, multiplier = 2.0) {
@@ -931,7 +959,7 @@
             }
 
             if (showVsa) {
-                const { markers: whaleMarkers, lastWhaleBuyPrice, lastWhaleSellPrice } = processWhaleVSA(currentCandleData);
+                const { markers: whaleMarkers, lastWhaleBuyPrice, lastWhaleSellPrice } = await processWhaleVSA(currentCandleData);
                 allMarkers = allMarkers.concat(whaleMarkers);
                 if (lastWhaleSellPrice) {
                     activePriceLines.push(candlestickSeries.createPriceLine({
