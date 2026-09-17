@@ -25,12 +25,13 @@
             display: flex; 
             align-items: center; 
             justify-content: space-between; 
-            padding: 6px 14px; 
+            padding: 4px 10px; 
             background-color: #1e222d; 
             border-bottom: 1px solid #2a2e39; 
             flex-shrink: 0; 
-            height: 42px;
+            min-height: 42px;
             width: 100%;
+            overflow-x: auto;
         }
 
         .controls-group { display: flex; align-items: center; gap: 6px; flex-wrap: nowrap; }
@@ -69,17 +70,18 @@
             position: relative; 
         }
 
+        /* FIX DASHBOARD CORTADO */
         #dashboard { 
-            width: 280px; 
-            min-width: 280px;
-            max-width: 280px;
+            width: 250px; 
+            min-width: 250px;
+            max-width: 250px;
             height: 100%;
             background-color: #1e222d; 
             border-left: 1px solid #2a2e39; 
-            padding: 8px; 
+            padding: 6px; 
             display: flex; 
             flex-direction: column; 
-            gap: 6px; 
+            gap: 5px; 
             overflow-y: auto; 
             overflow-x: hidden;
             flex-shrink: 0; 
@@ -98,33 +100,65 @@
             flex-direction: column; 
             gap: 3px; 
             flex-shrink: 0;
+            width: 100%;
+            box-sizing: border-box;
         }
-        .dash-module h4 { font-size: 10px; color: #787b86; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; }
-        .dash-row { display: flex; justify-content: space-between; font-size: 11px; align-items: center; }
-        .dash-val { font-weight: bold; }
-        .vsa-table { width: 100%; border-collapse: collapse; font-size: 10px; margin-top: 2px; }
+        .dash-module h4 { 
+            font-size: 10px; 
+            color: #787b86; 
+            text-transform: uppercase; 
+            letter-spacing: 0.5px; 
+            margin-bottom: 2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .dash-row { 
+            display: flex; 
+            justify-content: space-between; 
+            font-size: 10px; 
+            align-items: center; 
+            gap: 4px;
+            width: 100%;
+        }
+        .dash-row > span:first-child {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            color: #9db2c6;
+        }
+        .dash-val { 
+            font-weight: bold; 
+            white-space: nowrap;
+            text-align: right;
+        }
+
+        .vsa-table { width: 100%; border-collapse: collapse; font-size: 9px; margin-top: 2px; }
         .vsa-table th { text-align: left; color: #787b86; padding: 2px 0; font-weight: normal; border-bottom: 1px solid #2a2e39; }
-        .vsa-table td { padding: 3px 0; text-align: right; }
+        .vsa-table td { padding: 2px 0; text-align: right; }
         .vsa-table td:first-child { text-align: left; }
+        
         #timer-progress-container { width: 100%; height: 3px; background-color: #2a2e39; border-radius: 2px; overflow: hidden; margin-top: 2px; }
         #timer-progress { height: 100%; width: 0%; background-color: #2962ff; transition: width 1s linear; }
+        
         .vsa-badge { padding: 1px 3px; border-radius: 2px; font-size: 8px; font-weight: bold; text-transform: uppercase; display: inline-block; text-align: center; }
         .vsa-buy { background-color: rgba(0, 230, 118, 0.2); color: #00e676; border: 1px solid #00e676; }
         .vsa-sell { background-color: rgba(255, 23, 68, 0.2); color: #ff1744; border: 1px solid #ff1744; }
         .vsa-neutral { background-color: rgba(120, 123, 134, 0.2); color: #787b86; border: 1px solid #787b86; }
         .txt-buy { color: #00e676; font-weight: bold; }
         .txt-sell { color: #ff1744; font-weight: bold; }
-        .trend-bar-bg { width: 100%; height: 6px; background-color: #2a2e39; border-radius: 3px; overflow: hidden; margin: 3px 0; position: relative; }
+        
+        .trend-bar-bg { width: 100%; height: 5px; background-color: #2a2e39; border-radius: 3px; overflow: hidden; margin: 2px 0; position: relative; }
         .trend-bar-fill { height: 100%; width: 50%; background-color: #787b86; transition: all 0.5s ease; }
         
-        .session-badge { padding: 2px 5px; border-radius: 3px; font-size: 9px; font-weight: bold; text-transform: uppercase; }
+        .session-badge { padding: 1px 4px; border-radius: 3px; font-size: 8px; font-weight: bold; text-transform: uppercase; }
         .session-active { background-color: rgba(0, 230, 118, 0.2); color: #00e676; border: 1px solid #00e676; }
         .session-closed { background-color: rgba(120, 123, 134, 0.1); color: #5d606b; border: 1px solid #2a2e39; }
 
-        .news-item { display: flex; justify-content: space-between; align-items: center; font-size: 10px; padding: 3px 0; border-bottom: 1px solid #2a2e39; }
-        .news-title { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 5px; }
-        .news-impact { padding: 1px 4px; border-radius: 2px; font-weight: bold; font-size: 8px; background-color: rgba(255, 23, 68, 0.2); color: #ff1744; border: 1px solid #ff1744; }
-        .news-warning { background-color: rgba(255, 23, 68, 0.15); border: 1px solid #ff1744; color: #ff1744; font-size: 10px; padding: 4px; text-align: center; font-weight: bold; border-radius: 3px; margin-bottom: 4px; display: none; }
+        .news-item { display: flex; justify-content: space-between; align-items: center; font-size: 9px; padding: 2px 0; border-bottom: 1px solid #2a2e39; }
+        .news-title { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 4px; }
+        .news-impact { padding: 1px 3px; border-radius: 2px; font-weight: bold; font-size: 7px; background-color: rgba(255, 23, 68, 0.2); color: #ff1744; border: 1px solid #ff1744; margin-right: 4px; }
+        .news-warning { background-color: rgba(255, 23, 68, 0.15); border: 1px solid #ff1744; color: #ff1744; font-size: 9px; padding: 3px; text-align: center; font-weight: bold; border-radius: 3px; margin-bottom: 4px; display: none; }
     </style>
 </head>
 <body>
@@ -178,17 +212,17 @@
             </div>
 
             <div id="dash-module-news" class="dash-module" style="border: 1px solid #ff1744;">
-                <h4>Macro Eventos MQL5 USD (CR)</h4>
-                <div id="news-alert-banner" class="news-warning">⚠️ NOTICIA ALTO IMPACTO EN BREVE</div>
+                <h4>Macro Eventos USD (CR)</h4>
+                <div id="news-alert-banner" class="news-warning">⚠️ NOTICIA EN BREVE</div>
                 <div id="news-list-container">
-                    <div style="font-size: 10px; color: #787b86;">Cargando eventos MQL5...</div>
+                    <div style="font-size: 9px; color: #787b86;">Cargando eventos...</div>
                 </div>
             </div>
 
             <div id="dash-module-sessions" class="dash-module" style="border: 1px solid #363c4e;">
-                <h4>Sesión de Mercado Activa (CR)</h4>
+                <h4>Sesión de Mercado (CR)</h4>
                 <div class="dash-row" style="margin-bottom: 2px;">
-                    <span>Estado Actual:</span>
+                    <span>Estado:</span>
                     <span id="dash-active-session-text" class="dash-val" style="color: #00e676;">--</span>
                 </div>
                 <div class="dash-row">
@@ -208,65 +242,65 @@
             <div id="dash-module-global-trend" class="dash-module" style="border: 1px solid #2962ff;">
                 <h4>Tendencia Global Integrada</h4>
                 <div class="dash-row">
-                    <span>Tendencia TF Actual:</span>
+                    <span>Tendencia TF:</span>
                     <span id="dash-trend-tf" class="dash-val">--</span>
                 </div>
                 <div class="trend-bar-bg"><div id="trend-bar-tf" class="trend-bar-fill"></div></div>
 
-                <div class="dash-row" style="margin-top: 4px;">
-                    <span>Tendencia del Día (1D):</span>
+                <div class="dash-row" style="margin-top: 3px;">
+                    <span>Tendencia Día (1D):</span>
                     <span id="dash-trend-day" class="dash-val">--</span>
                 </div>
                 <div class="trend-bar-bg"><div id="trend-bar-day" class="trend-bar-fill"></div></div>
-                <div class="dash-row" style="font-size: 9px; color: #787b86;">
+                <div class="dash-row" style="font-size: 8px; color: #787b86; margin-top: 2px;">
                     <span>Fuerza / Confluencia:</span>
                     <span id="dash-trend-score" class="dash-val">0%</span>
                 </div>
             </div>
 
             <div id="dash-module-liquidity" class="dash-module" style="border: 1px solid #ffd700;">
-                <h4>Toma de Liquidez (SMC Sweep)</h4>
+                <h4>Toma Liquidez (SMC)</h4>
                 <div class="dash-row">
                     <span>Último Sweep:</span>
                     <span id="dash-lq-type" class="dash-val">--</span>
                 </div>
                 <div class="dash-row">
-                    <span>Nivel del Sweep:</span>
+                    <span>Nivel:</span>
                     <span id="dash-lq-price" class="dash-val">--</span>
                 </div>
             </div>
 
             <div id="dash-module-ob" class="dash-module" style="border: 1px solid #26a69a;">
-                <h4>Order Blocks Institucionales</h4>
+                <h4>Order Blocks (SMC)</h4>
                 <div class="dash-row">
-                    <span>OB Resistencia (Venta):</span>
+                    <span>OB Res (Venta):</span>
                     <span id="dash-ob-bearish" class="dash-val" style="color: #ff1744;">--</span>
                 </div>
                 <div class="dash-row">
-                    <span>OB Soporte (Compra):</span>
+                    <span>OB Sop (Compra):</span>
                     <span id="dash-ob-bullish" class="dash-val" style="color: #00e676;">--</span>
                 </div>
             </div>
 
             <div id="dash-module-vsa" class="dash-module">
-                <h4>S/R VSA Ballenas % Vol MTF</h4>
+                <h4>S/R VSA Ballenas MTF</h4>
                 <table class="vsa-table">
                     <thead>
                         <tr>
                             <th>TF</th>
                             <th>Señal</th>
                             <th>Vol (K)</th>
-                            <th>% Comp</th>
-                            <th>% Vent</th>
+                            <th>% C</th>
+                            <th>% V</th>
                         </tr>
                     </thead>
                     <tbody id="vsa-mtf-tbody">
-                        <tr><td>15 Min</td><td><span class="vsa-badge vsa-buy">BUY</span></td><td>--</td><td class="txt-buy">--</td><td class="txt-sell">--</td></tr>
-                        <tr><td>1 Hora</td><td><span class="vsa-badge vsa-buy">BUY</span></td><td>--</td><td class="txt-buy">--</td><td class="txt-sell">--</td></tr>
-                        <tr><td>4 Horas</td><td><span class="vsa-badge vsa-buy">BUY</span></td><td>--</td><td class="txt-buy">--</td><td class="txt-sell">--</td></tr>
-                        <tr><td>1 Diario</td><td><span class="vsa-badge vsa-sell">SELL</span></td><td>--</td><td class="txt-buy">--</td><td class="txt-sell">--</td></tr>
-                        <tr><td>1 Sem</td><td><span class="vsa-badge vsa-neutral">NEUTRAL</span></td><td>--</td><td class="txt-buy">--</td><td class="txt-sell">--</td></tr>
-                        <tr><td>1 Mes</td><td><span class="vsa-badge vsa-neutral">NEUTRAL</span></td><td>--</td><td class="txt-buy">--</td><td class="txt-sell">--</td></tr>
+                        <tr><td>15M</td><td><span class="vsa-badge vsa-buy">BUY</span></td><td>--</td><td class="txt-buy">--</td><td class="txt-sell">--</td></tr>
+                        <tr><td>1H</td><td><span class="vsa-badge vsa-buy">BUY</span></td><td>--</td><td class="txt-buy">--</td><td class="txt-sell">--</td></tr>
+                        <tr><td>4H</td><td><span class="vsa-badge vsa-buy">BUY</span></td><td>--</td><td class="txt-buy">--</td><td class="txt-sell">--</td></tr>
+                        <tr><td>1D</td><td><span class="vsa-badge vsa-sell">SELL</span></td><td>--</td><td class="txt-buy">--</td><td class="txt-sell">--</td></tr>
+                        <tr><td>1W</td><td><span class="vsa-badge vsa-neutral">NEU</span></td><td>--</td><td class="txt-buy">--</td><td class="txt-sell">--</td></tr>
+                        <tr><td>1M</td><td><span class="vsa-badge vsa-neutral">NEU</span></td><td>--</td><td class="txt-buy">--</td><td class="txt-sell">--</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -278,13 +312,13 @@
                     <span id="dash-st-signal" class="dash-val">--</span>
                 </div>
                 <div class="dash-row">
-                    <span>Precio Señal:</span>
+                    <span>Precio:</span>
                     <span id="dash-st-price" class="dash-val">--</span>
                 </div>
             </div>
 
             <div id="dash-module-footprint" class="dash-module">
-                <h4>Sesgo de Mercado & Liquidez</h4>
+                <h4>Sesgo & Liquidez</h4>
                 <div class="dash-row">
                     <span>Tendencia:</span>
                     <span id="dash-bias" class="dash-val">--</span>
@@ -294,15 +328,15 @@
                     <span id="dash-invalid" class="dash-val">--</span>
                 </div>
                 <div class="dash-row">
-                    <span>Entrada Sugerida:</span>
+                    <span>Entrada Sug:</span>
                     <span id="dash-entry" class="dash-val">--</span>
                 </div>
                 <div class="dash-row">
-                    <span>Próx Liquidez (TP):</span>
+                    <span>TP Liquidez:</span>
                     <span id="dash-tp" class="dash-val" style="color: #00e5ff;">--</span>
                 </div>
                 <div class="dash-row">
-                    <span>Stop Loss (SL):</span>
+                    <span>Stop Loss:</span>
                     <span id="dash-sl" class="dash-val">--</span>
                 </div>
             </div>
@@ -317,10 +351,10 @@
 
             <div id="dash-module-pivots-tf" class="dash-module">
                 <h4>Matriz Pivots Multi-TF</h4>
-                <div class="dash-row"><span>R/S 15M:</span><span id="pvt-15m" class="dash-val">--</span></div>
-                <div class="dash-row"><span>R/S 1H:</span><span id="pvt-1h" class="dash-val">--</span></div>
-                <div class="dash-row"><span>R/S 4H:</span><span id="pvt-4h" class="dash-val">--</span></div>
-                <div class="dash-row"><span>R/S 1D:</span><span id="pvt-1d" class="dash-val">--</span></div>
+                <div class="dash-row"><span>15M:</span><span id="pvt-15m" class="dash-val">--</span></div>
+                <div class="dash-row"><span>1H:</span><span id="pvt-1h" class="dash-val">--</span></div>
+                <div class="dash-row"><span>4H:</span><span id="pvt-4h" class="dash-val">--</span></div>
+                <div class="dash-row"><span>1D:</span><span id="pvt-1d" class="dash-val">--</span></div>
             </div>
         </div>
     </div>
@@ -376,13 +410,13 @@
             if (isNY) activeNames.push("NY");
 
             if (activeNames.length > 1) {
-                activeText.innerText = `TRASLAPE (${activeNames.join(" + ")}) 🔥`;
+                activeText.innerText = `TRASLAPE 🔥`;
                 activeText.style.color = "#ff9800";
             } else if (activeNames.length === 1) {
                 activeText.innerText = `${activeNames[0]} 🟢`;
                 activeText.style.color = "#00e676";
             } else {
-                activeText.innerText = "ASIA TARDÍA / BAJO VOL 🌙";
+                activeText.innerText = "ASIA TARDÍA 🌙";
                 activeText.style.color = "#787b86";
             }
         }
@@ -548,13 +582,19 @@
             { tf: '1d',  colorRes: '#ff1744', colorSup: '#00e676', label: '1D' }
         ];
 
+        /* FIX DE LAYOUT EN CHART CONFIG */
         const chart = LightweightCharts.createChart(chartContainer, {
             width: chartContainer.clientWidth,
             height: chartContainer.clientHeight,
             layout: { background: { type: 'solid', color: '#131722' }, textColor: '#d1d4dc' },
             grid: { vertLines: { color: 'rgba(42, 46, 57, 0.5)' }, horzLines: { color: 'rgba(42, 46, 57, 0.5)' } },
             timeScale: { borderColor: 'rgba(197, 203, 206, 0.8)', timeVisible: true, secondsVisible: true },
-            rightPriceScale: { autoScale: true }
+            rightPriceScale: { 
+                autoScale: true,
+                alignLabels: true,
+                borderVisible: true,
+                scaleMargins: { top: 0.1, bottom: 0.1 }
+            }
         });
 
         const candlestickSeries = chart.addSeries 
@@ -638,7 +678,7 @@
             } catch (e) {
                 console.warn("Error cargando eventos MQL5:", e);
                 if (newsContainer) {
-                    newsContainer.innerHTML = `<div style="font-size: 10px; color: #787b86;">Sin noticias USD de MQL5 registradas hoy.</div>`;
+                    newsContainer.innerHTML = `<div style="font-size: 9px; color: #787b86;">Sin noticias USD registradas hoy.</div>`;
                 }
             }
         }
@@ -648,7 +688,7 @@
             if (!newsContainer) return;
 
             if (!events || events.length === 0) {
-                newsContainer.innerHTML = `<div style="font-size: 10px; color: #00e676;">Sin noticias de alto impacto hoy 🟢</div>`;
+                newsContainer.innerHTML = `<div style="font-size: 9px; color: #00e676;">Sin noticias de impacto hoy 🟢</div>`;
                 return;
             }
 
@@ -659,7 +699,7 @@
                     <div class="news-item">
                         <span class="news-impact">USD</span>
                         <span class="news-title" title="${ev.title}">${ev.title}</span>
-                        <span style="color: #ff1744; font-weight: bold;">${crTimeFormatted}</span>
+                        <span style="color: #ff1744; font-weight: bold; white-space: nowrap;">${crTimeFormatted}</span>
                     </div>
                 `;
             });
@@ -764,7 +804,6 @@
             return null;
         }
 
-        /* --- INDICADOR DE TOMA DE LIQUIDEZ (SMC SWEEPS) --- */
         function calculateLiquiditySweeps(candles, lookback = 15) {
             const markers = [];
             let lastSweep = null;
@@ -781,23 +820,21 @@
                     if (candles[j].low < prevLow) prevLow = candles[j].low;
                 }
 
-                // Bullish Liquidity Sweep (Caza de liquidez en mínimos / Reversal Alcista)
                 if (current.low < prevLow && current.close > prevLow) {
                     markers.push({
                         time: current.time,
                         position: 'belowBar',
-                        color: '#ffd700', // Dorado
+                        color: '#ffd700',
                         shape: 'square',
                         text: '⚡ LQ BUY'
                     });
                     lastSweep = { type: 'LQ BUY ⚡', price: current.low, time: current.time };
                 }
-                // Bearish Liquidity Sweep (Caza de liquidez en máximos / Reversal Bajista)
                 else if (current.high > prevHigh && current.close < prevHigh) {
                     markers.push({
                         time: current.time,
                         position: 'aboveBar',
-                        color: '#ff00ff', // Fucsia
+                        color: '#ff00ff',
                         shape: 'square',
                         text: '⚡ LQ SELL'
                     });
@@ -808,7 +845,6 @@
             return { markers, lastSweep };
         }
 
-        /* --- ORDER BLOCKS CORREGIDOS --- */
         function calculateOrderBlocks(candles, lookback = 40) {
             let latestBullishOB = null;
             let latestBearishOB = null;
@@ -917,9 +953,9 @@
         function renderTrendUI(textEl, barEl, pct) {
             let label = "NEUTRAL ⚖️", color = "#787b86";
             if (pct >= 40) { label = "ALCISTA 🚀"; color = "#00e676"; }
-            else if (pct > 0) { label = "MOD. ALCISTA ↗️"; color = "#81c784"; }
+            else if (pct > 0) { label = "MOD. ALC ↗️"; color = "#81c784"; }
             else if (pct <= -40) { label = "BAJISTA 🐻"; color = "#ff1744"; }
-            else if (pct < 0) { label = "MOD. BAJISTA ↘️"; color = "#e57373"; }
+            else if (pct < 0) { label = "MOD. BAJ ↘️"; color = "#e57373"; }
 
             textEl.innerText = label;
             textEl.style.color = color;
@@ -1075,7 +1111,7 @@
                         const buyPct = ((totalBuyVol / totalVol) * 100).toFixed(1);
                         const sellPct = ((totalSellVol / totalVol) * 100).toFixed(1);
                         
-                        row.children[2].innerText = (totalVol / 1000).toFixed(2);
+                        row.children[2].innerText = (totalVol / 1000).toFixed(1);
                         row.children[3].innerText = `${buyPct}%`;
                         row.children[4].innerText = `${sellPct}%`;
                     }
@@ -1216,7 +1252,7 @@
 
                     if (pivotLow) {
                         activePriceLines.push(candlestickSeries.createPriceLine({
-                            price: pivotLow.low, color: item.colorSup, lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dotted, title: `Sop ${item.label}`
+                            price: pivotLow.low, color: item.colorSup, lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dotted, title: `S: $${pivotLow.low.toFixed(0)}`
                         }));
                         textInfo += `S: $${pivotLow.low.toFixed(0)}`;
                     }
@@ -1311,7 +1347,7 @@
                     activePriceLines.push(candlestickSeries.createPriceLine({
                         price: latestBearishOB.bottom, color: '#ef5350', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dotted, title: 'OB Res (Low)'
                     }));
-                    dashObBearish.innerText = `$${latestBearishOB.bottom.toFixed(1)} - $${latestBearishOB.top.toFixed(1)}`;
+                    dashObBearish.innerText = `$${latestBearishOB.bottom.toFixed(0)}-$${latestBearishOB.top.toFixed(0)}`;
                 } else {
                     dashObBearish.innerText = "--";
                 }
@@ -1323,7 +1359,7 @@
                     activePriceLines.push(candlestickSeries.createPriceLine({
                         price: latestBullishOB.bottom, color: '#26a69a', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Solid, title: 'OB Sop (Low)'
                     }));
-                    dashObBullish.innerText = `$${latestBullishOB.bottom.toFixed(1)} - $${latestBullishOB.top.toFixed(1)}`;
+                    dashObBullish.innerText = `$${latestBullishOB.bottom.toFixed(0)}-$${latestBullishOB.top.toFixed(0)}`;
                 } else {
                     dashObBullish.innerText = "--";
                 }
