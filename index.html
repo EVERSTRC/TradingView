@@ -3,12 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bitcoin Trading Terminal - Multi TF Pivots, OBs & Global Trend</title>
+    <title>Bitcoin Trading Terminal - Multi TF Pivots, OBs, Liquidity & Global Trend</title>
     <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         
-        /* Ajuste para ocupar exactamente el 100% de la ventana */
         html, body { 
             width: 100vw; 
             height: 100vh; 
@@ -52,7 +51,6 @@
         button.inactive { opacity: 0.5; }
         #status { font-size: 11px; color: #2962ff; font-weight: bold; }
 
-        /* Contenedor flexible ocupando el resto de la pantalla */
         #main-container { 
             display: flex; 
             flex: 1; 
@@ -62,7 +60,6 @@
             height: calc(100vh - 42px); 
         }
 
-        /* Área del gráfico expansiva */
         #chart { 
             flex: 1; 
             height: 100%; 
@@ -72,7 +69,6 @@
             position: relative; 
         }
 
-        /* Sidebar Ajustado para scroll independiente fluido */
         #dashboard { 
             width: 280px; 
             min-width: 280px;
@@ -89,7 +85,6 @@
             flex-shrink: 0; 
         }
 
-        /* Scrollbar personalizado para el dashboard */
         #dashboard::-webkit-scrollbar { width: 4px; }
         #dashboard::-webkit-scrollbar-track { background: #131722; }
         #dashboard::-webkit-scrollbar-thumb { background: #363c4e; border-radius: 2px; }
@@ -125,7 +120,6 @@
         .session-badge { padding: 2px 5px; border-radius: 3px; font-size: 9px; font-weight: bold; text-transform: uppercase; }
         .session-active { background-color: rgba(0, 230, 118, 0.2); color: #00e676; border: 1px solid #00e676; }
         .session-closed { background-color: rgba(120, 123, 134, 0.1); color: #5d606b; border: 1px solid #2a2e39; }
-        .session-overlap { background-color: rgba(255, 152, 0, 0.2); color: #ff9800; border: 1px solid #ff9800; }
 
         .news-item { display: flex; justify-content: space-between; align-items: center; font-size: 10px; padding: 3px 0; border-bottom: 1px solid #2a2e39; }
         .news-title { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 5px; }
@@ -157,6 +151,7 @@
 
         <div class="controls-group">
             <button id="toggle-supertrend" class="active">Supertrend</button>
+            <button id="toggle-liquidity" class="active">Toma Liquidez</button>
             <button id="toggle-footprint" class="active">Footprint POC</button>
             <button id="toggle-pivots" class="active">Pivots</button>
             <button id="toggle-pivots-tf" class="active">Pivots Multi-TF</button>
@@ -226,6 +221,18 @@
                 <div class="dash-row" style="font-size: 9px; color: #787b86;">
                     <span>Fuerza / Confluencia:</span>
                     <span id="dash-trend-score" class="dash-val">0%</span>
+                </div>
+            </div>
+
+            <div id="dash-module-liquidity" class="dash-module" style="border: 1px solid #ffd700;">
+                <h4>Toma de Liquidez (SMC Sweep)</h4>
+                <div class="dash-row">
+                    <span>Último Sweep:</span>
+                    <span id="dash-lq-type" class="dash-val">--</span>
+                </div>
+                <div class="dash-row">
+                    <span>Nivel del Sweep:</span>
+                    <span id="dash-lq-price" class="dash-val">--</span>
                 </div>
             </div>
 
@@ -484,11 +491,13 @@
         const btnVsa = document.getElementById("toggle-vsa");
         const btnOb = document.getElementById("toggle-ob");
         const btnSupertrend = document.getElementById("toggle-supertrend");
+        const btnLiquidity = document.getElementById("toggle-liquidity");
         const btnFootprint = document.getElementById("toggle-footprint");
         const btnMultiFp = document.getElementById("toggle-multi-fp");
         const btnNews = document.getElementById("toggle-news");
 
         const modSupertrend = document.getElementById("dash-module-supertrend");
+        const modLiquidity = document.getElementById("dash-module-liquidity");
         const modFootprint = document.getElementById("dash-module-footprint");
         const modPivots = document.getElementById("dash-module-pivots");
         const modPivotsTf = document.getElementById("dash-module-pivots-tf");
@@ -501,11 +510,14 @@
         const trendBarDay = document.getElementById("trend-bar-day");
         const dashTrendScore = document.getElementById("dash-trend-score");
 
+        const dashLqType = document.getElementById("dash-lq-type");
+        const dashLqPrice = document.getElementById("dash-lq-price");
+
         const dashObBearish = document.getElementById("dash-ob-bearish");
         const dashObBullish = document.getElementById("dash-ob-bullish");
 
         let showPivots = true, showPivotsTf = true, showVsa = true, showOb = true;
-        let showSupertrend = true, showFootprint = true, showMultiFootprint = false;
+        let showSupertrend = true, showLiquidity = true, showFootprint = true, showMultiFootprint = false;
 
         const timerDisplay = document.getElementById("timer-display");
         const timerProgress = document.getElementById("timer-progress");
@@ -558,6 +570,7 @@
 
         function updateDashboardModulesVisibility() {
             modSupertrend.style.display = showSupertrend ? "flex" : "none";
+            modLiquidity.style.display = showLiquidity ? "flex" : "none";
             modFootprint.style.display = showFootprint ? "flex" : "none";
             modPivots.style.display = showPivots ? "flex" : "none";
             modPivotsTf.style.display = showPivotsTf ? "flex" : "none";
@@ -751,7 +764,51 @@
             return null;
         }
 
-        /* --- CÁLCULO DE ORDER BLOCKS CORREGIDO --- */
+        /* --- INDICADOR DE TOMA DE LIQUIDEZ (SMC SWEEPS) --- */
+        function calculateLiquiditySweeps(candles, lookback = 15) {
+            const markers = [];
+            let lastSweep = null;
+
+            if (!candles || candles.length < lookback + 1) return { markers, lastSweep };
+
+            for (let i = lookback; i < candles.length; i++) {
+                const current = candles[i];
+                
+                let prevHigh = -Infinity;
+                let prevLow = Infinity;
+                for (let j = i - lookback; j < i; j++) {
+                    if (candles[j].high > prevHigh) prevHigh = candles[j].high;
+                    if (candles[j].low < prevLow) prevLow = candles[j].low;
+                }
+
+                // Bullish Liquidity Sweep (Caza de liquidez en mínimos / Reversal Alcista)
+                if (current.low < prevLow && current.close > prevLow) {
+                    markers.push({
+                        time: current.time,
+                        position: 'belowBar',
+                        color: '#ffd700', // Dorado
+                        shape: 'square',
+                        text: '⚡ LQ BUY'
+                    });
+                    lastSweep = { type: 'LQ BUY ⚡', price: current.low, time: current.time };
+                }
+                // Bearish Liquidity Sweep (Caza de liquidez en máximos / Reversal Bajista)
+                else if (current.high > prevHigh && current.close < prevHigh) {
+                    markers.push({
+                        time: current.time,
+                        position: 'aboveBar',
+                        color: '#ff00ff', // Fucsia
+                        shape: 'square',
+                        text: '⚡ LQ SELL'
+                    });
+                    lastSweep = { type: 'LQ SELL ⚡', price: current.high, time: current.time };
+                }
+            }
+
+            return { markers, lastSweep };
+        }
+
+        /* --- ORDER BLOCKS CORREGIDOS --- */
         function calculateOrderBlocks(candles, lookback = 40) {
             let latestBullishOB = null;
             let latestBearishOB = null;
@@ -762,7 +819,6 @@
                 const next1 = candles[i + 1];
                 const next2 = candles[i + 2];
 
-                // Bullish OB (Soporte): Vela bajista previa a impulso alcista
                 if (!latestBullishOB && (current.close < current.open) && (next1.close > current.high) && (next2.close > next1.close)) {
                     latestBullishOB = {
                         top: Math.max(current.open, current.high),
@@ -771,7 +827,6 @@
                     };
                 }
 
-                // Bearish OB (Resistencia): Vela alcista previa a impulso bajista
                 if (!latestBearishOB && (current.close > current.open) && (next1.close < current.low) && (next2.close < next1.close)) {
                     latestBearishOB = {
                         top: current.high,
@@ -1203,6 +1258,20 @@
                 }
             }
 
+            if (showLiquidity) {
+                const { markers: lqMarkers, lastSweep } = calculateLiquiditySweeps(currentCandleData, 15);
+                allMarkers = allMarkers.concat(lqMarkers);
+
+                if (lastSweep) {
+                    dashLqType.innerText = lastSweep.type;
+                    dashLqType.style.color = lastSweep.type.includes("BUY") ? "#ffd700" : "#ff00ff";
+                    dashLqPrice.innerText = `$${lastSweep.price.toFixed(2)}`;
+                } else {
+                    dashLqType.innerText = "--";
+                    dashLqPrice.innerText = "--";
+                }
+            }
+
             if (showFootprint) {
                 const { resPOC, supPOC } = calculateFootprintSR(currentCandleData, 60);
                 if (resPOC) {
@@ -1233,7 +1302,6 @@
                 }
             }
 
-            /* --- ETIQUETADO DE ORDER BLOCKS CORREGIDO --- */
             if (showOb) {
                 const { latestBullishOB, latestBearishOB } = calculateOrderBlocks(currentCandleData, 40);
                 if (latestBearishOB) {
@@ -1386,6 +1454,7 @@
         setupToggleBtn(btnVsa, () => showVsa, v => showVsa = v);
         setupToggleBtn(btnOb, () => showOb, v => showOb = v);
         setupToggleBtn(btnSupertrend, () => showSupertrend, v => showSupertrend = v);
+        setupToggleBtn(btnLiquidity, () => showLiquidity, v => showLiquidity = v);
         setupToggleBtn(btnFootprint, () => showFootprint, v => showFootprint = v);
         setupToggleBtn(btnMultiFp, () => showMultiFootprint, v => showMultiFootprint = v);
 
