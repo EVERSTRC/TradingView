@@ -7,19 +7,103 @@
     <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #131722; color: #d1d4dc; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
-        #top-bar { display: flex; align-items: center; justify-content: space-between; padding: 6px 14px; background-color: #1e222d; border-bottom: 1px solid #2a2e39; flex-shrink: 0; }
-        .controls-group { display: flex; align-items: center; gap: 8px; }
-        label { font-size: 12px; color: #787b86; }
-        select, button { background-color: #2a2e39; color: #d1d4dc; border: 1px solid #363c4e; padding: 4px 8px; border-radius: 4px; font-size: 12px; cursor: pointer; transition: all 0.2s; }
+        
+        /* Ajuste para ocupar exactamente el 100% de la ventana */
+        html, body { 
+            width: 100vw; 
+            height: 100vh; 
+            max-width: 100vw; 
+            max-height: 100vh; 
+            overflow: hidden; 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            background-color: #131722; 
+            color: #d1d4dc; 
+            display: flex; 
+            flex-direction: column; 
+        }
+
+        #top-bar { 
+            display: flex; 
+            align-items: center; 
+            justify-content: space-between; 
+            padding: 6px 14px; 
+            background-color: #1e222d; 
+            border-bottom: 1px solid #2a2e39; 
+            flex-shrink: 0; 
+            height: 42px;
+            width: 100%;
+        }
+
+        .controls-group { display: flex; align-items: center; gap: 6px; flex-wrap: nowrap; }
+        label { font-size: 11px; color: #787b86; }
+        select, button { 
+            background-color: #2a2e39; 
+            color: #d1d4dc; 
+            border: 1px solid #363c4e; 
+            padding: 3px 6px; 
+            border-radius: 4px; 
+            font-size: 11px; 
+            cursor: pointer; 
+            transition: all 0.2s; 
+            white-space: nowrap;
+        }
         select:hover, button:hover { background-color: #363c4e; }
         button.active { background-color: #2962ff; color: #ffffff; border-color: #2962ff; }
-        button.inactive { opacity: 0.6; }
+        button.inactive { opacity: 0.5; }
         #status { font-size: 11px; color: #2962ff; font-weight: bold; }
-        #main-container { display: flex; flex: 1; position: relative; overflow: hidden; width: 100%; height: 100%; }
-        #chart { flex: 1; height: 100%; width: 100%; min-width: 0; min-height: 0; position: relative; }
-        #dashboard { width: 280px; background-color: #1e222d; border-left: 1px solid #2a2e39; padding: 8px; display: flex; flex-direction: column; gap: 6px; overflow-y: auto; flex-shrink: 0; }
-        .dash-module { background-color: #131722; border-radius: 4px; padding: 6px 8px; border: 1px solid #2a2e39; display: flex; flex-direction: column; gap: 3px; }
+
+        /* Contenedor flexible ocupando el resto de la pantalla */
+        #main-container { 
+            display: flex; 
+            flex: 1; 
+            position: relative; 
+            overflow: hidden; 
+            width: 100%; 
+            height: calc(100vh - 42px); 
+        }
+
+        /* Área del gráfico expansiva */
+        #chart { 
+            flex: 1; 
+            height: 100%; 
+            width: 100%; 
+            min-width: 0; 
+            min-height: 0; 
+            position: relative; 
+        }
+
+        /* Sidebar Ajustado para scroll independiente fluido */
+        #dashboard { 
+            width: 280px; 
+            min-width: 280px;
+            max-width: 280px;
+            height: 100%;
+            background-color: #1e222d; 
+            border-left: 1px solid #2a2e39; 
+            padding: 8px; 
+            display: flex; 
+            flex-direction: column; 
+            gap: 6px; 
+            overflow-y: auto; 
+            overflow-x: hidden;
+            flex-shrink: 0; 
+        }
+
+        /* Scrollbar personalizado para el dashboard */
+        #dashboard::-webkit-scrollbar { width: 4px; }
+        #dashboard::-webkit-scrollbar-track { background: #131722; }
+        #dashboard::-webkit-scrollbar-thumb { background: #363c4e; border-radius: 2px; }
+
+        .dash-module { 
+            background-color: #131722; 
+            border-radius: 4px; 
+            padding: 6px 8px; 
+            border: 1px solid #2a2e39; 
+            display: flex; 
+            flex-direction: column; 
+            gap: 3px; 
+            flex-shrink: 0;
+        }
         .dash-module h4 { font-size: 10px; color: #787b86; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; }
         .dash-row { display: flex; justify-content: space-between; font-size: 11px; align-items: center; }
         .dash-val { font-weight: bold; }
@@ -43,7 +127,6 @@
         .session-closed { background-color: rgba(120, 123, 134, 0.1); color: #5d606b; border: 1px solid #2a2e39; }
         .session-overlap { background-color: rgba(255, 152, 0, 0.2); color: #ff9800; border: 1px solid #ff9800; }
 
-        /* ESTILOS MÓDULO CALENDARIO ECONÓMICO USD (COSTA RICA) */
         .news-item { display: flex; justify-content: space-between; align-items: center; font-size: 10px; padding: 3px 0; border-bottom: 1px solid #2a2e39; }
         .news-title { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 5px; }
         .news-impact { padding: 1px 4px; border-radius: 2px; font-weight: bold; font-size: 8px; background-color: rgba(255, 23, 68, 0.2); color: #ff1744; border: 1px solid #ff1744; }
@@ -54,7 +137,7 @@
 
     <div id="top-bar">
         <div class="controls-group">
-            <label for="timeframe">Timeframe:</label>
+            <label for="timeframe">TF:</label>
             <select id="timeframe">
                 <option value="1s">1 Sec</option>
                 <option value="1m">1 Min</option>
@@ -77,8 +160,8 @@
             <button id="toggle-footprint" class="active">Footprint POC</button>
             <button id="toggle-pivots" class="active">Pivots</button>
             <button id="toggle-pivots-tf" class="active">Pivots Multi-TF</button>
-            <button id="toggle-vsa" class="active">S/R Ballenas (Lux)</button>
-            <button id="toggle-ob" class="active">Order Blocks (OB)</button>
+            <button id="toggle-vsa" class="active">S/R Ballenas</button>
+            <button id="toggle-ob" class="active">Order Blocks</button>
             <button id="toggle-multi-fp" class="inactive">Multi-FP</button>
             <button id="toggle-news" class="active">Noticias USD</button>
         </div>
@@ -99,7 +182,6 @@
                 </div>
             </div>
 
-            <!-- MÓDULO CALENDARIO ECONÓMICO USD (MQL5 / CR) -->
             <div id="dash-module-news" class="dash-module" style="border: 1px solid #ff1744;">
                 <h4>Macro Eventos MQL5 USD (CR)</h4>
                 <div id="news-alert-banner" class="news-warning">⚠️ NOTICIA ALTO IMPACTO EN BREVE</div>
@@ -108,7 +190,6 @@
                 </div>
             </div>
 
-            <!-- MÓDULO DE SESIONES DE MERCADO -->
             <div id="dash-module-sessions" class="dash-module" style="border: 1px solid #363c4e;">
                 <h4>Sesión de Mercado Activa (CR)</h4>
                 <div class="dash-row" style="margin-bottom: 2px;">
@@ -148,7 +229,6 @@
                 </div>
             </div>
 
-            <!-- MÓDULO ORDER BLOCKS (SMC) -->
             <div id="dash-module-ob" class="dash-module" style="border: 1px solid #26a69a;">
                 <h4>Order Blocks Institucionales</h4>
                 <div class="dash-row">
@@ -248,15 +328,13 @@
         const SESSION_ALERTS_CONFIG = {
             enabled: true,
             alerts: [
-                { name: "Tokio", hour: 17, minute: 55 },    // 18:00 (6:00 PM CR)
-                { name: "Londres", hour: 1, minute: 55 },   // 02:00 (2:00 AM CR)
-                { name: "Nueva York", hour: 6, minute: 55 } // 07:00 (7:00 AM CR)
+                { name: "Tokio", hour: 17, minute: 55 },
+                { name: "Londres", hour: 1, minute: 55 },
+                { name: "Nueva York", hour: 6, minute: 55 }
             ]
         };
 
         let notifiedSessionsToday = new Set();
-
-        // VARIABLES CALENDARIO ECONÓMICO MQL5 Y BOTÓN NOTICIAS
         let showNewsOnChart = true;
         let cachedEconomicEvents = [];
         let notifiedNewsToday = new Set();
@@ -308,13 +386,11 @@
             const userClean = TELEGRAM_CONFIG.username.replace("@", "");
             const encodedMsg = encodeURIComponent(message);
             fetch(`https://api.callmebot.com/text.php?user=@${userClean}&text=${encodedMsg}`, { mode: 'no-cors' })
-                .then(() => console.log(`Alerta enviada para la sesión de ${sessionName}`))
                 .catch(err => console.error("Error enviando alerta de sesión:", err));
         }
 
         function checkSessionAlerts() {
             updateSessionsDashboard();
-
             if (!SESSION_ALERTS_CONFIG.enabled) return;
 
             const now = new Date();
@@ -496,7 +572,6 @@
             activePriceLines = [];
         }
 
-        // --- CONVERTIDOR A HORA LOCAL DE COSTA RICA (AMERICA/COSTA_RICA) ---
         function convertToCRTime(utcTimeString) {
             if (!utcTimeString) return "Hoy";
             const [hours, minutes] = utcTimeString.split(":").map(Number);
@@ -511,7 +586,6 @@
             });
         }
 
-        // --- INTEGRACIÓN MQL5 CALENDARIO ECONÓMICO (SIN ERRORES DE CORS) ---
         async function fetchEconomicCalendar() {
             const newsContainer = document.getElementById("news-list-container");
             try {
@@ -527,7 +601,6 @@
                     throw new Error("MQL5 sin eventos actualmente");
                 }
 
-                // Filtrar eventos de USD o impacto alto/relevante
                 const eventsUSD = data.items.filter(item => {
                     const content = (item.title + " " + item.description).toUpperCase();
                     return content.includes("USD") || content.includes("EE.UU") || content.includes("FED") || content.includes("EEUU");
@@ -661,7 +734,6 @@
                 .catch(err => console.error("Error Telegram Noticia:", err));
         }
 
-        // --- CÁLCULO DE PRÓXIMA LIQUIDEZ (BSL / SSL) ---
         function getNextLiquidityTarget(currentPrice, signalType, pivots, orderBlocks) {
             if (signalType === "BUY") {
                 let target = orderBlocks.latestBearishOB ? orderBlocks.latestBearishOB.bottom : null;
@@ -679,7 +751,7 @@
             return null;
         }
 
-        // --- CÁLCULO DE ORDER BLOCKS (SMC / S/R INSTITUCIONAL) ---
+        /* --- CÁLCULO DE ORDER BLOCKS CORREGIDO --- */
         function calculateOrderBlocks(candles, lookback = 40) {
             let latestBullishOB = null;
             let latestBearishOB = null;
@@ -690,6 +762,7 @@
                 const next1 = candles[i + 1];
                 const next2 = candles[i + 2];
 
+                // Bullish OB (Soporte): Vela bajista previa a impulso alcista
                 if (!latestBullishOB && (current.close < current.open) && (next1.close > current.high) && (next2.close > next1.close)) {
                     latestBullishOB = {
                         top: Math.max(current.open, current.high),
@@ -698,6 +771,7 @@
                     };
                 }
 
+                // Bearish OB (Resistencia): Vela alcista previa a impulso bajista
                 if (!latestBearishOB && (current.close > current.open) && (next1.close < current.low) && (next2.close < next1.close)) {
                     latestBearishOB = {
                         top: current.high,
@@ -885,7 +959,6 @@
             timerInterval = setInterval(updateTimer, 1000);
         }
 
-        // --- VSA BALLENAS & DASHBOARD MULTI-TF ---
         async function processWhaleVSA(candles) {
             const markers = [];
             let lastWhaleBuyPrice = null, lastWhaleSellPrice = null;
@@ -1160,6 +1233,7 @@
                 }
             }
 
+            /* --- ETIQUETADO DE ORDER BLOCKS CORREGIDO --- */
             if (showOb) {
                 const { latestBullishOB, latestBearishOB } = calculateOrderBlocks(currentCandleData, 40);
                 if (latestBearishOB) {
