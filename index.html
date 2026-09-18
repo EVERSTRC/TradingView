@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bitcoin Trading Terminal - Multi TF Pivots, OBs, Liquidity & Global Trend</title>
+    <title>Bitcoin Trading Terminal - Multi TF Pivots, OBs, Liquidity & Linear Trend</title>
     <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -615,10 +615,10 @@
             ? chart.addSeries(LightweightCharts.CandlestickSeries, { upColor: '#089981', downColor: '#f23645', borderVisible: false, wickUpColor: '#089981', wickDownColor: '#f23645' })
             : chart.addCandlestickSeries({ upColor: '#089981', downColor: '#f23645', borderVisible: false, wickUpColor: '#089981', wickDownColor: '#f23645' });
 
-        // SERIE PARA LA LÍNEA DE TENDENCIA INTEGRADA
+        // LÍNEA DE TENDENCIA DIAGONAL CLÁSICA
         const trendLineSeries = chart.addSeries
-            ? chart.addSeries(LightweightCharts.LineSeries, { color: '#2962ff', lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Solid })
-            : chart.addLineSeries({ color: '#2962ff', lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Solid });
+            ? chart.addSeries(LightweightCharts.LineSeries, { color: '#2962ff', lineWidth: 3, lineStyle: LightweightCharts.LineStyle.Solid })
+            : chart.addLineSeries({ color: '#2962ff', lineWidth: 3, lineStyle: LightweightCharts.LineStyle.Solid });
 
         const resizeObserver = new ResizeObserver(entries => {
             if (!entries || entries.length === 0) return;
@@ -1223,6 +1223,33 @@
             return { pivotHigh: lastPivotHigh, pivotLow: lastPivotLow };
         }
 
+        // CÁLCULO DE LÍNEA DE TENDENCIA DIAGONAL (REGRESIÓN LINEAL / PIVOTES)
+        function calculateLinearTrendLine(candles, lookback = 100) {
+            if (!candles || candles.length < 20) return [];
+
+            const subset = candles.slice(-lookback);
+            const n = subset.length;
+
+            let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+
+            for (let i = 0; i < n; i++) {
+                const x = i;
+                const y = subset[i].close;
+                sumX += x;
+                sumY += y;
+                sumXY += x * y;
+                sumXX += x * x;
+            }
+
+            const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
+            const intercept = (sumY - slope * sumX) / n;
+
+            return subset.map((c, i) => ({
+                time: c.time,
+                value: slope * i + intercept
+            }));
+        }
+
         async function fetchKlines(interval, limit = 500) {
             const cacheKey = `${interval}_${limit}`;
             const now = Date.now();
@@ -1410,14 +1437,10 @@
                 }
             }
 
-            // CALCULO Y DIBUJO DE LA LÍNEA DE TENDENCIA INTEGRADA
-            if (showTrendline && stValues && stValues.length > 0) {
-                const trendLinePoints = currentCandleData.map((candle, idx) => {
-                    const stVal = stValues[idx] ? stValues[idx].value : candle.close;
-                    let weightedVal = (stVal * 0.5) + (candle.close * 0.5);
-                    return { time: candle.time, value: weightedVal };
-                });
-                trendLineSeries.setData(trendLinePoints);
+            // DIBUJO DE LÍNEA DE TENDENCIA DIAGONAL CLÁSICA
+            if (showTrendline) {
+                const trendPoints = calculateLinearTrendLine(currentCandleData, 120);
+                trendLineSeries.setData(trendPoints);
             } else {
                 trendLineSeries.setData([]);
             }
