@@ -184,6 +184,7 @@
 
         <div class="controls-group">
             <button id="toggle-supertrend" class="active">Supertrend</button>
+            <button id="toggle-trendline" class="active">Línea Tendencia</button>
             <button id="toggle-liquidity" class="active">Toma Liquidez</button>
             <button id="toggle-footprint" class="active">Footprint POC</button>
             <button id="toggle-pivots" class="active">Pivots</button>
@@ -364,9 +365,8 @@
 
         let lastNotifiedSignalTime = null;
         let lastNotifiedSignalType = null;
-        let audioCtx = null; // Instancia global para Web Audio API
+        let audioCtx = null; 
 
-        // Desbloqueo de AudioContext por políticas de navegadores
         function initAudioContext() {
             if (!audioCtx) {
                 const AudioContextClass = window.AudioContext || window.webkitAudioContext;
@@ -539,6 +539,7 @@
         const btnVsa = document.getElementById("toggle-vsa");
         const btnOb = document.getElementById("toggle-ob");
         const btnSupertrend = document.getElementById("toggle-supertrend");
+        const btnTrendline = document.getElementById("toggle-trendline");
         const btnLiquidity = document.getElementById("toggle-liquidity");
         const btnFootprint = document.getElementById("toggle-footprint");
         const btnMultiFp = document.getElementById("toggle-multi-fp");
@@ -565,7 +566,7 @@
         const dashObBullish = document.getElementById("dash-ob-bullish");
 
         let showPivots = true, showPivotsTf = true, showVsa = true, showOb = true;
-        let showSupertrend = true, showLiquidity = true, showFootprint = true, showMultiFootprint = false;
+        let showSupertrend = true, showTrendline = true, showLiquidity = true, showFootprint = true, showMultiFootprint = false;
 
         const timerDisplay = document.getElementById("timer-display");
         const timerProgress = document.getElementById("timer-progress");
@@ -613,6 +614,11 @@
         const candlestickSeries = chart.addSeries 
             ? chart.addSeries(LightweightCharts.CandlestickSeries, { upColor: '#089981', downColor: '#f23645', borderVisible: false, wickUpColor: '#089981', wickDownColor: '#f23645' })
             : chart.addCandlestickSeries({ upColor: '#089981', downColor: '#f23645', borderVisible: false, wickUpColor: '#089981', wickDownColor: '#f23645' });
+
+        // SERIE PARA LA LÍNEA DE TENDENCIA INTEGRADA
+        const trendLineSeries = chart.addSeries
+            ? chart.addSeries(LightweightCharts.LineSeries, { color: '#2962ff', lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Solid })
+            : chart.addLineSeries({ color: '#2962ff', lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Solid });
 
         const resizeObserver = new ResizeObserver(entries => {
             if (!entries || entries.length === 0) return;
@@ -1094,7 +1100,6 @@
             return { markers, lastWhaleBuyPrice, lastWhaleSellPrice };
         }
 
-        // PARCHE 2: Optimización con Promise.all para procesamiento en paralelo
         async function updateVSADashboardTable() {
             const vsaTfConfig = [
                 { tf: '15m', rowIndex: 0 },
@@ -1143,7 +1148,7 @@
         }
 
         function getSupertrendMarkers(candles, atrPeriods = 14, multiplier = 2.0) {
-            if (!candles || candles.length < atrPeriods + 1) return { stMarkers: [], lastSignal: null };
+            if (!candles || candles.length < atrPeriods + 1) return { stMarkers: [], lastSignal: null, stValues: [] };
             const len = candles.length;
             const tr = new Float64Array(len);
             tr[0] = candles[0].high - candles[0].low;
@@ -1165,6 +1170,8 @@
             const up = new Float64Array(len), dn = new Float64Array(len), trend = new Int32Array(len);
             let currentTrend = 1;
 
+            const stValues = [];
+
             for (let i = 0; i < len; i++) {
                 const src = (candles[i].high + candles[i].low) / 2;
                 let basicUp = src - (multiplier * atr[i]), basicDn = src + (multiplier * atr[i]);
@@ -1179,6 +1186,7 @@
                 else currentTrend = trend[i - 1];
 
                 trend[i] = currentTrend;
+                stValues.push({ time: candles[i].time, value: currentTrend === 1 ? up[i] : dn[i] });
             }
 
             const stMarkers = [];
@@ -1193,7 +1201,7 @@
                     lastSignal = { type: 'SELL', price: candles[i].close, time: candles[i].time };
                 }
             }
-            return { stMarkers, lastSignal };
+            return { stMarkers, lastSignal, stValues };
         }
 
         function calculatePivots(candles, leftBars = 15, rightBars = 15) {
@@ -1297,8 +1305,9 @@
 
             const currentPrice = currentCandleData[currentCandleData.length - 1].close;
 
+            const { stMarkers, lastSignal, stValues } = getSupertrendMarkers(currentCandleData);
+
             if (showSupertrend) {
-                const { stMarkers, lastSignal } = getSupertrendMarkers(currentCandleData);
                 allMarkers = allMarkers.concat(stMarkers);
                 if (lastSignal) {
                     currentSupertrendSignal = lastSignal;
@@ -1401,6 +1410,18 @@
                 }
             }
 
+            // CALCULO Y DIBUJO DE LA LÍNEA DE TENDENCIA INTEGRADA
+            if (showTrendline && stValues && stValues.length > 0) {
+                const trendLinePoints = currentCandleData.map((candle, idx) => {
+                    const stVal = stValues[idx] ? stValues[idx].value : candle.close;
+                    let weightedVal = (stVal * 0.5) + (candle.close * 0.5);
+                    return { time: candle.time, value: weightedVal };
+                });
+                trendLineSeries.setData(trendLinePoints);
+            } else {
+                trendLineSeries.setData([]);
+            }
+
             await processMultiTfPivots();
 
             allMarkers.sort((a, b) => a.time - b.time);
@@ -1444,7 +1465,6 @@
             }
         }
 
-        // PARCHE 1: Sincronización robusta en WebSocket evitando duplicados
         function connectWebSocket(interval) {
             if (wsConnection) {
                 wsConnection.onclose = null;
@@ -1517,6 +1537,7 @@
         setupToggleBtn(btnVsa, () => showVsa, v => showVsa = v);
         setupToggleBtn(btnOb, () => showOb, v => showOb = v);
         setupToggleBtn(btnSupertrend, () => showSupertrend, v => showSupertrend = v);
+        setupToggleBtn(btnTrendline, () => showTrendline, v => showTrendline = v);
         setupToggleBtn(btnLiquidity, () => showLiquidity, v => showLiquidity = v);
         setupToggleBtn(btnFootprint, () => showFootprint, v => showFootprint = v);
         setupToggleBtn(btnMultiFp, () => showMultiFootprint, v => showMultiFootprint = v);
