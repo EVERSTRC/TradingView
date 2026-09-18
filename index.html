@@ -70,7 +70,6 @@
             position: relative; 
         }
 
-        /* FIX DASHBOARD CORTADO */
         #dashboard { 
             width: 250px; 
             min-width: 250px;
@@ -365,6 +364,21 @@
 
         let lastNotifiedSignalTime = null;
         let lastNotifiedSignalType = null;
+        let audioCtx = null; // Instancia global para Web Audio API
+
+        // Desbloqueo de AudioContext por políticas de navegadores
+        function initAudioContext() {
+            if (!audioCtx) {
+                const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                if (AudioContextClass) {
+                    audioCtx = new AudioContextClass();
+                }
+            }
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+        document.addEventListener('click', initAudioContext, { once: true });
 
         const SESSION_ALERTS_CONFIG = {
             enabled: true,
@@ -462,24 +476,24 @@
 
         function playBeepSound(type) {
             try {
-                const AudioContext = window.AudioContext || window.webkitAudioContext;
-                if (!AudioContext) return;
-                const ctx = new AudioContext();
-                const osc = ctx.createOscillator();
-                const gain = ctx.createGain();
+                initAudioContext();
+                if (!audioCtx) return;
+
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
                 osc.connect(gain);
-                gain.connect(ctx.destination);
+                gain.connect(audioCtx.destination);
                 if (type === "BUY") {
-                    osc.frequency.setValueAtTime(800, ctx.currentTime);
-                    osc.frequency.exponentialRampToValueAtTime(1200, ctx.currentTime + 0.3);
+                    osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(1200, audioCtx.currentTime + 0.3);
                 } else {
-                    osc.frequency.setValueAtTime(600, ctx.currentTime);
-                    osc.frequency.exponentialRampToValueAtTime(300, ctx.currentTime + 0.3);
+                    osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(300, audioCtx.currentTime + 0.3);
                 }
-                gain.gain.setValueAtTime(0.3, ctx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
-                osc.start(ctx.currentTime);
-                osc.stop(ctx.currentTime + 0.3);
+                gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+                osc.start(audioCtx.currentTime);
+                osc.stop(audioCtx.currentTime + 0.3);
             } catch (e) {
                 console.warn("Audio error:", e);
             }
@@ -582,7 +596,6 @@
             { tf: '1d',  colorRes: '#ff1744', colorSup: '#00e676', label: '1D' }
         ];
 
-        /* FIX DE LAYOUT EN CHART CONFIG */
         const chart = LightweightCharts.createChart(chartContainer, {
             width: chartContainer.clientWidth,
             height: chartContainer.clientHeight,
@@ -1081,6 +1094,7 @@
             return { markers, lastWhaleBuyPrice, lastWhaleSellPrice };
         }
 
+        // PARCHE 2: Optimización con Promise.all para procesamiento en paralelo
         async function updateVSADashboardTable() {
             const vsaTfConfig = [
                 { tf: '15m', rowIndex: 0 },
@@ -1094,7 +1108,7 @@
             const tbody = document.getElementById('vsa-mtf-tbody');
             if (!tbody) return;
 
-            for (const item of vsaTfConfig) {
+            const fetchPromises = vsaTfConfig.map(async (item) => {
                 try {
                     const tfCandles = await fetchKlines(item.tf, 100);
                     let totalBuyVol = 0, totalSellVol = 0;
@@ -1105,20 +1119,27 @@
                     });
 
                     const totalVol = totalBuyVol + totalSellVol;
-                    const row = tbody.children[item.rowIndex];
-
-                    if (row && totalVol > 0) {
-                        const buyPct = ((totalBuyVol / totalVol) * 100).toFixed(1);
-                        const sellPct = ((totalSellVol / totalVol) * 100).toFixed(1);
-                        
-                        row.children[2].innerText = (totalVol / 1000).toFixed(1);
-                        row.children[3].innerText = `${buyPct}%`;
-                        row.children[4].innerText = `${sellPct}%`;
-                    }
+                    return { item, totalVol, totalBuyVol, totalSellVol };
                 } catch (e) {
-                    console.warn(`Error procesando VSA para TF ${item.tf}:`, e);
+                    console.warn(`Error VSA ${item.tf}:`, e);
+                    return null;
                 }
-            }
+            });
+
+            const results = await Promise.all(fetchPromises);
+
+            results.forEach(res => {
+                if (!res || !res.totalVol) return;
+                const row = tbody.children[res.item.rowIndex];
+                if (row) {
+                    const buyPct = ((res.totalBuyVol / res.totalVol) * 100).toFixed(1);
+                    const sellPct = ((res.totalSellVol / res.totalVol) * 100).toFixed(1);
+
+                    row.children[2].innerText = (res.totalVol / 1000).toFixed(1);
+                    row.children[3].innerText = `${buyPct}%`;
+                    row.children[4].innerText = `${sellPct}%`;
+                }
+            });
         }
 
         function getSupertrendMarkers(candles, atrPeriods = 14, multiplier = 2.0) {
@@ -1423,6 +1444,7 @@
             }
         }
 
+        // PARCHE 1: Sincronización robusta en WebSocket evitando duplicados
         function connectWebSocket(interval) {
             if (wsConnection) {
                 wsConnection.onclose = null;
@@ -1443,7 +1465,12 @@
                 updateRealtimeAnalysis(updatedCandle.close);
 
                 if (k.x && currentCandleData.length > 0) {
-                    currentCandleData.push(updatedCandle);
+                    const lastIdx = currentCandleData.length - 1;
+                    if (currentCandleData[lastIdx].time === updatedCandle.time) {
+                        currentCandleData[lastIdx] = updatedCandle;
+                    } else {
+                        currentCandleData.push(updatedCandle);
+                    }
                     if (currentCandleData.length > 500) currentCandleData.shift();
                     await processIndicators(false);
                 }
