@@ -295,12 +295,12 @@
                         </tr>
                     </thead>
                     <tbody id="vsa-mtf-tbody">
-                        <tr><td>15M</td><td><span class="vsa-badge vsa-buy">BUY</span></td><td>--</td><td class="txt-buy">--</td><td class="txt-sell">--</td></tr>
-                        <tr><td>1H</td><td><span class="vsa-badge vsa-buy">BUY</span></td><td>--</td><td class="txt-buy">--</td><td class="txt-sell">--</td></tr>
-                        <tr><td>4H</td><td><span class="vsa-badge vsa-buy">BUY</span></td><td>--</td><td class="txt-buy">--</td><td class="txt-sell">--</td></tr>
-                        <tr><td>1D</td><td><span class="vsa-badge vsa-sell">SELL</span></td><td>--</td><td class="txt-buy">--</td><td class="txt-sell">--</td></tr>
-                        <tr><td>1W</td><td><span class="vsa-badge vsa-neutral">NEU</span></td><td>--</td><td class="txt-buy">--</td><td class="txt-sell">--</td></tr>
-                        <tr><td>1M</td><td><span class="vsa-badge vsa-neutral">NEU</span></td><td>--</td><td class="txt-buy">--</td><td class="txt-sell">--</td></tr>
+                        <tr><td>15M</td><td><span class="vsa-badge vsa-neutral">--</span></td><td>--</td><td class="txt-buy">--</td><td class="txt-sell">--</td></tr>
+                        <tr><td>1H</td><td><span class="vsa-badge vsa-neutral">--</span></td><td>--</td><td class="txt-buy">--</td><td class="txt-sell">--</td></tr>
+                        <tr><td>4H</td><td><span class="vsa-badge vsa-neutral">--</span></td><td>--</td><td class="txt-buy">--</td><td class="txt-sell">--</td></tr>
+                        <tr><td>1D</td><td><span class="vsa-badge vsa-neutral">--</span></td><td>--</td><td class="txt-buy">--</td><td class="txt-sell">--</td></tr>
+                        <tr><td>1W</td><td><span class="vsa-badge vsa-neutral">--</span></td><td>--</td><td class="txt-buy">--</td><td class="txt-sell">--</td></tr>
+                        <tr><td>1M</td><td><span class="vsa-badge vsa-neutral">--</span></td><td>--</td><td class="txt-buy">--</td><td class="txt-sell">--</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -409,29 +409,37 @@
             const badgeNY = document.getElementById("sess-badge-ny");
             const activeText = document.getElementById("dash-active-session-text");
 
-            badgeTokyo.className = isTokyo ? "session-badge session-active" : "session-badge session-closed";
-            badgeTokyo.innerText = isTokyo ? "ABIERTO" : "CERRADO";
+            if (badgeTokyo) {
+                badgeTokyo.className = isTokyo ? "session-badge session-active" : "session-badge session-closed";
+                badgeTokyo.innerText = isTokyo ? "ABIERTO" : "CERRADO";
+            }
 
-            badgeLondon.className = isLondon ? "session-badge session-active" : "session-badge session-closed";
-            badgeLondon.innerText = isLondon ? "ABIERTO" : "CERRADO";
+            if (badgeLondon) {
+                badgeLondon.className = isLondon ? "session-badge session-active" : "session-badge session-closed";
+                badgeLondon.innerText = isLondon ? "ABIERTO" : "CERRADO";
+            }
 
-            badgeNY.className = isNY ? "session-badge session-active" : "session-badge session-closed";
-            badgeNY.innerText = isNY ? "ABIERTO" : "CERRADO";
+            if (badgeNY) {
+                badgeNY.className = isNY ? "session-badge session-active" : "session-badge session-closed";
+                badgeNY.innerText = isNY ? "ABIERTO" : "CERRADO";
+            }
 
             const activeNames = [];
             if (isTokyo) activeNames.push("Tokio");
             if (isLondon) activeNames.push("Londres");
             if (isNY) activeNames.push("NY");
 
-            if (activeNames.length > 1) {
-                activeText.innerText = `TRASLAPE 🔥`;
-                activeText.style.color = "#ff9800";
-            } else if (activeNames.length === 1) {
-                activeText.innerText = `${activeNames[0]} 🟢`;
-                activeText.style.color = "#00e676";
-            } else {
-                activeText.innerText = "ASIA TARDÍA 🌙";
-                activeText.style.color = "#787b86";
+            if (activeText) {
+                if (activeNames.length > 1) {
+                    activeText.innerText = `TRASLAPE 🔥`;
+                    activeText.style.color = "#ff9800";
+                } else if (activeNames.length === 1) {
+                    activeText.innerText = `${activeNames[0]} 🟢`;
+                    activeText.style.color = "#00e676";
+                } else {
+                    activeText.innerText = "ASIA TARDÍA 🌙";
+                    activeText.style.color = "#787b86";
+                }
             }
         }
 
@@ -440,7 +448,7 @@
             const message = `🚨 ALERTA DE MERCADO FOREX/CRIPTO\n\nLa sesión de *${sessionName}* abre en 5 minutos ⏰.\n¡Prepárate para el aumento de volatilidad! 📈📉`;
             const userClean = TELEGRAM_CONFIG.username.replace("@", "");
             const encodedMsg = encodeURIComponent(message);
-            fetch(`https://api.callmebot.com/text.php?user=@${userClean}&text=${encodedMsg}`, { mode: 'no-cors' })
+            fetch(`https://api.callmebot.com/text.php?user=@${userClean}&text=${encodedMsg}`)
                 .catch(err => console.error("Error enviando alerta de sesión:", err));
         }
 
@@ -508,13 +516,13 @@
             const message = `ALERT SUPERTREND BTCUSDT\n\nSeñal: ${signalType} ${icon}\nPrecio Entrada: $${price.toFixed(2)}\nTimeframe: ${timeframe}\n\n🎯 Próxima Liquidez (TP): ${targetText}\n🛑 Invalidez (SL): ${invalidText}`;
             const userClean = TELEGRAM_CONFIG.username.replace("@", "");
             const encodedMsg = encodeURIComponent(message);
-            fetch(`https://api.callmebot.com/text.php?user=@${userClean}&text=${encodedMsg}`, { mode: 'no-cors' })
+            fetch(`https://api.callmebot.com/text.php?user=@${userClean}&text=${encodedMsg}`)
                 .catch(err => console.error("Error Telegram:", err));
         }
 
         function evaluateSupertrendAlert(lastSignal, timeframe) {
             if (!lastSignal || !lastSignal.time) return;
-            if (lastSignal.time !== lastNotifiedSignalTime && lastSignal.type !== lastNotifiedSignalType) {
+            if (lastSignal.time !== lastNotifiedSignalTime || lastSignal.type !== lastNotifiedSignalType) {
                 lastNotifiedSignalTime = lastSignal.time;
                 lastNotifiedSignalType = lastSignal.type;
                 
@@ -611,14 +619,13 @@
             }
         });
 
-        const candlestickSeries = chart.addSeries 
-            ? chart.addSeries(LightweightCharts.CandlestickSeries, { upColor: '#089981', downColor: '#f23645', borderVisible: false, wickUpColor: '#089981', wickDownColor: '#f23645' })
-            : chart.addCandlestickSeries({ upColor: '#089981', downColor: '#f23645', borderVisible: false, wickUpColor: '#089981', wickDownColor: '#f23645' });
+        const candlestickSeries = chart.addCandlestickSeries 
+            ? chart.addCandlestickSeries({ upColor: '#089981', downColor: '#f23645', borderVisible: false, wickUpColor: '#089981', wickDownColor: '#f23645' })
+            : chart.addSeries(LightweightCharts.CandlestickSeries, { upColor: '#089981', downColor: '#f23645', borderVisible: false, wickUpColor: '#089981', wickDownColor: '#f23645' });
 
-        // LÍNEA DE TENDENCIA DIAGONAL CLÁSICA
-        const trendLineSeries = chart.addSeries
-            ? chart.addSeries(LightweightCharts.LineSeries, { color: '#2962ff', lineWidth: 3, lineStyle: LightweightCharts.LineStyle.Solid })
-            : chart.addLineSeries({ color: '#2962ff', lineWidth: 3, lineStyle: LightweightCharts.LineStyle.Solid });
+        const trendLineSeries = chart.addLineSeries
+            ? chart.addLineSeries({ color: '#2962ff', lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Solid })
+            : chart.addSeries(LightweightCharts.LineSeries, { color: '#2962ff', lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Solid });
 
         const resizeObserver = new ResizeObserver(entries => {
             if (!entries || entries.length === 0) return;
@@ -628,13 +635,13 @@
         resizeObserver.observe(chartContainer);
 
         function updateDashboardModulesVisibility() {
-            modSupertrend.style.display = showSupertrend ? "flex" : "none";
-            modLiquidity.style.display = showLiquidity ? "flex" : "none";
-            modFootprint.style.display = showFootprint ? "flex" : "none";
-            modPivots.style.display = showPivots ? "flex" : "none";
-            modPivotsTf.style.display = showPivotsTf ? "flex" : "none";
-            modVsa.style.display = showVsa ? "flex" : "none";
-            modOb.style.display = showOb ? "flex" : "none";
+            if(modSupertrend) modSupertrend.style.display = showSupertrend ? "flex" : "none";
+            if(modLiquidity) modLiquidity.style.display = showLiquidity ? "flex" : "none";
+            if(modFootprint) modFootprint.style.display = showFootprint ? "flex" : "none";
+            if(modPivots) modPivots.style.display = showPivots ? "flex" : "none";
+            if(modPivotsTf) modPivotsTf.style.display = showPivotsTf ? "flex" : "none";
+            if(modVsa) modVsa.style.display = showVsa ? "flex" : "none";
+            if(modOb) modOb.style.display = showOb ? "flex" : "none";
         }
 
         function clearActiveLines() {
@@ -646,7 +653,12 @@
 
         function convertToCRTime(utcTimeString) {
             if (!utcTimeString) return "Hoy";
-            const [hours, minutes] = utcTimeString.split(":").map(Number);
+            const parts = utcTimeString.split(":");
+            if (parts.length < 2) return utcTimeString;
+            const hours = parseInt(parts[0], 10);
+            const minutes = parseInt(parts[1], 10);
+            if (isNaN(hours) || isNaN(minutes)) return utcTimeString;
+
             const now = new Date();
             const eventUtcDate = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes));
             
@@ -674,17 +686,17 @@
                 }
 
                 const eventsUSD = data.items.filter(item => {
-                    const content = (item.title + " " + item.description).toUpperCase();
+                    const content = ((item.title || "") + " " + (item.description || "")).toUpperCase();
                     return content.includes("USD") || content.includes("EE.UU") || content.includes("FED") || content.includes("EEUU");
                 });
 
                 cachedEconomicEvents = eventsUSD.map(item => {
                     const pubDate = new Date(item.pubDate);
-                    const hours = pubDate.getUTCHours().toString().padStart(2, '0');
-                    const minutes = pubDate.getUTCMinutes().toString().padStart(2, '0');
+                    const hours = isNaN(pubDate.getUTCHours()) ? "12" : pubDate.getUTCHours().toString().padStart(2, '0');
+                    const minutes = isNaN(pubDate.getUTCMinutes()) ? "00" : pubDate.getUTCMinutes().toString().padStart(2, '0');
 
                     return {
-                        title: item.title.replace(/\[USD\]/g, '').trim(),
+                        title: (item.title || "Noticia USD").replace(/\[USD\]/g, '').trim(),
                         country: "USD",
                         impact: "High",
                         time: `${hours}:${minutes}`
@@ -728,17 +740,19 @@
         function drawNewsOnChart(events) {
             if (!events || events.length === 0 || !currentCandleData || currentCandleData.length === 0) return;
 
-            if (!showNewsOnChart) {
-                processIndicators(false);
-                return;
-            }
+            if (!showNewsOnChart) return;
 
             const newsMarkers = [];
 
             events.forEach(ev => {
-                if (!ev.time) return;
+                if (!ev.time || typeof ev.time !== 'string') return;
 
-                const [hours, minutes] = ev.time.split(":").map(Number);
+                const parts = ev.time.split(":");
+                if (parts.length < 2) return;
+                const hours = parseInt(parts[0], 10);
+                const minutes = parseInt(parts[1], 10);
+                if (isNaN(hours) || isNaN(minutes)) return;
+
                 const now = new Date();
                 const eventUtcDate = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes));
                 const eventUnixTime = Math.floor(eventUtcDate.getTime() / 1000);
@@ -758,7 +772,7 @@
             });
 
             if (newsMarkers.length > 0) {
-                const currentMarkers = candlestickSeries.markers ? candlestickSeries.markers() : [];
+                const currentMarkers = (candlestickSeries.markers && typeof candlestickSeries.markers === 'function') ? candlestickSeries.markers() : [];
                 const combined = [...currentMarkers, ...newsMarkers].sort((a, b) => a.time - b.time);
                 candlestickSeries.setMarkers(combined);
             }
@@ -772,11 +786,15 @@
             let isNewsImminent = false;
 
             cachedEconomicEvents.forEach(ev => {
-                if (!ev.time) return;
+                if (!ev.time || typeof ev.time !== 'string') return;
                 
-                const [hours, minutes] = ev.time.split(":").map(Number);
-                const eventUtcDate = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes));
+                const parts = ev.time.split(":");
+                if (parts.length < 2) return;
+                const hours = parseInt(parts[0], 10);
+                const minutes = parseInt(parts[1], 10);
+                if (isNaN(hours) || isNaN(minutes)) return;
 
+                const eventUtcDate = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes));
                 const diffMinutes = (eventUtcDate - now) / (1000 * 60);
 
                 if (diffMinutes >= -5 && diffMinutes <= 15) {
@@ -802,7 +820,7 @@
             const message = `🚨 *ALERTA MACRO MQL5 USD (BTC)* 🚨\n\nEvento: *${eventTitle}*\nHora (CR): ${timeCR}\n\n*Protección SMC:* Alta probabilidad de volatilidad y barridos de liquidez. Ajusta o protege tus posiciones. 📉📈`;
             const userClean = TELEGRAM_CONFIG.username.replace("@", "");
             const encodedMsg = encodeURIComponent(message);
-            fetch(`https://api.callmebot.com/text.php?user=@${userClean}&text=${encodedMsg}`, { mode: 'no-cors' })
+            fetch(`https://api.callmebot.com/text.php?user=@${userClean}&text=${encodedMsg}`)
                 .catch(err => console.error("Error Telegram Noticia:", err));
         }
 
@@ -962,7 +980,7 @@
                 renderTrendUI(dashTrendDay, trendBarDay, pctDay);
 
                 const avgConfluence = Math.round((Math.abs(pctTF) + Math.abs(pctDay)) / 2);
-                dashTrendScore.innerText = `${avgConfluence}%`;
+                if (dashTrendScore) dashTrendScore.innerText = `${avgConfluence}%`;
 
             } catch(e) {
                 console.warn("Error evaluando tendencia diaria:", e);
@@ -970,6 +988,7 @@
         }
 
         function renderTrendUI(textEl, barEl, pct) {
+            if (!textEl || !barEl) return;
             let label = "NEUTRAL ⚖️", color = "#787b86";
             if (pct >= 40) { label = "ALCISTA 🚀"; color = "#00e676"; }
             else if (pct > 0) { label = "MOD. ALC ↗️"; color = "#81c784"; }
@@ -988,23 +1007,29 @@
 
             if (currentFootprintRes && showFootprint) {
                 const invalidLevel = currentFootprintRes + 35;
-                dashInvalid.innerText = `$${invalidLevel.toFixed(2)}`;
+                if (dashInvalid) dashInvalid.innerText = `$${invalidLevel.toFixed(2)}`;
                 if (lastClosePrice < currentFootprintRes) {
-                    dashBias.innerText = "BAJISTA 🐻";
-                    dashBias.style.color = "#ff5252";
+                    if (dashBias) {
+                        dashBias.innerText = "BAJISTA 🐻";
+                        dashBias.style.color = "#ff5252";
+                    }
                     isBullish = false;
                 } else {
-                    dashBias.innerText = "ALCISTA 🚀";
-                    dashBias.style.color = "#00e676";
+                    if (dashBias) {
+                        dashBias.innerText = "ALCISTA 🚀";
+                        dashBias.style.color = "#00e676";
+                    }
                     isBullish = true;
                 }
             } else {
-                dashBias.innerText = "--";
-                dashBias.style.color = "#d1d4dc";
-                dashInvalid.innerText = "--";
+                if (dashBias) {
+                    dashBias.innerText = "--";
+                    dashBias.style.color = "#d1d4dc";
+                }
+                if (dashInvalid) dashInvalid.innerText = "--";
             }
 
-            dashTarget.innerText = (currentMainTarget && showPivots) ? `$${currentMainTarget.toFixed(2)}` : "--";
+            if (dashTarget) dashTarget.innerText = (currentMainTarget && showPivots) ? `$${currentMainTarget.toFixed(2)}` : "--";
 
             if (currentFootprintRes && showFootprint) {
                 let entryPrice = lastClosePrice; 
@@ -1014,13 +1039,13 @@
                 const pivots = calculatePivots(currentCandleData, 20, 20);
                 const liquidityTarget = getNextLiquidityTarget(entryPrice, isBullish ? "BUY" : "SELL", pivots, obs);
 
-                dashEntry.innerText = `$${entryPrice.toFixed(2)}`;
-                dashTp.innerText = liquidityTarget ? `$${liquidityTarget.toFixed(2)}` : "--";
-                dashSl.innerText = `$${slPrice.toFixed(2)}`;
+                if (dashEntry) dashEntry.innerText = `$${entryPrice.toFixed(2)}`;
+                if (dashTp) dashTp.innerText = liquidityTarget ? `$${liquidityTarget.toFixed(2)}` : "--";
+                if (dashSl) dashSl.innerText = `$${slPrice.toFixed(2)}`;
             } else {
-                dashEntry.innerText = "--";
-                dashTp.innerText = "--";
-                dashSl.innerText = "--";
+                if (dashEntry) dashEntry.innerText = "--";
+                if (dashTp) dashTp.innerText = "--";
+                if (dashSl) dashSl.innerText = "--";
             }
 
             calculateGlobalTrend(lastClosePrice);
@@ -1028,7 +1053,7 @@
 
         function getIntervalInSeconds(interval) {
             const unit = interval.slice(-1);
-            const val = parseInt(interval);
+            const val = parseInt(interval, 10);
             if (unit === 's') return val;
             if (unit === 'm') return val * 60;
             if (unit === 'h') return val * 3600;
@@ -1052,17 +1077,19 @@
                 const mins = Math.floor((remaining % 3600) / 60);
                 const secs = remaining % 60;
 
-                if (intervalSecs < 60) {
-                    timerDisplay.innerText = `${remaining}s`;
-                } else if (days > 0) {
-                    timerDisplay.innerText = `${days}d ${hours}h`;
-                } else if (hours > 0) {
-                    timerDisplay.innerText = `${hours}h ${mins.toString().padStart(2, '0')}m`;
-                } else {
-                    timerDisplay.innerText = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+                if (timerDisplay) {
+                    if (intervalSecs < 60) {
+                        timerDisplay.innerText = `${remaining}s`;
+                    } else if (days > 0) {
+                        timerDisplay.innerText = `${days}d ${hours}h`;
+                    } else if (hours > 0) {
+                        timerDisplay.innerText = `${hours}h ${mins.toString().padStart(2, '0')}m`;
+                    } else {
+                        timerDisplay.innerText = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+                    }
                 }
 
-                timerProgress.style.width = `${(elapsed / intervalSecs) * 100}%`;
+                if (timerProgress) timerProgress.style.width = `${(elapsed / intervalSecs) * 100}%`;
             }
 
             updateTimer();
@@ -1095,8 +1122,6 @@
                 }
             }
 
-            await updateVSADashboardTable();
-
             return { markers, lastWhaleBuyPrice, lastWhaleSellPrice };
         }
 
@@ -1126,7 +1151,6 @@
                     const totalVol = totalBuyVol + totalSellVol;
                     return { item, totalVol, totalBuyVol, totalSellVol };
                 } catch (e) {
-                    console.warn(`Error VSA ${item.tf}:`, e);
                     return null;
                 }
             });
@@ -1140,9 +1164,9 @@
                     const buyPct = ((res.totalBuyVol / res.totalVol) * 100).toFixed(1);
                     const sellPct = ((res.totalSellVol / res.totalVol) * 100).toFixed(1);
 
-                    row.children[2].innerText = (res.totalVol / 1000).toFixed(1);
-                    row.children[3].innerText = `${buyPct}%`;
-                    row.children[4].innerText = `${sellPct}%`;
+                    if(row.children[2]) row.children[2].innerText = (res.totalVol / 1000).toFixed(1);
+                    if(row.children[3]) row.children[3].innerText = `${buyPct}%`;
+                    if(row.children[4]) row.children[4].innerText = `${sellPct}%`;
                 }
             });
         }
@@ -1223,11 +1247,10 @@
             return { pivotHigh: lastPivotHigh, pivotLow: lastPivotLow };
         }
 
-        // CÁLCULO DE LÍNEA DE TENDENCIA DIAGONAL (REGRESIÓN LINEAL / PIVOTES)
         function calculateLinearTrendLine(candles, lookback = 100) {
-            if (!candles || candles.length < 20) return [];
+            if (!candles || candles.length < 2) return [];
 
-            const subset = candles.slice(-lookback);
+            const subset = candles.slice(-Math.min(lookback, candles.length));
             const n = subset.length;
 
             let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
@@ -1241,13 +1264,16 @@
                 sumXX += x * x;
             }
 
-            const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
+            const denominator = (n * sumXX - sumX * sumX);
+            if (denominator === 0) return [];
+
+            const slope = (n * sumXY - sumX * sumY) / denominator;
             const intercept = (sumY - slope * sumX) / n;
 
             return subset.map((c, i) => ({
                 time: c.time,
                 value: slope * i + intercept
-            }));
+            })).filter(item => !isNaN(item.value) && isFinite(item.value));
         }
 
         async function fetchKlines(interval, limit = 500) {
@@ -1255,7 +1281,7 @@
             const now = Date.now();
             if (klineCache.has(cacheKey)) {
                 const cached = klineCache.get(cacheKey);
-                if (now - cached.timestamp < 5000) return cached.data;
+                if (now - cached.timestamp < 10000) return cached.data;
             }
 
             const is1s = interval === "1s";
@@ -1332,15 +1358,17 @@
 
             const currentPrice = currentCandleData[currentCandleData.length - 1].close;
 
-            const { stMarkers, lastSignal, stValues } = getSupertrendMarkers(currentCandleData);
+            const { stMarkers, lastSignal } = getSupertrendMarkers(currentCandleData);
 
             if (showSupertrend) {
                 allMarkers = allMarkers.concat(stMarkers);
                 if (lastSignal) {
                     currentSupertrendSignal = lastSignal;
-                    dashStSignal.innerText = lastSignal.type;
-                    dashStSignal.style.color = lastSignal.type === "BUY" ? "#00e676" : "#ff5252";
-                    dashStPrice.innerText = `$${lastSignal.price.toFixed(2)}`;
+                    if (dashStSignal) {
+                        dashStSignal.innerText = lastSignal.type;
+                        dashStSignal.style.color = lastSignal.type === "BUY" ? "#00e676" : "#ff5252";
+                    }
+                    if (dashStPrice) dashStPrice.innerText = `$${lastSignal.price.toFixed(2)}`;
                     
                     if (isInitialLoad) {
                         lastNotifiedSignalTime = lastSignal.time;
@@ -1356,12 +1384,14 @@
                 allMarkers = allMarkers.concat(lqMarkers);
 
                 if (lastSweep) {
-                    dashLqType.innerText = lastSweep.type;
-                    dashLqType.style.color = lastSweep.type.includes("BUY") ? "#ffd700" : "#ff00ff";
-                    dashLqPrice.innerText = `$${lastSweep.price.toFixed(2)}`;
+                    if (dashLqType) {
+                        dashLqType.innerText = lastSweep.type;
+                        dashLqType.style.color = lastSweep.type.includes("BUY") ? "#ffd700" : "#ff00ff";
+                    }
+                    if (dashLqPrice) dashLqPrice.innerText = `$${lastSweep.price.toFixed(2)}`;
                 } else {
-                    dashLqType.innerText = "--";
-                    dashLqPrice.innerText = "--";
+                    if (dashLqType) dashLqType.innerText = "--";
+                    if (dashLqPrice) dashLqPrice.innerText = "--";
                 }
             }
 
@@ -1404,9 +1434,9 @@
                     activePriceLines.push(candlestickSeries.createPriceLine({
                         price: latestBearishOB.bottom, color: '#ef5350', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dotted, title: 'OB Res (Low)'
                     }));
-                    dashObBearish.innerText = `$${latestBearishOB.bottom.toFixed(0)}-$${latestBearishOB.top.toFixed(0)}`;
+                    if (dashObBearish) dashObBearish.innerText = `$${latestBearishOB.bottom.toFixed(0)}-$${latestBearishOB.top.toFixed(0)}`;
                 } else {
-                    dashObBearish.innerText = "--";
+                    if (dashObBearish) dashObBearish.innerText = "--";
                 }
 
                 if (latestBullishOB) {
@@ -1416,9 +1446,9 @@
                     activePriceLines.push(candlestickSeries.createPriceLine({
                         price: latestBullishOB.bottom, color: '#26a69a', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Solid, title: 'OB Sop (Low)'
                     }));
-                    dashObBullish.innerText = `$${latestBullishOB.bottom.toFixed(0)}-$${latestBullishOB.top.toFixed(0)}`;
+                    if (dashObBullish) dashObBullish.innerText = `$${latestBullishOB.bottom.toFixed(0)}-$${latestBullishOB.top.toFixed(0)}`;
                 } else {
-                    dashObBullish.innerText = "--";
+                    if (dashObBullish) dashObBullish.innerText = "--";
                 }
             }
 
@@ -1437,7 +1467,6 @@
                 }
             }
 
-            // DIBUJO DE LÍNEA DE TENDENCIA DIAGONAL CLÁSICA
             if (showTrendline) {
                 const trendPoints = calculateLinearTrendLine(currentCandleData, 120);
                 trendLineSeries.setData(trendPoints);
@@ -1445,7 +1474,10 @@
                 trendLineSeries.setData([]);
             }
 
-            await processMultiTfPivots();
+            if (isInitialLoad) {
+                await processMultiTfPivots();
+                await updateVSADashboardTable();
+            }
 
             allMarkers.sort((a, b) => a.time - b.time);
             candlestickSeries.setMarkers(allMarkers);
@@ -1546,6 +1578,7 @@
         });
 
         function setupToggleBtn(btn, getVal, setVal) {
+            if(!btn) return;
             btn.addEventListener('click', async () => {
                 setVal(!getVal());
                 btn.classList.toggle('active', getVal());
