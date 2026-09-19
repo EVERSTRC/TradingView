@@ -1108,7 +1108,7 @@
             for (let i = 20; i < candles.length; i++) {
                 const c = candles[i];
                 const avgVol = rollingVolumeSum / 20;
-                const isWhaleVol = (c.volume || 0) > (avgVol * 2.2);
+                const isWhaleVol = (c.volume || 0) > (avgVol * 1.8); 
                 rollingVolumeSum += (c.volume || 1) - (candles[i - 20].volume || 1);
 
                 if (isWhaleVol) {
@@ -1164,6 +1164,14 @@
                     const buyPct = ((res.totalBuyVol / res.totalVol) * 100).toFixed(1);
                     const sellPct = ((res.totalSellVol / res.totalVol) * 100).toFixed(1);
 
+                    let badgeHtml = '<span class="vsa-badge vsa-neutral">NEUTRAL</span>';
+                    if (buyPct >= 52.0) {
+                        badgeHtml = '<span class="vsa-badge vsa-buy">BUY</span>';
+                    } else if (sellPct >= 52.0) {
+                        badgeHtml = '<span class="vsa-badge vsa-sell">SELL</span>';
+                    }
+
+                    if(row.children[1]) row.children[1].innerHTML = badgeHtml;
                     if(row.children[2]) row.children[2].innerText = (res.totalVol / 1000).toFixed(1);
                     if(row.children[3]) row.children[3].innerText = `${buyPct}%`;
                     if(row.children[4]) row.children[4].innerText = `${sellPct}%`;
