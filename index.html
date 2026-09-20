@@ -674,35 +674,42 @@
             const newsContainer = document.getElementById("news-list-container");
             try {
                 const mql5RssUrl = "https://www.mql5.com/es/rss/calendar";
-                const apiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(mql5RssUrl)}`;
+                const apiUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(mql5RssUrl)}`;
 
                 const response = await fetch(apiUrl);
                 if (!response.ok) throw new Error("Error en feed de MQL5");
 
-                const data = await response.json();
+                const str = await response.text();
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(str, "text/xml");
+                const items = Array.from(xmlDoc.querySelectorAll("item"));
 
-                if (!data.items || data.items.length === 0) {
+                if (!items || items.length === 0) {
                     throw new Error("MQL5 sin eventos actualmente");
                 }
 
-                const eventsUSD = data.items.filter(item => {
-                    const content = ((item.title || "") + " " + (item.description || "")).toUpperCase();
-                    return content.includes("USD") || content.includes("EE.UU") || content.includes("FED") || content.includes("EEUU");
+                const eventsUSD = [];
+                items.forEach(item => {
+                    const title = item.querySelector("title") ? item.querySelector("title").textContent : "";
+                    const description = item.querySelector("description") ? item.querySelector("description").textContent : "";
+                    const pubDateStr = item.querySelector("pubDate") ? item.querySelector("pubDate").textContent : "";
+
+                    const content = (title + " " + description).toUpperCase();
+                    if (content.includes("USD") || content.includes("EE.UU") || content.includes("FED") || content.includes("EEUU")) {
+                        const pubDate = new Date(pubDateStr);
+                        const hours = isNaN(pubDate.getUTCHours()) ? "12" : pubDate.getUTCHours().toString().padStart(2, '0');
+                        const minutes = isNaN(pubDate.getUTCMinutes()) ? "00" : pubDate.getUTCMinutes().toString().padStart(2, '0');
+
+                        eventsUSD.push({
+                            title: title.replace(/\[USD\]/g, '').trim(),
+                            country: "USD",
+                            impact: "High",
+                            time: `${hours}:${minutes}`
+                        });
+                    }
                 });
 
-                cachedEconomicEvents = eventsUSD.map(item => {
-                    const pubDate = new Date(item.pubDate);
-                    const hours = isNaN(pubDate.getUTCHours()) ? "12" : pubDate.getUTCHours().toString().padStart(2, '0');
-                    const minutes = isNaN(pubDate.getUTCMinutes()) ? "00" : pubDate.getUTCMinutes().toString().padStart(2, '0');
-
-                    return {
-                        title: (item.title || "Noticia USD").replace(/\[USD\]/g, '').trim(),
-                        country: "USD",
-                        impact: "High",
-                        time: `${hours}:${minutes}`
-                    };
-                });
-
+                cachedEconomicEvents = eventsUSD;
                 renderNewsUI(cachedEconomicEvents);
                 drawNewsOnChart(cachedEconomicEvents);
 
@@ -739,7 +746,6 @@
 
         function drawNewsOnChart(events) {
             if (!events || events.length === 0 || !currentCandleData || currentCandleData.length === 0) return;
-
             if (!showNewsOnChart) return;
 
             const newsMarkers = [];
@@ -1545,16 +1551,20 @@
                 };
 
                 candlestickSeries.update(updatedCandle);
-                updateRealtimeAnalysis(updatedCandle.close);
 
-                if (k.x && currentCandleData.length > 0) {
+                if (currentCandleData.length > 0) {
                     const lastIdx = currentCandleData.length - 1;
                     if (currentCandleData[lastIdx].time === updatedCandle.time) {
                         currentCandleData[lastIdx] = updatedCandle;
                     } else {
                         currentCandleData.push(updatedCandle);
+                        if (currentCandleData.length > 500) currentCandleData.shift();
                     }
-                    if (currentCandleData.length > 500) currentCandleData.shift();
+                }
+
+                updateRealtimeAnalysis(updatedCandle.close);
+
+                if (k.x) {
                     await processIndicators(false);
                 }
 
