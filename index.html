@@ -13,7 +13,7 @@
             height: 100vh; 
             overflow: hidden; 
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
-            background-color: #131722; 
+            background-color: #000000; 
             color: #d1d4dc; 
             display: flex; 
             flex-direction: column; 
@@ -27,7 +27,7 @@
             background-color: #131722; 
             border-bottom: 1px solid #2a2e39; 
             flex-shrink: 0; 
-            height: 48px;
+            height: 44px;
             font-size: 13px;
         }
 
@@ -35,7 +35,7 @@
         .controls-right { display: flex; align-items: center; gap: 6px; }
 
         .select-tf { 
-            background-color: transparent; 
+            background-color: #1e222d; 
             color: #d1d4dc; 
             border: 1px solid #363c4e; 
             padding: 4px 8px; 
@@ -53,23 +53,18 @@
             border-radius: 4px;
             font-size: 11px;
             font-weight: bold;
-            display: flex;
-            align-items: center;
-            gap: 4px;
         }
 
         .btn-toggle {
             background-color: #2962ff;
             color: #ffffff;
             border: none;
-            padding: 6px 12px;
+            padding: 5px 10px;
             border-radius: 4px;
             font-size: 12px;
             font-weight: 500;
             cursor: pointer;
-            transition: all 0.2s ease;
         }
-        .btn-toggle:hover { background-color: #1e53e5; }
         .btn-toggle.inactive { background-color: #2a2e39; color: #787b86; }
 
         #main-container { 
@@ -86,53 +81,69 @@
             position: relative; 
         }
 
+        /* --- DASHBOARD IGUAL A LA CAPTURA DE TRADINGVIEW --- */
         #dashboard { 
             position: absolute;
-            top: 10px;
-            right: 10px;
-            width: 290px; 
+            top: 12px;
+            right: 12px;
             z-index: 10;
             display: flex; 
             flex-direction: column; 
             gap: 8px; 
-            pointer-events: none;
         }
 
-        .dash-module { 
-            background-color: rgba(19, 23, 34, 0.85); 
-            backdrop-filter: blur(4px);
-            border-radius: 6px; 
-            padding: 10px 12px; 
-            border: 1px solid #2a2e39; 
-            display: flex; 
-            flex-direction: column; 
-            gap: 6px; 
-            pointer-events: auto;
+        .vsa-table-container {
+            background-color: #000000;
+            border: 1px solid #2962ff;
+            border-radius: 4px;
+            padding: 4px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
         }
 
-        .dash-module h4 { 
+        .vsa-table { 
+            border-collapse: collapse; 
             font-size: 11px; 
-            color: #787b86; 
-            text-transform: uppercase; 
-            letter-spacing: 0.5px; 
-            font-weight: 700;
-            margin-bottom: 2px;
+            color: #d1d4dc;
+            min-width: 280px;
         }
 
-        .vsa-table { width: 100%; border-collapse: collapse; font-size: 11px; }
-        .vsa-table th { text-align: left; color: #787b86; padding: 4px 2px; font-weight: 500; font-size: 10px; }
-        .vsa-table td { padding: 4px 2px; text-align: right; font-size: 11px; }
-        .vsa-table td:first-child { text-align: left; font-weight: 600; color: #d1d4dc; }
-        
-        .badge-neu { background-color: #2a2e39; color: #787b86; padding: 1px 4px; border-radius: 3px; font-size: 9px; font-weight: bold; }
-        .badge-buy { background-color: rgba(0, 230, 118, 0.2); color: #00e676; padding: 1px 4px; border-radius: 3px; font-size: 9px; font-weight: bold; }
-        .badge-sell { background-color: rgba(255, 23, 68, 0.2); color: #ff1744; padding: 1px 4px; border-radius: 3px; font-size: 9px; font-weight: bold; }
+        .vsa-table th { 
+            background-color: #2962ff; 
+            color: #ffffff; 
+            text-align: center; 
+            padding: 3px 6px; 
+            font-weight: 600; 
+            font-size: 10px;
+        }
 
-        .txt-green { color: #00e676; font-weight: bold; }
-        .txt-red { color: #ff1744; font-weight: bold; }
+        .vsa-table td { 
+            padding: 3px 6px; 
+            text-align: right; 
+            font-size: 11px; 
+            border-bottom: 1px solid #1e222d;
+        }
 
-        .param-row { display: flex; justify-content: space-between; align-items: center; font-size: 11px; }
-        .param-input { width: 45px; background: #2a2e39; border: 1px solid #363c4e; color: #fff; font-size: 11px; padding: 2px 4px; border-radius: 3px; text-align: right; }
+        .vsa-table td:first-child { text-align: left; font-weight: bold; color: #ffffff; }
+
+        .badge-buy { background-color: #00e676; color: #000; font-weight: bold; padding: 1px 4px; border-radius: 2px; }
+        .badge-sell { background-color: #ff1744; color: #fff; font-weight: bold; padding: 1px 4px; border-radius: 2px; }
+        .badge-neu { background-color: #434651; color: #d1d4dc; font-weight: bold; padding: 1px 4px; border-radius: 2px; }
+
+        .txt-green { color: #00e676; }
+        .txt-red { color: #ff1744; }
+
+        .config-box {
+            background-color: rgba(19, 23, 34, 0.9);
+            border: 1px solid #2a2e39;
+            padding: 6px 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .config-row { display: flex; justify-content: space-between; align-items: center; }
+        .config-input { width: 40px; background: #2a2e39; border: 1px solid #363c4e; color: #fff; text-align: right; font-size: 11px; border-radius: 2px; }
     </style>
 </head>
 <body>
@@ -141,7 +152,7 @@
         <div class="controls-left">
             <span>TF:</span>
             <select id="timeframe" class="select-tf">
-                <option value="15m" selected>15 Min</option>
+                <option value="15m" selected>15 Minutos</option>
                 <option value="1h">1 Hora</option>
                 <option value="4h">4 Horas</option>
                 <option value="1d">1 Diario</option>
@@ -160,38 +171,39 @@
         <div id="chart"></div>
 
         <div id="dashboard">
-            <div id="panel-vsa-mtf" class="dash-module">
-                <h4>S/R VSA BALLENAS MTF & VOL %</h4>
+            <div id="panel-vsa-mtf" class="vsa-table-container">
                 <table class="vsa-table">
                     <thead>
                         <tr>
-                            <th>TF</th>
-                            <th style="text-align: center;">Señal</th>
-                            <th>Vol</th>
-                            <th>% C</th>
-                            <th>% V</th>
+                            <th>Timeframe</th>
+                            <th>Señal VSA</th>
+                            <th>Vol. Transado</th>
+                            <th>% Compra</th>
+                            <th>% Venta</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <tr id="row-15m"><td>15M</td><td style="text-align: center;"><span class="badge-neu">NEU</span></td><td>--</td><td class="txt-green">--</td><td class="txt-red">--</td></tr>
-                        <tr id="row-1h"><td>1H</td><td style="text-align: center;"><span class="badge-neu">NEU</span></td><td>--</td><td class="txt-green">--</td><td class="txt-red">--</td></tr>
-                        <tr id="row-4h"><td>4H</td><td style="text-align: center;"><span class="badge-neu">NEU</span></td><td>--</td><td class="txt-green">--</td><td class="txt-red">--</td></tr>
-                        <tr id="row-1d"><td>1D</td><td style="text-align: center;"><span class="badge-neu">NEU</span></td><td>--</td><td class="txt-green">--</td><td class="txt-red">--</td></tr>
-                        <tr id="row-1w"><td>1W</td><td style="text-align: center;"><span class="badge-neu">NEU</span></td><td>--</td><td class="txt-green">--</td><td class="txt-red">--</td></tr>
-                        <tr id="row-1m"><td>1M</td><td style="text-align: center;"><span class="badge-neu">NEU</span></td><td>--</td><td class="txt-green">--</td><td class="txt-red">--</td></tr>
+                        <tr id="row-15m"><td>15 Minutos</td><td style="text-align: center;"><span class="badge-neu">NEUTRAL</span></td><td>--</td><td class="txt-green">--</td><td class="txt-red">--</td></tr>
+                        <tr id="row-1h"><td>1 Hora</td><td style="text-align: center;"><span class="badge-neu">NEUTRAL</span></td><td>--</td><td class="txt-green">--</td><td class="txt-red">--</td></tr>
+                        <tr id="row-4h"><td>4 Horas</td><td style="text-align: center;"><span class="badge-neu">NEUTRAL</span></td><td>--</td><td class="txt-green">--</td><td class="txt-red">--</td></tr>
+                        <tr id="row-1d"><td>1 Diario</td><td style="text-align: center;"><span class="badge-neu">NEUTRAL</span></td><td>--</td><td class="txt-green">--</td><td class="txt-red">--</td></tr>
+                        <tr id="row-1w"><td>1 Semana</td><td style="text-align: center;"><span class="badge-neu">NEUTRAL</span></td><td>--</td><td class="txt-green">--</td><td class="txt-red">--</td></tr>
+                        <tr id="row-1m"><td>1 Mes</td><td style="text-align: center;"><span class="badge-neu">NEUTRAL</span></td><td>--</td><td class="txt-green">--</td><td class="txt-red">--</td></tr>
                     </tbody>
                 </table>
             </div>
 
-            <div class="dash-module">
-                <h4>CONFIGURACIÓN VSA</h4>
-                <div class="param-row">
-                    <span>Período Prom. Vol:</span>
-                    <input type="number" id="input-period" class="param-input" value="20" min="1">
+            <div class="config-box">
+                <div class="config-row">
+                    <span style="color:#787b86; font-weight:bold;">CONFIGURACIÓN VSA</span>
                 </div>
-                <div class="param-row" style="margin-top: 4px;">
+                <div class="config-row">
+                    <span>Período Prom. Vol:</span>
+                    <input type="number" id="input-period" class="config-input" value="20">
+                </div>
+                <div class="config-row">
                     <span>Mult. Vol Ballena:</span>
-                    <input type="number" id="input-factor" class="param-input" value="1.8" step="0.1" min="1.1">
+                    <input type="number" id="input-factor" class="config-input" value="1.8" step="0.1">
                 </div>
             </div>
         </div>
@@ -201,14 +213,13 @@
     document.addEventListener("DOMContentLoaded", function () {
         let showVsaLines = true;
         let showVsaSignals = true;
-        let showDashboard = true;
 
         let periodoVol = 20;
         let factorVol = 1.8;
 
-        let activePriceLines = [];
         let currentCandleData = [];
         let mtfVsaCache = {};
+        let raySeriesList = [];
         let ws = null;
 
         const statusEl = document.getElementById("status");
@@ -225,10 +236,10 @@
         const chart = LightweightCharts.createChart(chartContainer, {
             width: chartContainer.clientWidth,
             height: chartContainer.clientHeight,
-            layout: { background: { type: 'solid', color: '#131722' }, textColor: '#d1d4dc' },
-            grid: { vertLines: { color: 'rgba(42, 46, 57, 0.3)' }, horzLines: { color: 'rgba(42, 46, 57, 0.3)' } },
+            layout: { background: { type: 'solid', color: '#000000' }, textColor: '#d1d4dc' },
+            grid: { vertLines: { color: '#161923' }, horzLines: { color: '#161923' } },
             timeScale: { borderColor: '#2a2e39', timeVisible: true, secondsVisible: false },
-            rightPriceScale: { borderColor: '#2a2e39', autoScale: true }
+            rightPriceScale: { borderColor: '#2a2e39' }
         });
 
         const candlestickSeries = chart.addCandlestickSeries({
@@ -242,22 +253,19 @@
         });
         resizeObserver.observe(chartContainer);
 
-        function clearLines() {
-            activePriceLines.forEach(line => {
-                try { candlestickSeries.removePriceLine(line); } catch(e){}
+        function clearRayLines() {
+            raySeriesList.forEach(s => {
+                try { chart.removeSeries(s); } catch(e){}
             });
-            activePriceLines = [];
+            raySeriesList = [];
         }
 
-        // --- ALGORITMO VSA REVISADO CON PERSISTENCIA DE ULTIMO NIVEL (PINE SCRIPT VALUENWHEN) ---
-        function calculateVSA(candles, period, factor) {
-            if (!candles || candles.length < period) return null;
+        // --- ALGORITMO VSA EXPERTO CON REGISTRO DE RAYOS HISTÓRICOS ---
+        function analyzeVSAData(candles, period, factor) {
+            if (!candles || candles.length < period) return { events: [], lastState: null };
 
-            let lastSop = null;
-            let lastRes = null;
-            let lastIsBuy = false;
-            let lastIsSell = false;
-            let lastVol = 0, lastPctBuy = 0, lastPctSell = 0;
+            let events = [];
+            let lastState = null;
 
             for (let i = period; i < candles.length; i++) {
                 let sumVol = 0;
@@ -281,27 +289,28 @@
                 const isBuy = isWhale && (deltaNet > 0 || mInf > (range * 0.35));
                 const isSell = isWhale && (deltaNet < 0 || mSup > (range * 0.35));
 
-                if (isBuy) lastSop = candle.low;
-                if (isSell) lastRes = candle.high;
+                if (isBuy || isSell) {
+                    events.push({
+                        index: i,
+                        time: candle.time,
+                        type: isBuy ? 'BUY' : 'SELL',
+                        price: isBuy ? candle.low : candle.high,
+                        vol: effVol
+                    });
+                }
 
                 if (i === candles.length - 1) {
-                    lastIsBuy = isBuy;
-                    lastIsSell = isSell;
-                    lastVol = effVol;
-                    lastPctBuy = ((volBuy / effVol) * 100).toFixed(1);
-                    lastPctSell = ((volSell / effVol) * 100).toFixed(1);
+                    lastState = {
+                        isBuy,
+                        isSell,
+                        volume: effVol,
+                        pctBuy: ((volBuy / effVol) * 100).toFixed(1),
+                        pctSell: ((volSell / effVol) * 100).toFixed(1)
+                    };
                 }
             }
 
-            return {
-                isBuy: lastIsBuy,
-                isSell: lastIsSell,
-                volume: lastVol,
-                pctBuy: lastPctBuy,
-                pctSell: lastPctSell,
-                support: lastSop,
-                resistance: lastRes
-            };
+            return { events, lastState };
         }
 
         function formatVol(val) {
@@ -312,84 +321,107 @@
         }
 
         async function loadMTFData() {
-            const mapTf = { '15m': '15m', '1h': '1h', '4h': '4h', '1d': '1d', '1w': '1w', '1m': '1m' };
-            for (const tf in mapTf) {
+            const tfs = ['15m', '1h', '4h', '1d', '1w', '1m'];
+            for (const tf of tfs) {
                 try {
-                    const res = await fetch(`https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=${tf}&limit=100`);
+                    const res = await fetch(`https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=${tf}&limit=150`);
                     const data = await res.json();
                     const candles = data.map(d => ({
+                        time: Math.floor(d[0] / 1000),
                         open: parseFloat(d[1]), high: parseFloat(d[2]), low: parseFloat(d[3]), close: parseFloat(d[4]), volume: parseFloat(d[5])
                     }));
-                    mtfVsaCache[tf] = calculateVSA(candles, periodoVol, factorVol);
-                    updateDashboardRow(tf, mtfVsaCache[tf]);
+
+                    const analysis = analyzeVSAData(candles, periodoVol, factorVol);
+                    mtfVsaCache[tf] = analysis;
+                    updateDashboardRow(tf, analysis.lastState);
                 } catch(e) {
-                    console.error("Error MTF:", tf, e);
+                    console.error("Error cargando MTF:", tf, e);
                 }
             }
-            renderVSAElements();
+            renderVSAChartElements();
         }
 
-        function updateDashboardRow(tf, vsa) {
+        function updateDashboardRow(tf, state) {
             const row = document.getElementById(`row-${tf}`);
-            if (!row || !vsa) return;
+            if (!row || !state) return;
 
-            let badge = `<span class="badge-neu">NEU</span>`;
-            if (vsa.isBuy) badge = `<span class="badge-buy">BUY</span>`;
-            if (vsa.isSell) badge = `<span class="badge-sell">SELL</span>`;
+            let badge = `<span class="badge-neu">NEUTRAL</span>`;
+            if (state.isBuy) badge = `<span class="badge-buy">BUY</span>`;
+            if (state.isSell) badge = `<span class="badge-sell">SELL</span>`;
 
             row.cells[1].innerHTML = badge;
-            row.cells[2].innerText = formatVol(vsa.volume);
-            row.cells[3].innerText = `${vsa.pctBuy}%`;
-            row.cells[4].innerText = `${vsa.pctSell}%`;
+            row.cells[2].innerText = formatVol(state.volume);
+            row.cells[3].innerText = `${state.pctBuy}%`;
+            row.cells[4].innerText = `${state.pctSell}%`;
         }
 
-        function renderVSAElements() {
-            clearLines();
-            let markers = [];
+        function renderVSAChartElements() {
+            clearRayLines();
 
             if (currentCandleData.length < periodoVol) return;
 
-            // Marcadores en Gráfico
+            const currentAnalysis = analyzeVSAData(currentCandleData, periodoVol, factorVol);
+            
+            // 1. DIBUJAR SEÑALES (BUY / SELL ARROWS)
             if (showVsaSignals) {
-                for (let i = periodoVol; i < currentCandleData.length; i++) {
-                    const slice = currentCandleData.slice(0, i + 1);
-                    const v = calculateVSA(slice, periodoVol, factorVol);
-                    if (v && v.isBuy) {
-                        markers.push({ time: currentCandleData[i].time, position: 'belowBar', color: '#00e676', shape: 'arrowUp', text: 'BUY' });
-                    } else if (v && v.isSell) {
-                        markers.push({ time: currentCandleData[i].time, position: 'aboveBar', color: '#ff1744', shape: 'arrowDown', text: 'SELL' });
-                    }
-                }
+                const markers = currentAnalysis.events.map(e => ({
+                    time: e.time,
+                    position: e.type === 'BUY' ? 'belowBar' : 'aboveBar',
+                    color: e.type === 'BUY' ? '#00e676' : '#ff1744',
+                    shape: e.type === 'BUY' ? 'arrowUp' : 'arrowDown',
+                    text: e.type
+                }));
                 candlestickSeries.setMarkers(markers);
             } else {
                 candlestickSeries.setMarkers([]);
             }
 
-            // Dibujar líneas horizontales visibles en la escala de precios
+            // 2. DIBUJAR RAYOS DE SOPORTE Y RESISTENCIA COMO EN TRADINGVIEW
             if (showVsaLines) {
-                const levels = [
-                    { tf: '15m', label: '15m', cS: '#00b0ff', cR: '#ff5252' },
-                    { tf: '1h',  label: '1H',  cS: '#0288d1', cR: '#d32f2f' },
-                    { tf: '4h',  label: '4H',  cS: '#aa00ff', cR: '#ff6d00' },
-                    { tf: '1d',  label: '1D',  cS: '#ffd700', cR: '#e65100' },
-                    { tf: '1w',  label: '1W',  cS: '#00ffff', cR: '#ff007f' },
-                    { tf: '1m',  label: '1M',  cS: '#ffffff', cR: '#7c4dff' }
+                const lastTime = currentCandleData[currentCandleData.length - 1].time;
+
+                // Trazar los rayos del marco de tiempo actual
+                currentAnalysis.events.slice(-6).forEach(ev => {
+                    const lineSeries = chart.addLineSeries({
+                        color: ev.type === 'BUY' ? '#00b0ff' : '#ff5252',
+                        lineWidth: 2,
+                        priceLineVisible: false,
+                        lastValueVisible: true,
+                        title: `${ev.type === 'BUY' ? 'Sop' : 'Res'} ${ev.price.toFixed(0)}`
+                    });
+
+                    lineSeries.setData([
+                        { time: ev.time, value: ev.price },
+                        { time: lastTime, value: ev.price }
+                    ]);
+
+                    raySeriesList.push(lineSeries);
+                });
+
+                // Trazar S/R MTF Clave (4H, 1D)
+                const mtfLevels = [
+                    { tf: '4h', label: '4H', color: '#aa00ff' },
+                    { tf: '1d', label: '1D', color: '#ffd700' }
                 ];
 
-                levels.forEach(l => {
-                    const data = mtfVsaCache[l.tf];
-                    if (data) {
-                        if (data.support !== null) {
-                            activePriceLines.push(candlestickSeries.createPriceLine({
-                                price: data.support, color: l.cS, lineWidth: 2,
-                                lineStyle: LightweightCharts.LineStyle.Solid, axisLabelVisible: true, title: `Sop ${l.label}`
-                            }));
-                        }
-                        if (data.resistance !== null) {
-                            activePriceLines.push(candlestickSeries.createPriceLine({
-                                price: data.resistance, color: l.cR, lineWidth: 2,
-                                lineStyle: LightweightCharts.LineStyle.Solid, axisLabelVisible: true, title: `Res ${l.label}`
-                            }));
+                mtfLevels.forEach(m => {
+                    if (mtfVsaCache[m.tf] && mtfVsaCache[m.tf].events.length > 0) {
+                        const lastMtfEvent = mtfVsaCache[m.tf].events[mtfVsaCache[m.tf].events.length - 1];
+                        if (lastMtfEvent.time <= lastTime) {
+                            const lineSeries = chart.addLineSeries({
+                                color: m.color,
+                                lineWidth: 2,
+                                priceLineVisible: false,
+                                lastValueVisible: true,
+                                title: `${lastMtfEvent.type === 'BUY' ? 'Sop' : 'Res'} ${m.label}`
+                            });
+
+                            lineSeries.setData([
+                                { time: lastMtfEvent.time, value: lastMtfEvent.price },
+                                { time: lastTime, value: lastMtfEvent.price }
+                            ]);
+
+                            raySeriesList.push(lineSeries);
                         }
                     }
                 });
@@ -446,26 +478,27 @@
                     currentCandleData.push(candle);
                 }
 
-                renderVSAElements();
+                renderVSAChartElements();
             };
         }
 
         btnVsa.addEventListener("click", () => {
             showVsaLines = !showVsaLines;
             btnVsa.className = showVsaLines ? "btn-toggle" : "btn-toggle inactive";
-            renderVSAElements();
+            renderVSAChartElements();
         });
 
         btnSignals.addEventListener("click", () => {
             showVsaSignals = !showVsaSignals;
             btnSignals.className = showVsaSignals ? "btn-toggle" : "btn-toggle inactive";
-            renderVSAElements();
+            renderVSAChartElements();
         });
 
         btnPanel.addEventListener("click", () => {
-            showDashboard = !showDashboard;
-            btnPanel.className = showDashboard ? "btn-toggle" : "btn-toggle inactive";
-            document.getElementById("panel-vsa-mtf").style.display = showDashboard ? "flex" : "none";
+            const panel = document.getElementById("panel-vsa-mtf");
+            const isHidden = panel.style.display === "none";
+            panel.style.display = isHidden ? "block" : "none";
+            btnPanel.className = isHidden ? "btn-toggle" : "btn-toggle inactive";
         });
 
         timeframeSelect.addEventListener("change", (e) => fetchKlines(e.target.value));
