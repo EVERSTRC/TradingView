@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bitcoin Trading Terminal - S/R VSA Ballenas + Supertrend</title>
+    <title>Bitcoin Trading Terminal - S/R VSA Ballenas + Supertrend exacto</title>
     <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -146,19 +146,6 @@
         .txt-green { color: #00e676; }
         .txt-red { color: #ff1744; }
 
-        .config-box {
-            background-color: rgba(19, 23, 34, 0.9);
-            border: 1px solid #2a2e39;
-            padding: 6px 10px;
-            border-radius: 4px;
-            font-size: 11px;
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
-        .config-row { display: flex; justify-content: space-between; align-items: center; }
-        .config-input { width: 40px; background: #2a2e39; border: 1px solid #363c4e; color: #fff; text-align: right; font-size: 11px; border-radius: 2px; }
-        
         .dash-module {
             background-color: rgba(19, 23, 34, 0.9);
             border: 1px solid #2a2e39;
@@ -176,6 +163,19 @@
             letter-spacing: 0.5px;
         }
         .dash-val { font-weight: bold; }
+
+        .config-box {
+            background-color: rgba(19, 23, 34, 0.9);
+            border: 1px solid #2a2e39;
+            padding: 6px 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .config-row { display: flex; justify-content: space-between; align-items: center; }
+        .config-input { width: 40px; background: #2a2e39; border: 1px solid #363c4e; color: #fff; text-align: right; font-size: 11px; border-radius: 2px; }
     </style>
 </head>
 <body>
@@ -238,7 +238,7 @@
                     <span id="dash-st-signal" class="dash-val">--</span>
                 </div>
                 <div class="config-row">
-                    <span>Precio:</span>
+                    <span>Precio Señal:</span>
                     <span id="dash-st-price" class="dash-val">--</span>
                 </div>
             </div>
@@ -326,63 +326,74 @@
 
         chart.timeScale().subscribeVisibleLogicalRangeChange(() => drawOverlay());
 
-        // --- CÁLCULO DE SUPERTREND (ATR 10, Mult 3.0) ---
-        function calculateSupertrend(candles, period = 10, multiplier = 3.0) {
-            if (!candles || candles.length < period) return [];
+        // --- CÁLCULO EXACTO DE SUPERTREND (LÓGICA DEL CÓDIGO ARCHIVO BASE) ---
+        function getSupertrendMarkers(candles, atrPeriods = 10, multiplier = 3.0) {
+            if (!candles || candles.length < atrPeriods + 1) return { stLine: [], lastSignal: null };
 
-            let stLine = [];
-            let trs = [];
+            const len = candles.length;
+            const tr = new Float64Array(len);
+            tr[0] = candles[0].high - candles[0].low;
 
-            for (let i = 0; i < candles.length; i++) {
-                if (i === 0) {
-                    trs.push(candles[i].high - candles[i].low);
-                } else {
-                    const tr = Math.max(
-                        candles[i].high - candles[i].low,
-                        Math.abs(candles[i].high - candles[i - 1].close),
-                        Math.abs(candles[i].low - candles[i - 1].close)
-                    );
-                    trs.push(tr);
-                }
+            for (let i = 1; i < len; i++) {
+                const hL = candles[i].high - candles[i].low;
+                const hC = Math.abs(candles[i].high - candles[i - 1].close);
+                const lC = Math.abs(candles[i].low - candles[i - 1].close);
+                tr[i] = Math.max(hL, hC, lC);
             }
 
-            let upperBand = 0, lowerBand = 0, supertrend = 0, dir = 1;
+            const atr = new Float64Array(len);
+            let sumTR = 0;
+            for (let i = 0; i < atrPeriods; i++) sumTR += tr[i];
+            atr[atrPeriods - 1] = sumTR / atrPeriods;
 
-            for (let i = 0; i < candles.length; i++) {
-                if (i < period - 1) {
-                    stLine.push({ time: candles[i].time, value: NaN, dir: 1 });
+            for (let i = atrPeriods; i < len; i++) {
+                atr[i] = (atr[i - 1] * (atrPeriods - 1) + tr[i]) / atrPeriods;
+            }
+
+            const up = new Float64Array(len);
+            const dn = new Float64Array(len);
+            const trend = new Int32Array(len);
+            let currentTrend = 1;
+
+            for (let i = 0; i < len; i++) {
+                const src = (candles[i].high + candles[i].low) / 2;
+                let basicUp = src - (multiplier * atr[i]);
+                let basicDn = src + (multiplier * atr[i]);
+
+                if (i === 0) {
+                    up[i] = basicUp;
+                    dn[i] = basicDn;
+                    trend[i] = 1;
                     continue;
                 }
 
-                let sumTR = 0;
-                for (let j = i - period + 1; j <= i; j++) sumTR += trs[j];
-                const atr = sumTR / period;
+                up[i] = candles[i - 1].close > up[i - 1] ? Math.max(basicUp, up[i - 1]) : basicUp;
+                dn[i] = candles[i - 1].close < dn[i - 1] ? Math.min(basicDn, dn[i - 1]) : basicDn;
 
-                const hl2 = (candles[i].high + candles[i].low) / 2;
-                let basicUpper = hl2 + (multiplier * atr);
-                let basicLower = hl2 - (multiplier * atr);
+                if (trend[i - 1] === -1 && candles[i].close > dn[i - 1]) currentTrend = 1;
+                else if (trend[i - 1] === 1 && candles[i].close < up[i - 1]) currentTrend = -1;
+                else currentTrend = trend[i - 1];
 
-                const prevUpper = i > period - 1 ? upperBand : basicUpper;
-                const prevLower = i > period - 1 ? lowerBand : basicLower;
-                const prevClose = i > 0 ? candles[i - 1].close : candles[i].close;
-
-                lowerBand = (basicLower > prevLower || prevClose < prevLower) ? basicLower : prevLower;
-                upperBand = (basicUpper < prevUpper || prevClose > prevUpper) ? basicUpper : prevUpper;
-
-                const prevST = i > period - 1 ? supertrend : lowerBand;
-                const prevDir = i > period - 1 ? dir : 1;
-
-                if (prevST === prevUpper) {
-                    dir = candles[i].close > upperBand ? 1 : -1;
-                } else {
-                    dir = candles[i].close < lowerBand ? -1 : 1;
-                }
-
-                supertrend = dir === 1 ? lowerBand : upperBand;
-                stLine.push({ time: candles[i].time, value: supertrend, dir: dir });
+                trend[i] = currentTrend;
             }
 
-            return stLine;
+            let stLine = [];
+            let lastSignal = null;
+
+            for (let i = atrPeriods; i < len; i++) {
+                const val = trend[i] === 1 ? up[i] : dn[i];
+                stLine.push({ time: candles[i].time, value: val, color: trend[i] === 1 ? '#00e676' : '#ff1744' });
+
+                if (i > atrPeriods && trend[i] !== trend[i - 1]) {
+                    lastSignal = {
+                        type: trend[i] === 1 ? 'BUY' : 'SELL',
+                        price: candles[i].close,
+                        time: candles[i].time
+                    };
+                }
+            }
+
+            return { stLine, lastSignal };
         }
 
         function analyzeVSAData(candles, period, factor, isMTF = false) {
@@ -648,23 +659,21 @@
                 vsaLinesToDraw = [];
             }
 
-            // Renderizado y actualización de Supertrend
+            // Aplicar el motor Supertrend traído de 'Para FireBase'
             if (showSupertrend) {
-                const stData = calculateSupertrend(currentCandleData);
-                if (stData.length > 0) {
-                    const formattedSt = stData.filter(d => !isNaN(d.value)).map(d => ({
-                        time: d.time,
-                        value: d.value,
-                        color: d.dir === 1 ? '#00e676' : '#ff1744'
-                    }));
-                    supertrendSeries.setData(formattedSt);
+                const { stLine, lastSignal } = getSupertrendMarkers(currentCandleData, 10, 3.0);
+                supertrendSeries.setData(stLine);
 
-                    const lastSt = stData[stData.length - 1];
-                    if (lastSt && !isNaN(lastSt.value)) {
-                        dashStSignal.innerText = lastSt.dir === 1 ? "BULLISH (COMPRA)" : "BEARISH (VENTA)";
-                        dashStSignal.style.color = lastSt.dir === 1 ? "#00e676" : "#ff1744";
-                        dashStPrice.innerText = lastSt.value.toFixed(2);
-                    }
+                if (lastSignal) {
+                    dashStSignal.innerText = lastSignal.type === "BUY" ? "BUY (ALCISTA)" : "SELL (BAJISTA)";
+                    dashStSignal.style.color = lastSignal.type === "BUY" ? "#00e676" : "#ff1744";
+                    dashStPrice.innerText = `$${lastSignal.price.toFixed(2)}`;
+                } else if (stLine.length > 0) {
+                    const lastSt = stLine[stLine.length - 1];
+                    const isBuy = lastSt.color === "#00e676";
+                    dashStSignal.innerText = isBuy ? "BUY (ALCISTA)" : "SELL (BAJISTA)";
+                    dashStSignal.style.color = lastSt.color;
+                    dashStPrice.innerText = `$${lastSt.value.toFixed(2)}`;
                 }
             } else {
                 supertrendSeries.setData([]);
