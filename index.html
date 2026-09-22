@@ -430,7 +430,7 @@
 
             drawableItems.forEach(item => {
                 ctx.strokeStyle = item.color;
-                ctx.lineWidth = item.lineWidth || 2.5; // Grosor por defecto elevado
+                ctx.lineWidth = item.lineWidth || 2.5;
                 ctx.beginPath();
 
                 if (item.style === 'dashed') {
@@ -475,7 +475,7 @@
                     time: e.time,
                     position: e.type === 'BUY' ? 'belowBar' : 'aboveBar',
                     color: e.type === 'BUY' ? '#00e676' : '#ff1744',
-                    shape: e.type === 'BUY' ? 'arrowUp' : 'arrowDown',
+                    shape: 'circle', // Cambiado de flechas a círculos
                     text: e.type
                 }));
                 candlestickSeries.setMarkers(markers);
@@ -507,7 +507,6 @@
                     });
                 }
 
-                // Incrementamos los valores de lineWidth para dar más grosor
                 const mtfLevels = [
                     { tf: '5m', label: '5m', colorS: '#00e5ff', colorR: '#ff4081', style: 'dashed', lineWidth: 2.0 },
                     { tf: '15m', label: '15m', colorS: '#00b0ff', colorR: '#ff5252', style: 'dashed', lineWidth: 2.2 },
