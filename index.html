@@ -12,7 +12,7 @@
             width: 100vw; 
             height: 100vh; 
             overflow: hidden; 
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            font-family: -apple-system, BlinkMacSystemFont, "Trebuchet MS", Roboto, Ubuntu, sans-serif; 
             background-color: #000000; 
             color: #d1d4dc; 
             display: flex; 
@@ -107,10 +107,10 @@
         }
 
         .vsa-table-container {
-            background-color: rgba(0, 0, 0, 0.85);
+            background-color: rgba(19, 23, 34, 0.85);
             border: 1px solid #2962ff;
             border-radius: 4px;
-            padding: 4px;
+            padding: 2px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.5);
         }
 
@@ -118,7 +118,7 @@
             border-collapse: collapse; 
             font-size: 11px; 
             color: #d1d4dc;
-            min-width: 280px;
+            min-width: 250px;
         }
 
         .vsa-table th { 
@@ -166,8 +166,8 @@
         <div class="controls-left">
             <span>TF:</span>
             <select id="timeframe" class="select-tf">
-                <option value="15m" selected>15 Minutos</option>
-                <option value="1h">1 Hora</option>
+                <option value="15m">15 Minutos</option>
+                <option value="1h" selected>1 Hora</option>
                 <option value="4h">4 Horas</option>
                 <option value="1d">1 Diario</option>
             </select>
@@ -257,7 +257,7 @@
             height: chartContainer.clientHeight,
             layout: { background: { type: 'solid', color: '#000000' }, textColor: '#d1d4dc' },
             grid: { vertLines: { color: '#161923' }, horzLines: { color: '#161923' } },
-            timeScale: { borderColor: '#2a2e39', timeVisible: true, secondsVisible: false, rightOffset: 12 },
+            timeScale: { borderColor: '#2a2e39', timeVisible: true, secondsVisible: false, rightOffset: 15 },
             rightPriceScale: { borderColor: '#2a2e39', autoScale: true }
         });
 
@@ -376,29 +376,16 @@
             row.cells[4].innerText = `${state.pctSell}%`;
         }
 
-        // RENDERIZADO CON DESPLAZAMIENTO A LA DERECHA DE VELAS Y ETIQUETAS
+        // DIBUJO DE LÍNEAS Y ETIQUETAS IDÉNTICAS A TRADINGVIEW
         function drawOverlay() {
             ctx.clearRect(0, 0, overlay.width, overlay.height);
             if (!showVsaLines || vsaLinesToDraw.length === 0 || currentCandleData.length === 0) return;
 
             const timeScale = chart.timeScale();
-            const lastCandle = currentCandleData[currentCandleData.length - 1];
-            const lastCandleX = timeScale.timeToCoordinate(lastCandle.time);
+            const width = overlay.width;
 
-            if (lastCandleX === null) return;
-
-            // Calcular ancho entre velas para proyectar un desplazamiento equivalente a 4 velas a la derecha
-            let candleSpacing = 10;
-            if (currentCandleData.length >= 2) {
-                const prevCandleX = timeScale.timeToCoordinate(currentCandleData[currentCandleData.length - 2].time);
-                if (prevCandleX !== null) candleSpacing = Math.abs(lastCandleX - prevCandleX);
-            }
-
-            // Extremo de la línea horizontal (4 velas más allá del precio)
-            const lineEndX = lastCandleX + (candleSpacing * 4);
-
-            let renderList = [];
-
+            // Agrupar niveles por precio cercano para combinar etiquetas (Ej: "Sop 1H Sop 4H")
+            let rawList = [];
             vsaLinesToDraw.forEach(item => {
                 const y = candlestickSeries.priceToCoordinate(item.price);
                 if (y !== null && y >= 0 && y <= overlay.height) {
@@ -407,58 +394,79 @@
                         const coordX = timeScale.timeToCoordinate(item.startTime);
                         if (coordX !== null) startX = Math.max(0, coordX);
                     }
+                    rawList.push({ ...item, y, startX });
+                }
+            });
 
-                    renderList.push({
+            // Agrupar elementos visualmente adyacentes
+            let grouped = [];
+            rawList.sort((a, b) => a.y - b.y);
+
+            rawList.forEach(item => {
+                let match = grouped.find(g => Math.abs(g.y - item.y) < 6);
+                if (match) {
+                    if (!match.titles.includes(item.title)) {
+                        match.titles.push(item.title);
+                    }
+                    match.startX = Math.min(match.startX, item.startX);
+                } else {
+                    grouped.push({
                         price: item.price,
-                        title: item.title,
+                        titles: [item.title],
                         color: item.color,
-                        startX: startX,
-                        endX: lineEndX,
-                        y: y,
-                        labelY: y
+                        style: item.style || 'solid',
+                        lineWidth: item.lineWidth || 1.5,
+                        y: item.y,
+                        startX: item.startX
                     });
                 }
             });
 
-            // Ordenar por eje Y
-            renderList.sort((a, b) => a.y - b.y);
+            // Renderizar cada nivel
+            grouped.forEach(item => {
+                const lineX2 = width - 65; // Extender hasta cerca de la escala de precio
+                const titleStr = item.titles.join(" ");
 
-            // Evitar solapamientos verticales en etiquetas ajustando coordenadas Y
-            const minSpace = 16;
-            for (let i = 1; i < renderList.length; i++) {
-                if (renderList[i].labelY - renderList[i-1].labelY < minSpace) {
-                    renderList[i].labelY = renderList[i-1].labelY + minSpace;
-                }
-            }
-
-            // Dibujar
-            renderList.forEach(item => {
-                // 1. Línea horizontal despejada hacia la derecha
+                // Configurar Trazo de Línea (Punteado vs Sólido estilo TV)
                 ctx.strokeStyle = item.color;
-                ctx.lineWidth = 1.5;
+                ctx.lineWidth = item.lineWidth;
                 ctx.beginPath();
+
+                if (item.style === 'dashed') {
+                    ctx.setLineDash([6, 6]);
+                } else {
+                    ctx.setLineDash([]);
+                }
+
                 ctx.moveTo(item.startX, item.y);
-                ctx.lineTo(item.endX, item.y);
+                ctx.lineTo(lineX2, item.y);
                 ctx.stroke();
+                ctx.setLineDash([]); // Reset dash
 
-                // 2. Etiqueta flotante posicionada A LA DERECHA de la línea
-                ctx.font = "bold 10px sans-serif";
-                const textWidth = ctx.measureText(item.title).width;
-                const rectPadding = 5;
-                const rectWidth = textWidth + rectPadding * 2;
-                const rectHeight = 15;
-                const rectX = item.endX + 6; // Posicionada justo al finalizar la línea
-                const rectY = item.labelY - rectHeight / 2;
+                // Dibujar Etiqueta Encimada/Flotante (Estilo TradingView)
+                ctx.font = "11px -apple-system, BlinkMacSystemFont, Roboto, sans-serif";
+                const textMetrics = ctx.measureText(titleStr);
+                const padX = 6;
+                const padY = 3;
+                const rectW = textMetrics.width + (padX * 2);
+                const rectH = 16;
+                
+                // Ubicar etiqueta hacia la mitad/derecha de la línea
+                const rectX = lineX2 - rectW - 20; 
+                const rectY = item.y - (rectH / 2);
 
+                // Fondo de la etiqueta con curva estilo TradingView
                 ctx.fillStyle = item.color;
                 ctx.beginPath();
-                ctx.roundRect(rectX, rectY, rectWidth, rectHeight, 3);
+                ctx.roundRect(rectX, rectY, rectW, rectH, 3);
                 ctx.fill();
 
-                ctx.fillStyle = "#ffffff";
+                // Texto dentro del badge
+                ctx.fillStyle = "#000000";
                 ctx.textAlign = "center";
                 ctx.textBaseline = "middle";
-                ctx.fillText(item.title, rectX + rectWidth / 2, item.labelY);
+                ctx.font = "bold 10px -apple-system, BlinkMacSystemFont, Roboto, sans-serif";
+                ctx.fillText(titleStr, rectX + (rectW / 2), item.y + 0.5);
             });
         }
 
@@ -483,10 +491,12 @@
             if (showVsaLines) {
                 const levels = [];
 
+                // Configuración exacta de colores/estilos según TradingView
                 const mtfLevels = [
-                    { tf: '1d', label: '1D', colorS: '#ffd700', colorR: '#e65100' },
-                    { tf: '4h', label: '4H', colorS: '#aa00ff', colorR: '#ff6d00' },
-                    { tf: '1h', label: '1H', colorS: '#0288d1', colorR: '#d32f2f' }
+                    { tf: '1d', label: '1D', colorS: '#e6a100', colorR: '#e6a100', style: 'solid', lineWidth: 2.5 },
+                    { tf: '4h', label: '4H', colorS: '#a142f4', colorR: '#a142f4', style: 'solid', lineWidth: 1.5 },
+                    { tf: '1h', label: '1H', colorS: '#2962ff', colorR: '#d32f2f', style: 'solid', lineWidth: 1.5 },
+                    { tf: '15m', label: '15m', colorS: '#00b0ff', colorR: '#ff5252', style: 'dashed', lineWidth: 1.0 }
                 ];
 
                 mtfLevels.forEach(m => {
@@ -496,18 +506,10 @@
                             price: lastEv.price,
                             title: `${lastEv.type === 'BUY' ? 'Sop' : 'Res'} ${m.label}`,
                             color: lastEv.type === 'BUY' ? m.colorS : m.colorR,
+                            style: m.style,
+                            lineWidth: m.lineWidth,
                             startTime: lastEv.time
                         });
-                    }
-                });
-
-                currentAnalysis.events.slice(-3).forEach(ev => {
-                    const title = `${ev.type === 'BUY' ? 'Sop' : 'Res'} 6bar15m`;
-                    const color = ev.type === 'BUY' ? '#00b0ff' : '#ff5252';
-
-                    const isDuplicate = levels.some(l => Math.abs(l.price - ev.price) / ev.price < 0.0008);
-                    if (!isDuplicate) {
-                        levels.push({ price: ev.price, title, color, startTime: ev.time });
                     }
                 });
 
@@ -519,7 +521,7 @@
             drawOverlay();
         }
 
-        async function fetchKlines(interval = "15m") {
+        async function fetchKlines(interval = "1h") {
             statusEl.innerText = "Cargando...";
             statusEl.style.color = "#ffd700";
 
@@ -543,7 +545,7 @@
             }
         }
 
-        function connectWebSocket(interval = "15m") {
+        function connectWebSocket(interval = "1h") {
             ws = new WebSocket(`wss://stream.binance.com:9443/ws/btcusdt@kline_${interval}`);
 
             ws.onopen = () => {
@@ -596,7 +598,7 @@
         inputPeriod.addEventListener("change", (e) => { periodoVol = parseInt(e.target.value) || 20; loadMTFData(); });
         inputFactor.addEventListener("change", (e) => { factorVol = parseFloat(e.target.value) || 1.8; loadMTFData(); });
 
-        fetchKlines();
+        fetchKlines("1h");
     });
     </script>
 </body>
