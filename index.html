@@ -3,401 +3,724 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VSA Multi-Timeframe Dashboard - BTC/USDT</title>
-    <!-- Lightweight Charts CDN -->
-    <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+    <title>Bitcoin Trading Terminal - S/R VSA Ballenas + Supertrend</title>
+    <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body {
-            background-color: #12141d;
-            color: #d1d4dc;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-            overflow: hidden;
+        
+        html, body { 
+            width: 100vw; 
+            height: 100vh; 
+            overflow: hidden; 
+            font-family: -apple-system, BlinkMacSystemFont, "Trebuchet MS", Roboto, Ubuntu, sans-serif; 
+            background-color: #000000; 
+            color: #d1d4dc; 
+            display: flex; 
+            flex-direction: column; 
         }
 
-        header {
-            background-color: #1e222d;
-            padding: 10px 20px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            border-bottom: 1px solid #2a2e39;
-        }
-
-        .controls {
-            display: flex;
-            gap: 15px;
-            align-items: center;
-        }
-
-        label {
+        #top-bar { 
+            display: flex; 
+            align-items: center; 
+            justify-content: space-between; 
+            padding: 0 16px; 
+            background-color: #131722; 
+            border-bottom: 1px solid #2a2e39; 
+            flex-shrink: 0; 
+            height: 44px;
             font-size: 13px;
-            color: #787b86;
         }
 
-        select, input {
-            background-color: #2a2e39;
-            color: #fff;
-            border: 1px solid #363c4e;
-            padding: 6px 10px;
-            border-radius: 4px;
-            font-size: 13px;
+        .controls-left { display: flex; align-items: center; gap: 12px; }
+        .controls-right { display: flex; align-items: center; gap: 6px; }
+
+        .select-tf { 
+            background-color: #1e222d; 
+            color: #d1d4dc; 
+            border: 1px solid #363c4e; 
+            padding: 4px 8px; 
+            border-radius: 4px; 
+            font-size: 12px; 
+            cursor: pointer; 
             outline: none;
         }
 
-        #status {
-            font-size: 13px;
+        .status-badge {
+            background-color: rgba(0, 230, 118, 0.15);
+            color: #00e676;
+            border: 1px solid #00e676;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
             font-weight: bold;
-            color: #ffd700;
         }
 
-        .main-container {
+        .btn-toggle {
+            background-color: #2962ff;
+            color: #ffffff;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+        }
+        .btn-toggle.inactive { background-color: #2a2e39; color: #787b86; }
+
+        /* Estilos del desplegable de Indicadores */
+        .dropdown {
+            position: relative;
+            display: inline-block;
+        }
+        .dropdown-content {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background-color: #1e222d;
+            min-width: 170px;
+            box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.5);
+            border: 1px solid #2a2e39;
+            border-radius: 4px;
+            z-index: 20;
+            padding: 6px;
+        }
+        .dropdown-content label {
             display: flex;
-            flex: 1;
-            position: relative;
-            overflow: hidden;
+            align-items: center;
+            gap: 8px;
+            padding: 6px;
+            color: #d1d4dc;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        .dropdown-content label:hover {
+            background-color: #2a2e39;
+            border-radius: 2px;
+        }
+        .dropdown.show .dropdown-content {
+            display: block;
         }
 
-        #chartContainer {
+        #main-container { 
+            display: flex; 
+            flex: 1; 
+            position: relative; 
+            overflow: hidden; 
+            width: 100%; 
+        }
+
+        #chart-wrapper {
             flex: 1;
-            position: relative;
             height: 100%;
+            position: relative;
         }
 
-        #overlayCanvas {
+        #chart { 
+            width: 100%; 
+            height: 100%; 
+        }
+
+        #labels-overlay {
             position: absolute;
             top: 0;
             left: 0;
+            width: 100%;
+            height: 100%;
             pointer-events: none;
-            z-index: 10;
+            z-index: 5;
         }
 
-        #dashboard {
-            width: 280px;
-            background-color: #181a20;
-            border-left: 1px solid #2a2e39;
-            padding: 15px;
+        #dashboard { 
+            position: absolute;
+            top: 12px;
+            right: 80px;
+            z-index: 10;
+            display: flex; 
+            flex-direction: column; 
+            gap: 8px; 
+        }
+
+        .vsa-table-container {
+            background-color: rgba(19, 23, 34, 0.85);
+            border: 1px solid #2962ff;
+            border-radius: 4px;
+            padding: 2px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+        }
+
+        .vsa-table { 
+            border-collapse: collapse; 
+            font-size: 11px; 
+            color: #d1d4dc;
+            min-width: 250px;
+        }
+
+        .vsa-table th { 
+            background-color: #2962ff; 
+            color: #ffffff; 
+            text-align: center; 
+            padding: 3px 6px; 
+            font-weight: 600; 
+            font-size: 10px;
+        }
+
+        .vsa-table td { 
+            padding: 3px 6px; 
+            text-align: right; 
+            font-size: 11px; 
+            border-bottom: 1px solid #1e222d;
+        }
+
+        .vsa-table td:first-child { text-align: left; font-weight: bold; color: #ffffff; }
+
+        .badge-buy { background-color: #00e676; color: #000; font-weight: bold; padding: 1px 4px; border-radius: 2px; }
+        .badge-sell { background-color: #ff1744; color: #fff; font-weight: bold; padding: 1px 4px; border-radius: 2px; }
+        .badge-neu { background-color: #434651; color: #d1d4dc; font-weight: bold; padding: 1px 4px; border-radius: 2px; }
+
+        .txt-green { color: #00e676; }
+        .txt-red { color: #ff1744; }
+
+        .config-box {
+            background-color: rgba(19, 23, 34, 0.9);
+            border: 1px solid #2a2e39;
+            padding: 6px 10px;
+            border-radius: 4px;
+            font-size: 11px;
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            gap: 4px;
         }
-
-        .mtf-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 12px;
-        }
-
-        .mtf-table th, .mtf-table td {
-            padding: 8px 4px;
-            text-align: left;
-            border-bottom: 1px solid #2a2e39;
-        }
-
-        .mtf-table th {
-            color: #787b86;
-            font-weight: normal;
-        }
-
-        .badge {
-            padding: 2px 6px;
-            border-radius: 3px;
-            font-weight: bold;
-            font-size: 11px;
-            display: inline-block;
-        }
-
-        .badge-ultra { background-color: #9c27b0; color: #fff; }
-        .badge-high { background-color: #2196f3; color: #fff; }
-        .badge-normal { background-color: #4caf50; color: #fff; }
-        .badge-low { background-color: #ff9800; color: #fff; }
+        .config-row { display: flex; justify-content: space-between; align-items: center; }
+        .config-input { width: 40px; background: #2a2e39; border: 1px solid #363c4e; color: #fff; text-align: right; font-size: 11px; border-radius: 2px; }
     </style>
 </head>
 <body>
 
-    <header>
-        <div class="controls">
-            <div>
-                <label>Temporalidad: </label>
-                <select id="timeframeSelect">
-                    <option value="5m">5m</option>
-                    <option value="15m" selected>15m</option>
-                    <option value="1h">1h</option>
-                    <option value="4h">4h</option>
-                    <option value="1d">1d</option>
-                </select>
+    <div id="top-bar">
+        <div class="controls-left">
+            <span>TF:</span>
+            <select id="timeframe" class="select-tf">
+                <option value="5m">5 Minutos</option>
+                <option value="15m" selected>15 Minutos</option>
+                <option value="1h">1 Hora</option>
+                <option value="4h">4 Horas</option>
+                <option value="1d">1 Diario</option>
+            </select>
+            
+            <!-- Pestaña / Menú de Indicadores -->
+            <div class="dropdown" id="dropdown-indicators">
+                <button class="btn-toggle" style="background-color: #1e222d; border: 1px solid #363c4e;">📊 Indicadores ▾</button>
+                <div class="dropdown-content">
+                    <label><input type="checkbox" id="chk-supertrend" checked> Supertrend (10, 3)</label>
+                    <label><input type="checkbox" id="chk-vsa-lines" checked> S/R Ballenas VSA</label>
+                    <label><input type="checkbox" id="chk-vsa-signals" checked> Señales BUY/SELL</label>
+                </div>
             </div>
-            <div>
-                <label>Período Vol: </label>
-                <input type="number" id="periodoVol" value="20" min="5" max="200" style="width: 60px;">
-            </div>
-            <div>
-                <label>Factor VSA: </label>
-                <input type="number" id="factorVol" value="1.5" step="0.1" min="1.0" max="5.0" style="width: 60px;">
-            </div>
-            <div>
-                <label><input type="checkbox" id="vsaLinesCheck" checked> Mostrar Líneas VSA</label>
-            </div>
-        </div>
-        <div id="status">Conectando...</div>
-    </header>
 
-    <div class="main-container">
-        <div id="chartContainer">
-            <canvas id="overlayCanvas"></canvas>
+            <div id="status" class="status-badge">Conectado ✓</div>
         </div>
+
+        <div class="controls-right">
+            <button id="btn-vsa" class="btn-toggle">S/R Ballenas VSA</button>
+            <button id="btn-signals" class="btn-toggle">Señales BUY/SELL</button>
+            <button id="btn-supertrend" class="btn-toggle">Supertrend</button>
+            <button id="btn-panel" class="btn-toggle">Dashboard MTF</button>
+        </div>
+    </div>
+
+    <div id="main-container">
+        <div id="chart-wrapper">
+            <div id="chart"></div>
+            <canvas id="labels-overlay"></canvas>
+        </div>
+
         <div id="dashboard">
-            <h3>Visión MTF VSA</h3>
-            <table class="mtf-table">
-                <thead>
-                    <tr>
-                        <th>TF</th>
-                        <th>Estado Vol</th>
-                        <th>VSA</th>
-                    </tr>
-                </thead>
-                <tbody id="mtfTableBody">
-                    <!-- Filas dinámicas -->
-                </tbody>
-            </table>
+            <div id="panel-vsa-mtf" class="vsa-table-container">
+                <table class="vsa-table">
+                    <thead>
+                        <tr>
+                            <th>Timeframe</th>
+                            <th>Señal VSA</th>
+                            <th>Vol. Transado</th>
+                            <th>% Compra</th>
+                            <th>% Venta</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr id="row-5m"><td>5 Minutos</td><td style="text-align: center;"><span class="badge-neu">NEUTRAL</span></td><td>--</td><td class="txt-green">--</td><td class="txt-red">--</td></tr>
+                        <tr id="row-15m"><td>15 Minutos</td><td style="text-align: center;"><span class="badge-neu">NEUTRAL</span></td><td>--</td><td class="txt-green">--</td><td class="txt-red">--</td></tr>
+                        <tr id="row-1h"><td>1 Hora</td><td style="text-align: center;"><span class="badge-neu">NEUTRAL</span></td><td>--</td><td class="txt-green">--</td><td class="txt-red">--</td></tr>
+                        <tr id="row-4h"><td>4 Horas</td><td style="text-align: center;"><span class="badge-neu">NEUTRAL</span></td><td>--</td><td class="txt-green">--</td><td class="txt-red">--</td></tr>
+                        <tr id="row-1d"><td>1 Diario</td><td style="text-align: center;"><span class="badge-neu">NEUTRAL</span></td><td>--</td><td class="txt-green">--</td><td class="txt-red">--</td></tr>
+                        <tr id="row-1w"><td>1 Semana</td><td style="text-align: center;"><span class="badge-neu">NEUTRAL</span></td><td>--</td><td class="txt-green">--</td><td class="txt-red">--</td></tr>
+                        <tr id="row-1m"><td>1 Mes</td><td style="text-align: center;"><span class="badge-neu">NEUTRAL</span></td><td>--</td><td class="txt-green">--</td><td class="txt-red">--</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="config-box">
+                <div class="config-row">
+                    <span style="color:#787b86; font-weight:bold;">CONFIGURACIÓN VSA</span>
+                </div>
+                <div class="config-row">
+                    <span>Período Prom. Vol:</span>
+                    <input type="number" id="input-period" class="config-input" value="20">
+                </div>
+                <div class="config-row">
+                    <span>Mult. Vol Ballena:</span>
+                    <input type="number" id="input-factor" class="config-input" value="1.8" step="0.1">
+                </div>
+            </div>
         </div>
     </div>
 
     <script>
-        // --- Variables de Estado Global ---
-        let chart = null;
-        let candlestickSeries = null;
-        let ws = null;
-        
+    document.addEventListener("DOMContentLoaded", function () {
+        let showVsaLines = true;
+        let showVsaSignals = true;
+        let showSupertrend = true;
+
+        let periodoVol = 20;
+        let factorVol = 1.8;
+
         let currentCandleData = [];
         let mtfVsaCache = {};
         let vsaLinesToDraw = [];
-        
-        let isDrawingPending = false;
+        let ws = null;
 
-        // --- Elementos del DOM ---
-        const chartContainer = document.getElementById('chartContainer');
-        const overlay = document.getElementById('overlayCanvas');
-        const ctx = overlay.getContext('2d');
-        const statusEl = document.getElementById('status');
-        const timeframeSelect = document.getElementById('timeframeSelect');
-        const periodoVolInput = document.getElementById('periodoVol');
-        const factorVolInput = document.getElementById('factorVol');
-        const vsaLinesCheck = document.getElementById('vsaLinesCheck');
+        const statusEl = document.getElementById("status");
+        const timeframeSelect = document.getElementById("timeframe");
+        const chartContainer = document.getElementById("chart");
+        const overlay = document.getElementById("labels-overlay");
+        const ctx = overlay.getContext("2d");
 
-        // --- Inicialización del Gráfico ---
-        function initChart() {
-            chart = LightweightCharts.createChart(chartContainer, {
-                width: chartContainer.clientWidth,
-                height: chartContainer.clientHeight,
-                layout: {
-                    backgroundColor: '#12141d',
-                    textColor: '#d1d4dc',
-                },
-                grid: {
-                    vertLines: { color: '#1f2430' },
-                    horzLines: { color: '#1f2430' },
-                },
-                crosshair: {
-                    mode: LightweightCharts.CrosshairMode.Normal,
-                },
-                priceScale: {
-                    borderColor: '#2a2e39',
-                },
-                timeScale: {
-                    borderColor: '#2a2e39',
-                    timeVisible: true,
-                },
-            });
+        const btnVsa = document.getElementById("btn-vsa");
+        const btnSignals = document.getElementById("btn-signals");
+        const btnSupertrend = document.getElementById("btn-supertrend");
+        const btnPanel = document.getElementById("btn-panel");
 
-            candlestickSeries = chart.addCandlestickSeries({
-                upColor: '#26a69a',
-                downColor: '#ef5350',
-                borderVisible: false,
-                wickUpColor: '#26a69a',
-                wickDownColor: '#ef5350',
-            });
+        const chkSupertrend = document.getElementById("chk-supertrend");
+        const chkVsaLines = document.getElementById("chk-vsa-lines");
+        const chkVsaSignals = document.getElementById("chk-vsa-signals");
 
-            // Reajustar overlay con movimiento del gráfico
-            chart.timeScale().subscribeVisibleLogicalRangeChange(() => drawOverlay());
-            
-            window.addEventListener('resize', () => {
-                chart.applyOptions({
-                    width: chartContainer.clientWidth,
-                    height: chartContainer.clientHeight
-                });
-                resizeCanvas();
-            });
+        const inputPeriod = document.getElementById("input-period");
+        const inputFactor = document.getElementById("input-factor");
 
-            resizeCanvas();
-        }
+        const chart = LightweightCharts.createChart(chartContainer, {
+            width: chartContainer.clientWidth,
+            height: chartContainer.clientHeight,
+            layout: { background: { type: 'solid', color: '#000000' }, textColor: '#d1d4dc' },
+            grid: { vertLines: { color: '#161923' }, horzLines: { color: '#161923' } },
+            timeScale: { borderColor: '#2a2e39', timeVisible: true, secondsVisible: false, rightOffset: 15 },
+            rightPriceScale: { borderColor: '#2a2e39', autoScale: true }
+        });
 
-        // --- Manejo del Canvas Overlay Retina/HiDPI ---
+        const candlestickSeries = chart.addCandlestickSeries({
+            upColor: '#089981', downColor: '#f23645', borderVisible: false, wickUpColor: '#089981', wickDownColor: '#f23645'
+        });
+
+        // Serie de Línea para el Supertrend
+        const supertrendSeries = chart.addLineSeries({
+            lineWidth: 2,
+            priceLineVisible: false,
+            lastValueVisible: true,
+            crosshairMarkerVisible: true
+        });
+
+        // Lógica del desplegable
+        const dropdown = document.getElementById("dropdown-indicators");
+        dropdown.querySelector("button").addEventListener("click", (e) => {
+            e.stopPropagation();
+            dropdown.classList.toggle("show");
+        });
+        document.addEventListener("click", () => dropdown.classList.remove("show"));
+
         function resizeCanvas() {
-            const dpr = window.devicePixelRatio || 1;
-            overlay.width = chartContainer.clientWidth * dpr;
-            overlay.height = chartContainer.clientHeight * dpr;
-            
-            overlay.style.width = chartContainer.clientWidth + 'px';
-            overlay.style.height = chartContainer.clientHeight + 'px';
-            
-            ctx.scale(dpr, dpr);
+            overlay.width = chartContainer.clientWidth;
+            overlay.height = chartContainer.clientHeight;
             drawOverlay();
         }
 
-        function drawOverlay() {
-            if (isDrawingPending) return;
+        const resizeObserver = new ResizeObserver(entries => {
+            if (!entries || entries.length === 0) return;
+            const { width, height } = entries[0].contentRect;
+            chart.applyOptions({ width, height });
+            resizeCanvas();
+        });
+        resizeObserver.observe(chartContainer);
 
-            isDrawingPending = true;
-            requestAnimationFrame(() => {
-                isDrawingPending = false;
+        chart.timeScale().subscribeVisibleLogicalRangeChange(() => drawOverlay());
+
+        // --- CÁLCULO SUPERTREND (ATR Period 10, Factor 3) ---
+        function calculateSupertrend(data, period = 10, multiplier = 3.0) {
+            if (!data || data.length < period) return [];
+
+            let stData = [];
+            let atr = [];
+
+            // 1. Calcular True Range (TR) y ATR
+            for (let i = 0; i < data.length; i++) {
+                const high = data[i].high;
+                const low = data[i].low;
+                const prevClose = i > 0 ? data[i - 1].close : data[i].open;
                 
-                ctx.clearRect(0, 0, overlay.width, overlay.height);
-                if (!vsaLinesCheck.checked || vsaLinesToDraw.length === 0 || currentCandleData.length === 0) return;
+                const tr = Math.max(high - low, Math.abs(high - prevClose), Math.abs(low - prevClose));
 
-                const timeScale = chart.timeScale();
-                
-                vsaLinesToDraw.forEach(line => {
-                    const x = timeScale.timeToCoordinate(line.time);
-                    const yHigh = candlestickSeries.priceToCoordinate(line.high);
-                    const yLow = candlestickSeries.priceToCoordinate(line.low);
-
-                    if (x !== null && x >= 0 && x <= chartContainer.clientWidth) {
-                        ctx.strokeStyle = line.color || 'rgba(156, 39, 176, 0.6)';
-                        ctx.lineWidth = 1;
-                        ctx.setLineDash([4, 4]);
-
-                        // Dibujar Línea de Alto VSA
-                        if (yHigh !== null) {
-                            ctx.beginPath();
-                            ctx.moveTo(x, yHigh);
-                            ctx.lineTo(chartContainer.clientWidth, yHigh);
-                            ctx.stroke();
-                        }
-
-                        // Dibujar Línea de Bajo VSA
-                        if (yLow !== null) {
-                            ctx.beginPath();
-                            ctx.moveTo(x, yLow);
-                            ctx.lineTo(chartContainer.clientWidth, yLow);
-                            ctx.stroke();
-                        }
-                    }
-                });
-            });
-        }
-
-        // --- Algoritmo Integrado VSA (Volume Spread Analysis) ---
-        function analyzeVSAData(candles, period, factor, isMTF = false) {
-            if (!candles || candles.length < period) return { lastState: 'Normal', lines: [] };
-
-            let lines = [];
-            let lastState = 'Normal';
-
-            for (let i = period; i < candles.length; i++) {
-                const slice = candles.slice(i - period, i);
-                const avgVol = slice.reduce((acc, c) => acc + c.volume, 0) / period;
-                const current = candles[i];
-
-                const isUltraHigh = current.volume >= avgVol * factor * 1.5;
-                const isHigh = current.volume >= avgVol * factor;
-
-                if (isUltraHigh) {
-                    lastState = 'Ultra Alto';
-                    if (!isMTF) lines.push({ time: current.time, high: current.high, low: current.low, color: '#9c27b0' });
-                } else if (isHigh) {
-                    if (lastState !== 'Ultra Alto') lastState = 'Alto';
-                    if (!isMTF) lines.push({ time: current.time, high: current.high, low: current.low, color: '#2196f3' });
+                if (i === 0) {
+                    atr.push(tr);
+                } else if (i < period) {
+                    let sum = atr.reduce((a, b) => a + b, 0) + tr;
+                    atr.push(sum / (i + 1));
+                } else {
+                    atr.push((atr[i - 1] * (period - 1) + tr) / period);
                 }
             }
 
-            return { lastState, lines };
+            // 2. Calcular Supertrend
+            let prevUpperBand = 0, prevLowerBand = 0, prevSupertrend = 0;
+            let prevTrend = 1; // 1: Alcista, -1: Bajista
+
+            for (let i = 0; i < data.length; i++) {
+                const hl2 = (data[i].high + data[i].low) / 2;
+                const currentAtr = atr[i];
+
+                let basicUpperBand = hl2 + (multiplier * currentAtr);
+                let basicLowerBand = hl2 - (multiplier * currentAtr);
+
+                let upperBand = (basicUpperBand < prevUpperBand || (i > 0 && data[i - 1].close > prevUpperBand)) ? basicUpperBand : prevUpperBand;
+                let lowerBand = (basicLowerBand > prevLowerBand || (i > 0 && data[i - 1].close < prevLowerBand)) ? basicLowerBand : prevLowerBand;
+
+                let trend = prevTrend;
+                let supertrend = 0;
+
+                if (i === 0) {
+                    trend = 1;
+                    supertrend = lowerBand;
+                } else {
+                    if (prevTrend === 1) {
+                        trend = data[i].close < lowerBand ? -1 : 1;
+                    } else {
+                        trend = data[i].close > upperBand ? 1 : -1;
+                    }
+
+                    supertrend = trend === 1 ? lowerBand : upperBand;
+                }
+
+                stData.push({
+                    time: data[i].time,
+                    value: supertrend,
+                    color: trend === 1 ? '#00e676' : '#ff1744'
+                });
+
+                prevUpperBand = upperBand;
+                prevLowerBand = lowerBand;
+                prevTrend = trend;
+                prevSupertrend = supertrend;
+            }
+
+            return stData;
         }
 
-        // --- Carga de Datos MTF en Paralelo ---
+        function analyzeVSAData(candles, period, factor, isMTF = false) {
+            if (!candles || candles.length < period + 1) return { events: [], lastSupport: null, lastResistance: null, lastState: null };
+
+            const targetCandles = isMTF ? candles.slice(0, -1) : candles;
+
+            let events = [];
+            let lastSupport = null;
+            let lastResistance = null;
+            let lastState = null;
+
+            for (let i = period; i < targetCandles.length; i++) {
+                let sumVol = 0;
+                for (let j = i - period; j < i; j++) {
+                    sumVol += targetCandles[j].volume;
+                }
+                const avgVol = sumVol / period;
+                const candle = targetCandles[i];
+
+                const range = candle.high - candle.low;
+                const effVol = (candle.volume === 0 || isNaN(candle.volume)) ? 1.0 : candle.volume;
+                const isWhale = effVol > (avgVol * factor);
+
+                const volBuy = range === 0 ? effVol / 2 : effVol * ((candle.close - candle.low) / range);
+                const volSell = effVol - volBuy;
+                const deltaNet = volBuy - volSell;
+
+                const mInf = Math.min(candle.open, candle.close) - candle.low;
+                const mSup = candle.high - Math.max(candle.open, candle.close);
+
+                const isBuy = isWhale && (deltaNet > 0 || mInf > (range * 0.35));
+                const isSell = isWhale && (deltaNet < 0 || mSup > (range * 0.35));
+
+                if (isBuy) {
+                    const ev = { index: i, time: candle.time, type: 'BUY', price: candle.low, vol: effVol };
+                    events.push(ev);
+                    lastSupport = ev;
+                } else if (isSell) {
+                    const ev = { index: i, time: candle.time, type: 'SELL', price: candle.high, vol: effVol };
+                    events.push(ev);
+                    lastResistance = ev;
+                }
+
+                if (i === targetCandles.length - 1) {
+                    const lastEvent = events.length > 0 ? events[events.length - 1] : null;
+                    lastState = {
+                        isBuy: lastEvent ? lastEvent.type === 'BUY' : false,
+                        isSell: lastEvent ? lastEvent.type === 'SELL' : false,
+                        volume: effVol,
+                        pctBuy: ((volBuy / effVol) * 100).toFixed(1),
+                        pctSell: ((volSell / effVol) * 100).toFixed(1)
+                    };
+                }
+            }
+
+            return { events, lastSupport, lastResistance, lastState };
+        }
+
+        function formatVol(val) {
+            if (!val || isNaN(val)) return "--";
+            if (val >= 1000000) return (val / 1000000).toFixed(2) + "M";
+            if (val >= 1000) return (val / 1000).toFixed(2) + "K";
+            return val.toFixed(2);
+        }
+
         async function loadMTFData() {
-            const tfs = ['5m', '15m', '1h', '4h', '1d'];
+            const tfs = ['5m', '15m', '1h', '4h', '1d', '1w', '1m'];
             const currentTF = timeframeSelect.value;
-            const periodoVol = parseInt(periodoVolInput.value, 10);
-            const factorVol = parseFloat(factorVolInput.value);
 
-            // Fetch en paralelo con Promise.all
-            const requests = tfs.map(tf => 
-                fetch(`https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=${tf}&limit=500`)
-                    .then(res => res.json())
-                    .then(data => ({ tf, data }))
-                    .catch(err => {
-                        console.error(`Error procesando temporalidad (${tf}):`, err);
-                        return null;
-                    })
-            );
+            for (const tf of tfs) {
+                try {
+                    const res = await fetch(`https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=${tf}&limit=1000`);
+                    const data = await res.json();
+                    const candles = data.map(d => ({
+                        time: Math.floor(d[0] / 1000),
+                        open: parseFloat(d[1]), high: parseFloat(d[2]), low: parseFloat(d[3]), close: parseFloat(d[4]), volume: parseFloat(d[5])
+                    }));
 
-            const results = await Promise.all(requests);
-            vsaLinesToDraw = [];
-
-            results.forEach(item => {
-                if (!item) return;
-                const { tf, data } = item;
-                const candles = data.map(d => ({
-                    time: Math.floor(d[0] / 1000),
-                    open: parseFloat(d[1]), 
-                    high: parseFloat(d[2]), 
-                    low: parseFloat(d[3]), 
-                    close: parseFloat(d[4]), 
-                    volume: parseFloat(d[5])
-                }));
-
-                const isCurrent = (tf === currentTF);
-                
-                if (isCurrent) {
-                    currentCandleData = candles;
-                    candlestickSeries.setData(candles);
+                    const isMTF = (tf !== currentTF);
+                    const analysis = analyzeVSAData(candles, periodoVol, factorVol, isMTF);
+                    mtfVsaCache[tf] = analysis;
+                    updateDashboardRow(tf, analysis.lastState);
+                } catch(e) {
+                    console.error("Error cargando MTF:", tf, e);
                 }
-
-                const analysis = analyzeVSAData(candles, periodoVol, factorVol, !isCurrent);
-                mtfVsaCache[tf] = analysis;
-
-                if (isCurrent) {
-                    vsaLinesToDraw = analysis.lines;
-                }
-
-                updateDashboardRow(tf, analysis.lastState);
-            });
-
-            drawOverlay();
+            }
+            renderVSAChartElements();
         }
 
         function updateDashboardRow(tf, state) {
-            let row = document.getElementById(`row-${tf}`);
-            const tbody = document.getElementById('mtfTableBody');
+            const row = document.getElementById(`row-${tf}`);
+            if (!row || !state) return;
 
-            if (!row) {
-                row = document.createElement('tr');
-                row.id = `row-${tf}`;
-                tbody.appendChild(row);
-            }
+            let badge = `<span class="badge-neu">NEUTRAL</span>`;
+            if (state.isBuy) badge = `<span class="badge-buy">BUY</span>`;
+            else if (state.isSell) badge = `<span class="badge-sell">SELL</span>`;
 
-            let badgeClass = 'badge-normal';
-            if (state === 'Ultra Alto') badgeClass = 'badge-ultra';
-            else if (state === 'Alto') badgeClass = 'badge-high';
-
-            row.innerHTML = `
-                <td><strong>${tf.toUpperCase()}</strong></td>
-                <td><span class="badge ${badgeClass}">${state}</span></td>
-                <td>${state !== 'Normal' ? 'Alerta VSA' : 'Neutro'}</td>
-            `;
+            row.cells[1].innerHTML = badge;
+            row.cells[2].innerText = formatVol(state.volume);
+            row.cells[3].innerText = `${state.pctBuy}%`;
+            row.cells[4].innerText = `${state.pctSell}%`;
         }
 
-        // --- Conexión WebSocket Robusta con Auto-Reconexión ---
-        function connectWebSocket(interval) {
-            if (ws) {
-                ws.onclose = null; // Evitar callbacks duplicados
-                ws.close();
+        function drawOverlay() {
+            ctx.clearRect(0, 0, overlay.width, overlay.height);
+            if (!showVsaLines || vsaLinesToDraw.length === 0 || currentCandleData.length === 0) return;
+
+            const timeScale = chart.timeScale();
+            const lastCandle = currentCandleData[currentCandleData.length - 1];
+            
+            let lastCandleX = timeScale.timeToCoordinate(lastCandle.time);
+            if (lastCandleX === null) {
+                lastCandleX = overlay.width - 65;
             }
 
+            let drawableItems = [];
+
+            vsaLinesToDraw.forEach(item => {
+                const y = candlestickSeries.priceToCoordinate(item.price);
+                if (y !== null && y >= 0 && y <= overlay.height) {
+                    let startX = 0;
+                    if (item.startTime) {
+                        const coordX = timeScale.timeToCoordinate(item.startTime);
+                        if (coordX !== null) startX = Math.max(0, coordX);
+                    }
+                    drawableItems.push({
+                        ...item,
+                        y: y,
+                        labelY: y,
+                        startX: startX,
+                        endX: lastCandleX
+                    });
+                }
+            });
+
+            drawableItems.sort((a, b) => a.y - b.y);
+
+            const minPadding = 16;
+            for (let i = 1; i < drawableItems.length; i++) {
+                let prev = drawableItems[i - 1];
+                let curr = drawableItems[i];
+                if (curr.labelY - prev.labelY < minPadding) {
+                    curr.labelY = prev.labelY + minPadding;
+                }
+            }
+
+            drawableItems.forEach(item => {
+                ctx.strokeStyle = item.color;
+                ctx.lineWidth = item.lineWidth || 2.5;
+                ctx.beginPath();
+
+                if (item.style === 'dashed') {
+                    ctx.setLineDash([6, 4]);
+                } else {
+                    ctx.setLineDash([]);
+                }
+
+                ctx.moveTo(item.startX, item.y);
+                ctx.lineTo(item.endX, item.y);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                ctx.font = "bold 10px -apple-system, BlinkMacSystemFont, Roboto, sans-serif";
+                const textMetrics = ctx.measureText(item.title);
+                const padX = 5;
+                const rectW = textMetrics.width + (padX * 2);
+                const rectH = 15;
+                
+                const rectX = item.endX + 18; 
+                const rectY = item.labelY - (rectH / 2);
+
+                ctx.fillStyle = item.color;
+                ctx.beginPath();
+                ctx.roundRect(rectX, rectY, rectW, rectH, 3);
+                ctx.fill();
+
+                ctx.fillStyle = "#000000";
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.fillText(item.title, rectX + (rectW / 2), item.labelY + 0.5);
+            });
+        }
+
+        function renderVSAChartElements() {
+            if (currentCandleData.length < periodoVol) return;
+
+            // Renderizar / Actualizar Supertrend
+            if (showSupertrend) {
+                const stValues = calculateSupertrend(currentCandleData, 10, 3.0);
+                supertrendSeries.setData(stValues);
+            } else {
+                supertrendSeries.setData([]);
+            }
+
+            const currentAnalysis = analyzeVSAData(currentCandleData, periodoVol, factorVol, false);
+            
+            if (showVsaSignals) {
+                const markers = currentAnalysis.events.map(e => ({
+                    time: e.time,
+                    position: e.type === 'BUY' ? 'belowBar' : 'aboveBar',
+                    color: e.type === 'BUY' ? '#00e676' : '#ff1744',
+                    shape: e.type === 'BUY' ? 'arrowUp' : 'arrowDown',
+                    text: e.type
+                }));
+                candlestickSeries.setMarkers(markers);
+            } else {
+                candlestickSeries.setMarkers([]);
+            }
+
+            if (showVsaLines) {
+                const levels = [];
+
+                if (currentAnalysis.lastSupport) {
+                    levels.push({
+                        price: currentAnalysis.lastSupport.price,
+                        title: 'Sop Chart',
+                        color: '#00b0ff',
+                        style: 'solid',
+                        lineWidth: 2.5,
+                        startTime: currentAnalysis.lastSupport.time
+                    });
+                }
+                if (currentAnalysis.lastResistance) {
+                    levels.push({
+                        price: currentAnalysis.lastResistance.price,
+                        title: 'Res Chart',
+                        color: '#ff5252',
+                        style: 'solid',
+                        lineWidth: 2.5,
+                        startTime: currentAnalysis.lastResistance.time
+                    });
+                }
+
+                const mtfLevels = [
+                    { tf: '5m', label: '5m', colorS: '#00e5ff', colorR: '#ff4081', style: 'dashed', lineWidth: 2.0 },
+                    { tf: '15m', label: '15m', colorS: '#00b0ff', colorR: '#ff5252', style: 'dashed', lineWidth: 2.2 },
+                    { tf: '1h', label: '1H', colorS: '#2962ff', colorR: '#d32f2f', style: 'solid', lineWidth: 2.5 },
+                    { tf: '4h', label: '4H', colorS: '#a142f4', colorR: '#e040fb', style: 'solid', lineWidth: 3.0 },
+                    { tf: '1d', label: '1D', colorS: '#e6a100', colorR: '#ff9100', style: 'solid', lineWidth: 3.5 }
+                ];
+
+                mtfLevels.forEach(m => {
+                    const cache = mtfVsaCache[m.tf];
+                    if (cache) {
+                        if (cache.lastSupport) {
+                            levels.push({
+                                price: cache.lastSupport.price,
+                                title: `Sop ${m.label}`,
+                                color: m.colorS,
+                                style: m.style,
+                                lineWidth: m.lineWidth,
+                                startTime: cache.lastSupport.time
+                            });
+                        }
+                        if (cache.lastResistance) {
+                            levels.push({
+                                price: cache.lastResistance.price,
+                                title: `Res ${m.label}`,
+                                color: m.colorR,
+                                style: m.style,
+                                lineWidth: m.lineWidth,
+                                startTime: cache.lastResistance.time
+                            });
+                        }
+                    }
+                });
+
+                vsaLinesToDraw = levels;
+            } else {
+                vsaLinesToDraw = [];
+            }
+
+            drawOverlay();
+        }
+
+        async function fetchKlines(interval = "15m") {
+            statusEl.innerText = "Cargando...";
+            statusEl.style.color = "#ffd700";
+
+            if (ws) ws.close();
+
+            try {
+                const res = await fetch(`https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=${interval}&limit=1000`);
+                const data = await res.json();
+                
+                currentCandleData = data.map(d => ({
+                    time: Math.floor(d[0] / 1000),
+                    open: parseFloat(d[1]), high: parseFloat(d[2]), low: parseFloat(d[3]), close: parseFloat(d[4]), volume: parseFloat(d[5])
+                }));
+
+                candlestickSeries.setData(currentCandleData);
+                await loadMTFData();
+                connectWebSocket(interval);
+            } catch (err) {
+                statusEl.innerText = "Error API";
+                statusEl.style.color = "#ff1744";
+            }
+        }
+
+        function connectWebSocket(interval = "15m") {
             ws = new WebSocket(`wss://stream.binance.com:9443/ws/btcusdt@kline_${interval}`);
 
             ws.onopen = () => {
@@ -411,11 +734,7 @@
 
                 const candle = {
                     time: Math.floor(k.t / 1000),
-                    open: parseFloat(k.o), 
-                    high: parseFloat(k.h), 
-                    low: parseFloat(k.l), 
-                    close: parseFloat(k.c), 
-                    volume: parseFloat(k.v)
+                    open: parseFloat(k.o), high: parseFloat(k.h), low: parseFloat(k.l), close: parseFloat(k.c), volume: parseFloat(k.v)
                 };
 
                 candlestickSeries.update(candle);
@@ -427,38 +746,54 @@
                     currentCandleData.push(candle);
                 }
 
-                drawOverlay();
-            };
-
-            ws.onerror = () => {
-                statusEl.innerText = "Error WS";
-                statusEl.style.color = "#ff1744";
-            };
-
-            ws.onclose = () => {
-                statusEl.innerText = "Reconectando...";
-                statusEl.style.color = "#ffd700";
-                setTimeout(() => connectWebSocket(interval), 3000);
+                renderVSAChartElements();
             };
         }
 
-        // --- Eventos y Controladores ---
-        timeframeSelect.addEventListener('change', () => {
-            const tf = timeframeSelect.value;
-            loadMTFData();
-            connectWebSocket(tf);
+        // Manejo de Estados e Interacciones de Botones/Checkboxes
+        function toggleVsaLines(state) {
+            showVsaLines = state;
+            btnVsa.className = showVsaLines ? "btn-toggle" : "btn-toggle inactive";
+            chkVsaLines.checked = showVsaLines;
+            renderVSAChartElements();
+        }
+
+        function toggleVsaSignals(state) {
+            showVsaSignals = state;
+            btnSignals.className = showVsaSignals ? "btn-toggle" : "btn-toggle inactive";
+            chkVsaSignals.checked = showVsaSignals;
+            renderVSAChartElements();
+        }
+
+        function toggleSupertrend(state) {
+            showSupertrend = state;
+            btnSupertrend.className = showSupertrend ? "btn-toggle" : "btn-toggle inactive";
+            chkSupertrend.checked = showSupertrend;
+            renderVSAChartElements();
+        }
+
+        btnVsa.addEventListener("click", () => toggleVsaLines(!showVsaLines));
+        chkVsaLines.addEventListener("change", (e) => toggleVsaLines(e.target.checked));
+
+        btnSignals.addEventListener("click", () => toggleVsaSignals(!showVsaSignals));
+        chkVsaSignals.addEventListener("change", (e) => toggleVsaSignals(e.target.checked));
+
+        btnSupertrend.addEventListener("click", () => toggleSupertrend(!showSupertrend));
+        chkSupertrend.addEventListener("change", (e) => toggleSupertrend(e.target.checked));
+
+        btnPanel.addEventListener("click", () => {
+            const panel = document.getElementById("panel-vsa-mtf");
+            const isHidden = panel.style.display === "none";
+            panel.style.display = isHidden ? "block" : "none";
+            btnPanel.className = isHidden ? "btn-toggle" : "btn-toggle inactive";
         });
 
-        periodoVolInput.addEventListener('change', loadMTFData);
-        factorVolInput.addEventListener('change', loadMTFData);
-        vsaLinesCheck.addEventListener('change', drawOverlay);
+        timeframeSelect.addEventListener("change", (e) => fetchKlines(e.target.value));
+        inputPeriod.addEventListener("change", (e) => { periodoVol = parseInt(e.target.value) || 20; loadMTFData(); });
+        inputFactor.addEventListener("change", (e) => { factorVol = parseFloat(e.target.value) || 1.8; loadMTFData(); });
 
-        // --- Inicialización General ---
-        window.onload = () => {
-            initChart();
-            loadMTFData();
-            connectWebSocket(timeframeSelect.value);
-        };
+        fetchKlines("15m");
+    });
     </script>
 </body>
 </html>
