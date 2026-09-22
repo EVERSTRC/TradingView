@@ -430,11 +430,11 @@
 
             drawableItems.forEach(item => {
                 ctx.strokeStyle = item.color;
-                ctx.lineWidth = item.lineWidth || 1.5;
+                ctx.lineWidth = item.lineWidth || 2.5; // Grosor por defecto elevado
                 ctx.beginPath();
 
                 if (item.style === 'dashed') {
-                    ctx.setLineDash([4, 4]);
+                    ctx.setLineDash([6, 4]);
                 } else {
                     ctx.setLineDash([]);
                 }
@@ -492,7 +492,7 @@
                         title: 'Sop Chart',
                         color: '#00b0ff',
                         style: 'solid',
-                        lineWidth: 1.5,
+                        lineWidth: 2.5,
                         startTime: currentAnalysis.lastSupport.time
                     });
                 }
@@ -502,17 +502,18 @@
                         title: 'Res Chart',
                         color: '#ff5252',
                         style: 'solid',
-                        lineWidth: 1.5,
+                        lineWidth: 2.5,
                         startTime: currentAnalysis.lastResistance.time
                     });
                 }
 
+                // Incrementamos los valores de lineWidth para dar más grosor
                 const mtfLevels = [
-                    { tf: '5m', label: '5m', colorS: '#00e5ff', colorR: '#ff4081', style: 'dashed', lineWidth: 1.0 },
-                    { tf: '15m', label: '15m', colorS: '#00b0ff', colorR: '#ff5252', style: 'dashed', lineWidth: 1.2 },
-                    { tf: '1h', label: '1H', colorS: '#2962ff', colorR: '#d32f2f', style: 'solid', lineWidth: 1.5 },
-                    { tf: '4h', label: '4H', colorS: '#a142f4', colorR: '#e040fb', style: 'solid', lineWidth: 1.8 },
-                    { tf: '1d', label: '1D', colorS: '#e6a100', colorR: '#ff9100', style: 'solid', lineWidth: 2.5 }
+                    { tf: '5m', label: '5m', colorS: '#00e5ff', colorR: '#ff4081', style: 'dashed', lineWidth: 2.0 },
+                    { tf: '15m', label: '15m', colorS: '#00b0ff', colorR: '#ff5252', style: 'dashed', lineWidth: 2.2 },
+                    { tf: '1h', label: '1H', colorS: '#2962ff', colorR: '#d32f2f', style: 'solid', lineWidth: 2.5 },
+                    { tf: '4h', label: '4H', colorS: '#a142f4', colorR: '#e040fb', style: 'solid', lineWidth: 3.0 },
+                    { tf: '1d', label: '1D', colorS: '#e6a100', colorR: '#ff9100', style: 'solid', lineWidth: 3.5 }
                 ];
 
                 mtfLevels.forEach(m => {
