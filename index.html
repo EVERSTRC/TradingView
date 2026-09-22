@@ -381,9 +381,14 @@
             if (!showVsaLines || vsaLinesToDraw.length === 0 || currentCandleData.length === 0) return;
 
             const timeScale = chart.timeScale();
-            const width = overlay.width;
+            const lastCandle = currentCandleData[currentCandleData.length - 1];
+            
+            // Determinar la posición X de la última vela actual para detener la línea exactamente ahí
+            let lastCandleX = timeScale.timeToCoordinate(lastCandle.time);
+            if (lastCandleX === null) {
+                lastCandleX = overlay.width - 65;
+            }
 
-            let rawList = [];
             vsaLinesToDraw.forEach(item => {
                 const y = candlestickSeries.priceToCoordinate(item.price);
                 if (y !== null && y >= 0 && y <= overlay.height) {
@@ -392,73 +397,46 @@
                         const coordX = timeScale.timeToCoordinate(item.startTime);
                         if (coordX !== null) startX = Math.max(0, coordX);
                     }
-                    rawList.push({ ...item, y, startX });
-                }
-            });
 
-            // Agrupar etiquetas cercanas para fusionar texto (Ej. "Sop 15m Sop 1H Sop 4H")
-            let grouped = [];
-            rawList.sort((a, b) => a.y - b.y);
+                    const endX = lastCandleX;
 
-            rawList.forEach(item => {
-                let match = grouped.find(g => Math.abs(g.y - item.y) < 6);
-                if (match) {
-                    if (!match.titles.includes(item.title)) {
-                        match.titles.push(item.title);
+                    // Dibujar Línea Horizontal
+                    ctx.strokeStyle = item.color;
+                    ctx.lineWidth = item.lineWidth || 1.5;
+                    ctx.beginPath();
+
+                    if (item.style === 'dashed') {
+                        ctx.setLineDash([4, 4]);
+                    } else {
+                        ctx.setLineDash([]);
                     }
-                    match.startX = Math.min(match.startX, item.startX);
-                } else {
-                    grouped.push({
-                        price: item.price,
-                        titles: [item.title],
-                        color: item.color,
-                        style: item.style || 'solid',
-                        lineWidth: item.lineWidth || 1.5,
-                        y: item.y,
-                        startX: item.startX
-                    });
-                }
-            });
 
-            grouped.forEach(item => {
-                const lineX2 = width - 65;
-                const titleStr = item.titles.join(" ");
-
-                ctx.strokeStyle = item.color;
-                ctx.lineWidth = item.lineWidth;
-                ctx.beginPath();
-
-                if (item.style === 'dashed') {
-                    ctx.setLineDash([5, 5]);
-                } else {
+                    ctx.moveTo(startX, y);
+                    ctx.lineTo(endX, y);
+                    ctx.stroke();
                     ctx.setLineDash([]);
+
+                    // Dibujar Etiqueta flotante justo al término de la línea (sobre las velas)
+                    ctx.font = "bold 10px -apple-system, BlinkMacSystemFont, Roboto, sans-serif";
+                    const textMetrics = ctx.measureText(item.title);
+                    const padX = 5;
+                    const padY = 3;
+                    const rectW = textMetrics.width + (padX * 2);
+                    const rectH = 15;
+                    
+                    const rectX = endX + 4; 
+                    const rectY = y - (rectH / 2);
+
+                    ctx.fillStyle = item.color;
+                    ctx.beginPath();
+                    ctx.roundRect(rectX, rectY, rectW, rectH, 3);
+                    ctx.fill();
+
+                    ctx.fillStyle = "#000000";
+                    ctx.textAlign = "center";
+                    ctx.textBaseline = "middle";
+                    ctx.fillText(item.title, rectX + (rectW / 2), y + 0.5);
                 }
-
-                ctx.moveTo(item.startX, item.y);
-                ctx.lineTo(lineX2, item.y);
-                ctx.stroke();
-                ctx.setLineDash([]);
-
-                ctx.font = "11px -apple-system, BlinkMacSystemFont, Roboto, sans-serif";
-                const textMetrics = ctx.measureText(titleStr);
-                const padX = 6;
-                const padY = 3;
-                const rectW = textMetrics.width + (padX * 2);
-                const rectH = 16;
-                
-                const rectX = lineX2 - rectW - 20; 
-                const rectY = item.y - (rectH / 2);
-
-                ctx.fillStyle = item.color;
-                ctx.beginPath();
-                ctx.roundRect(rectX, rectY, rectW, rectH, 3);
-                ctx.fill();
-
-                ctx.fillStyle = "#000000";
-                ctx.textAlign = "center";
-                ctx.textBaseline = "middle";
-                ctx.font = "bold 10px -apple-system, BlinkMacSystemFont, Roboto, sans-serif";
-                ctx.fillText(titleStr, rectX + (rectW / 2), item.y + 0.5);
             });
         }
 
@@ -483,7 +461,7 @@
             if (showVsaLines) {
                 const levels = [];
 
-                // 1. Agregar nivel "Sop Chart / Res Chart" (Nivel directo del timeframe activo)
+                // 1. Nivel del gráfico actual (Sop/Res Chart)
                 if (currentAnalysis.events.length > 0) {
                     const lastChartEv = currentAnalysis.events[currentAnalysis.events.length - 1];
                     levels.push({
@@ -496,7 +474,7 @@
                     });
                 }
 
-                // 2. Agregar niveles Multi-Timeframe (15m, 1h, 4h, 1d)
+                // 2. Niveles Multi-Timeframe (15m, 1h, 4h, 1d)
                 const mtfLevels = [
                     { tf: '15m', label: '15m', colorS: '#00b0ff', colorR: '#ff5252', style: 'dashed', lineWidth: 1.2 },
                     { tf: '1h', label: '1H', colorS: '#2962ff', colorR: '#d32f2f', style: 'solid', lineWidth: 1.5 },
