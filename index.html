@@ -284,7 +284,6 @@
         function analyzeVSAData(candles, period, factor, isMTF = false) {
             if (!candles || candles.length < period + 1) return { events: [], lastSupport: null, lastResistance: null, lastState: null };
 
-            // Si es MTF, ignorar la vela en vivo no cerrada para replicar TradingView exactamente
             const targetCandles = isMTF ? candles.slice(0, -1) : candles;
 
             let events = [];
@@ -449,7 +448,8 @@
                 const rectW = textMetrics.width + (padX * 2);
                 const rectH = 15;
                 
-                const rectX = item.endX + 4; 
+                // Offset ajustado a 18px a la derecha para separación limpia respecto a las velas
+                const rectX = item.endX + 18; 
                 const rectY = item.labelY - (rectH / 2);
 
                 ctx.fillStyle = item.color;
