@@ -376,15 +376,23 @@
             row.cells[4].innerText = `${state.pctSell}%`;
         }
 
-        // RENDERIZADO COMPLETO EN CANVAS DE LÍNEAS HASTA EL BORDES Y ETIQUETAS FLOTANTES
+        // DIBUJA LÍNEAS HASTA 4 VELAS ANTES DE LA VELA ACTUAL
         function drawOverlay() {
             ctx.clearRect(0, 0, overlay.width, overlay.height);
-            if (!showVsaLines || vsaLinesToDraw.length === 0) return;
+            if (!showVsaLines || vsaLinesToDraw.length === 0 || currentCandleData.length === 0) return;
 
             const timeScale = chart.timeScale();
-            const rightEdgeX = overlay.width - 65; // Límite donde empieza el eje de precio derecho
+            
+            // Determinar la coordenada X correspondiente a 4 velas antes de la última vela
+            const targetIndex = Math.max(0, currentCandleData.length - 1 - 4);
+            const targetCandleTime = currentCandleData[targetIndex].time;
+            let endX = timeScale.timeToCoordinate(targetCandleTime);
 
-            // Agrupar elementos por Y para resolver superposiciones de etiquetas pegadas
+            // Fallback si no está visible
+            if (endX === null) {
+                endX = overlay.width - 120;
+            }
+
             let renderList = [];
 
             vsaLinesToDraw.forEach(item => {
@@ -396,21 +404,25 @@
                         if (coordX !== null) startX = Math.max(0, coordX);
                     }
 
-                    renderList.push({
-                        price: item.price,
-                        title: item.title,
-                        color: item.color,
-                        startX: startX,
-                        y: y,
-                        labelY: y
-                    });
+                    // Asegurar que startX no sea mayor que endX
+                    if (startX < endX) {
+                        renderList.push({
+                            price: item.price,
+                            title: item.title,
+                            color: item.color,
+                            startX: startX,
+                            endX: endX,
+                            y: y,
+                            labelY: y
+                        });
+                    }
                 }
             });
 
-            // Ordenar por coordenada Y
+            // Ordenar verticalmente
             renderList.sort((a, b) => a.y - b.y);
 
-            // Ajuste anti-solapamiento vertical de etiquetas cercanas
+            // Desplazar etiquetas solapadas
             const minSpace = 16;
             for (let i = 1; i < renderList.length; i++) {
                 if (renderList[i].labelY - renderList[i-1].labelY < minSpace) {
@@ -418,32 +430,30 @@
                 }
             }
 
-            // Dibujar Líneas + Etiquetas estilo TradingView
+            // Dibujar las líneas y etiquetas
             renderList.forEach(item => {
-                // 1. Línea horizontal desde la vela de origen hacia la derecha
+                // 1. Línea que finaliza 4 velas antes del precio
                 ctx.strokeStyle = item.color;
                 ctx.lineWidth = 1.5;
                 ctx.beginPath();
                 ctx.moveTo(item.startX, item.y);
-                ctx.lineTo(rightEdgeX, item.y);
+                ctx.lineTo(item.endX, item.y);
                 ctx.stroke();
 
-                // 2. Etiqueta Flotante
+                // 2. Etiqueta al final de la línea
                 ctx.font = "bold 10px sans-serif";
                 const textWidth = ctx.measureText(item.title).width;
-                const rectPadding = 6;
+                const rectPadding = 5;
                 const rectWidth = textWidth + rectPadding * 2;
-                const rectHeight = 16;
-                const rectX = rightEdgeX - rectWidth - 5;
+                const rectHeight = 15;
+                const rectX = item.endX - rectWidth;
                 const rectY = item.labelY - rectHeight / 2;
 
-                // Fondo redondeado de la etiqueta
                 ctx.fillStyle = item.color;
                 ctx.beginPath();
                 ctx.roundRect(rectX, rectY, rectWidth, rectHeight, 3);
                 ctx.fill();
 
-                // Texto
                 ctx.fillStyle = "#ffffff";
                 ctx.textAlign = "center";
                 ctx.textBaseline = "middle";
@@ -456,7 +466,6 @@
 
             const currentAnalysis = analyzeVSAData(currentCandleData, periodoVol, factorVol);
             
-            // 1. MARCADORES DE SEÑALES BUY / SELL EN VELAS
             if (showVsaSignals) {
                 const markers = currentAnalysis.events.map(e => ({
                     time: e.time,
@@ -470,7 +479,6 @@
                 candlestickSeries.setMarkers([]);
             }
 
-            // 2. RECOPILAR LÍNEAS S/R MTF + LOCALES
             if (showVsaLines) {
                 const levels = [];
 
@@ -492,7 +500,6 @@
                     }
                 });
 
-                // Últimos 3 eventos locales del marco de tiempo activo
                 currentAnalysis.events.slice(-3).forEach(ev => {
                     const title = `${ev.type === 'BUY' ? 'Sop' : 'Res'} 6bar15m`;
                     const color = ev.type === 'BUY' ? '#00b0ff' : '#ff5252';
