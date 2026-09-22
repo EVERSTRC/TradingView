@@ -166,8 +166,8 @@
         <div class="controls-left">
             <span>TF:</span>
             <select id="timeframe" class="select-tf">
-                <option value="15m">15 Minutos</option>
-                <option value="1h" selected>1 Hora</option>
+                <option value="15m" selected>15 Minutos</option>
+                <option value="1h">1 Hora</option>
                 <option value="4h">4 Horas</option>
                 <option value="1d">1 Diario</option>
             </select>
@@ -376,7 +376,6 @@
             row.cells[4].innerText = `${state.pctSell}%`;
         }
 
-        // DIBUJO DE LÍNEAS Y ETIQUETAS IDÉNTICAS A TRADINGVIEW
         function drawOverlay() {
             ctx.clearRect(0, 0, overlay.width, overlay.height);
             if (!showVsaLines || vsaLinesToDraw.length === 0 || currentCandleData.length === 0) return;
@@ -384,7 +383,6 @@
             const timeScale = chart.timeScale();
             const width = overlay.width;
 
-            // Agrupar niveles por precio cercano para combinar etiquetas (Ej: "Sop 1H Sop 4H")
             let rawList = [];
             vsaLinesToDraw.forEach(item => {
                 const y = candlestickSeries.priceToCoordinate(item.price);
@@ -398,7 +396,7 @@
                 }
             });
 
-            // Agrupar elementos visualmente adyacentes
+            // Agrupar etiquetas cercanas para fusionar texto (Ej. "Sop 15m Sop 1H Sop 4H")
             let grouped = [];
             rawList.sort((a, b) => a.y - b.y);
 
@@ -422,18 +420,16 @@
                 }
             });
 
-            // Renderizar cada nivel
             grouped.forEach(item => {
-                const lineX2 = width - 65; // Extender hasta cerca de la escala de precio
+                const lineX2 = width - 65;
                 const titleStr = item.titles.join(" ");
 
-                // Configurar Trazo de Línea (Punteado vs Sólido estilo TV)
                 ctx.strokeStyle = item.color;
                 ctx.lineWidth = item.lineWidth;
                 ctx.beginPath();
 
                 if (item.style === 'dashed') {
-                    ctx.setLineDash([6, 6]);
+                    ctx.setLineDash([5, 5]);
                 } else {
                     ctx.setLineDash([]);
                 }
@@ -441,9 +437,8 @@
                 ctx.moveTo(item.startX, item.y);
                 ctx.lineTo(lineX2, item.y);
                 ctx.stroke();
-                ctx.setLineDash([]); // Reset dash
+                ctx.setLineDash([]);
 
-                // Dibujar Etiqueta Encimada/Flotante (Estilo TradingView)
                 ctx.font = "11px -apple-system, BlinkMacSystemFont, Roboto, sans-serif";
                 const textMetrics = ctx.measureText(titleStr);
                 const padX = 6;
@@ -451,17 +446,14 @@
                 const rectW = textMetrics.width + (padX * 2);
                 const rectH = 16;
                 
-                // Ubicar etiqueta hacia la mitad/derecha de la línea
                 const rectX = lineX2 - rectW - 20; 
                 const rectY = item.y - (rectH / 2);
 
-                // Fondo de la etiqueta con curva estilo TradingView
                 ctx.fillStyle = item.color;
                 ctx.beginPath();
                 ctx.roundRect(rectX, rectY, rectW, rectH, 3);
                 ctx.fill();
 
-                // Texto dentro del badge
                 ctx.fillStyle = "#000000";
                 ctx.textAlign = "center";
                 ctx.textBaseline = "middle";
@@ -491,12 +483,25 @@
             if (showVsaLines) {
                 const levels = [];
 
-                // Configuración exacta de colores/estilos según TradingView
+                // 1. Agregar nivel "Sop Chart / Res Chart" (Nivel directo del timeframe activo)
+                if (currentAnalysis.events.length > 0) {
+                    const lastChartEv = currentAnalysis.events[currentAnalysis.events.length - 1];
+                    levels.push({
+                        price: lastChartEv.price,
+                        title: `${lastChartEv.type === 'BUY' ? 'Sop' : 'Res'} Chart`,
+                        color: lastChartEv.type === 'BUY' ? '#00b0ff' : '#ff5252',
+                        style: 'solid',
+                        lineWidth: 1.5,
+                        startTime: lastChartEv.time
+                    });
+                }
+
+                // 2. Agregar niveles Multi-Timeframe (15m, 1h, 4h, 1d)
                 const mtfLevels = [
-                    { tf: '1d', label: '1D', colorS: '#e6a100', colorR: '#e6a100', style: 'solid', lineWidth: 2.5 },
-                    { tf: '4h', label: '4H', colorS: '#a142f4', colorR: '#a142f4', style: 'solid', lineWidth: 1.5 },
+                    { tf: '15m', label: '15m', colorS: '#00b0ff', colorR: '#ff5252', style: 'dashed', lineWidth: 1.2 },
                     { tf: '1h', label: '1H', colorS: '#2962ff', colorR: '#d32f2f', style: 'solid', lineWidth: 1.5 },
-                    { tf: '15m', label: '15m', colorS: '#00b0ff', colorR: '#ff5252', style: 'dashed', lineWidth: 1.0 }
+                    { tf: '4h', label: '4H', colorS: '#a142f4', colorR: '#a142f4', style: 'solid', lineWidth: 1.8 },
+                    { tf: '1d', label: '1D', colorS: '#e6a100', colorR: '#e6a100', style: 'solid', lineWidth: 2.5 }
                 ];
 
                 mtfLevels.forEach(m => {
@@ -521,7 +526,7 @@
             drawOverlay();
         }
 
-        async function fetchKlines(interval = "1h") {
+        async function fetchKlines(interval = "15m") {
             statusEl.innerText = "Cargando...";
             statusEl.style.color = "#ffd700";
 
@@ -545,7 +550,7 @@
             }
         }
 
-        function connectWebSocket(interval = "1h") {
+        function connectWebSocket(interval = "15m") {
             ws = new WebSocket(`wss://stream.binance.com:9443/ws/btcusdt@kline_${interval}`);
 
             ws.onopen = () => {
@@ -598,7 +603,7 @@
         inputPeriod.addEventListener("change", (e) => { periodoVol = parseInt(e.target.value) || 20; loadMTFData(); });
         inputFactor.addEventListener("change", (e) => { factorVol = parseFloat(e.target.value) || 1.8; loadMTFData(); });
 
-        fetchKlines("1h");
+        fetchKlines("15m");
     });
     </script>
 </body>
