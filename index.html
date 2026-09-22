@@ -383,11 +383,12 @@
             const timeScale = chart.timeScale();
             const lastCandle = currentCandleData[currentCandleData.length - 1];
             
-            // Determinar la posición X de la última vela actual para detener la línea exactamente ahí
             let lastCandleX = timeScale.timeToCoordinate(lastCandle.time);
             if (lastCandleX === null) {
                 lastCandleX = overlay.width - 65;
             }
+
+            let drawableItems = [];
 
             vsaLinesToDraw.forEach(item => {
                 const y = candlestickSeries.priceToCoordinate(item.price);
@@ -397,46 +398,66 @@
                         const coordX = timeScale.timeToCoordinate(item.startTime);
                         if (coordX !== null) startX = Math.max(0, coordX);
                     }
-
-                    const endX = lastCandleX;
-
-                    // Dibujar Línea Horizontal
-                    ctx.strokeStyle = item.color;
-                    ctx.lineWidth = item.lineWidth || 1.5;
-                    ctx.beginPath();
-
-                    if (item.style === 'dashed') {
-                        ctx.setLineDash([4, 4]);
-                    } else {
-                        ctx.setLineDash([]);
-                    }
-
-                    ctx.moveTo(startX, y);
-                    ctx.lineTo(endX, y);
-                    ctx.stroke();
-                    ctx.setLineDash([]);
-
-                    // Dibujar Etiqueta flotante justo al término de la línea (sobre las velas)
-                    ctx.font = "bold 10px -apple-system, BlinkMacSystemFont, Roboto, sans-serif";
-                    const textMetrics = ctx.measureText(item.title);
-                    const padX = 5;
-                    const padY = 3;
-                    const rectW = textMetrics.width + (padX * 2);
-                    const rectH = 15;
-                    
-                    const rectX = endX + 4; 
-                    const rectY = y - (rectH / 2);
-
-                    ctx.fillStyle = item.color;
-                    ctx.beginPath();
-                    ctx.roundRect(rectX, rectY, rectW, rectH, 3);
-                    ctx.fill();
-
-                    ctx.fillStyle = "#000000";
-                    ctx.textAlign = "center";
-                    ctx.textBaseline = "middle";
-                    ctx.fillText(item.title, rectX + (rectW / 2), y + 0.5);
+                    drawableItems.push({
+                        ...item,
+                        y: y,
+                        labelY: y, // Y inicial de la etiqueta
+                        startX: startX,
+                        endX: lastCandleX
+                    });
                 }
+            });
+
+            // Ordenar de arriba hacia abajo según posición Y
+            drawableItems.sort((a, b) => a.y - b.y);
+
+            // Ajustar posición vertical labelY para evitar colisión/solapamiento de etiquetas
+            const minPadding = 16;
+            for (let i = 1; i < drawableItems.length; i++) {
+                let prev = drawableItems[i - 1];
+                let curr = drawableItems[i];
+                if (curr.labelY - prev.labelY < minPadding) {
+                    curr.labelY = prev.labelY + minPadding;
+                }
+            }
+
+            // Dibujar cada elemento (Línea exacta en su precio Y + Etiqueta en labelY)
+            drawableItems.forEach(item => {
+                // Dibujar Línea Horizontal Exacta
+                ctx.strokeStyle = item.color;
+                ctx.lineWidth = item.lineWidth || 1.5;
+                ctx.beginPath();
+
+                if (item.style === 'dashed') {
+                    ctx.setLineDash([4, 4]);
+                } else {
+                    ctx.setLineDash([]);
+                }
+
+                ctx.moveTo(item.startX, item.y);
+                ctx.lineTo(item.endX, item.y);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                // Dibujar Etiqueta en posición desolapada (labelY)
+                ctx.font = "bold 10px -apple-system, BlinkMacSystemFont, Roboto, sans-serif";
+                const textMetrics = ctx.measureText(item.title);
+                const padX = 5;
+                const rectW = textMetrics.width + (padX * 2);
+                const rectH = 15;
+                
+                const rectX = item.endX + 4; 
+                const rectY = item.labelY - (rectH / 2);
+
+                ctx.fillStyle = item.color;
+                ctx.beginPath();
+                ctx.roundRect(rectX, rectY, rectW, rectH, 3);
+                ctx.fill();
+
+                ctx.fillStyle = "#000000";
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.fillText(item.title, rectX + (rectW / 2), item.labelY + 0.5);
             });
         }
 
