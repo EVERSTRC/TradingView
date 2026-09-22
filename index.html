@@ -257,7 +257,7 @@
             height: chartContainer.clientHeight,
             layout: { background: { type: 'solid', color: '#000000' }, textColor: '#d1d4dc' },
             grid: { vertLines: { color: '#161923' }, horzLines: { color: '#161923' } },
-            timeScale: { borderColor: '#2a2e39', timeVisible: true, secondsVisible: false },
+            timeScale: { borderColor: '#2a2e39', timeVisible: true, secondsVisible: false, rightOffset: 12 },
             rightPriceScale: { borderColor: '#2a2e39', autoScale: true }
         });
 
@@ -376,22 +376,26 @@
             row.cells[4].innerText = `${state.pctSell}%`;
         }
 
-        // DIBUJA LÍNEAS HASTA 4 VELAS ANTES DE LA VELA ACTUAL
+        // RENDERIZADO CON DESPLAZAMIENTO A LA DERECHA DE VELAS Y ETIQUETAS
         function drawOverlay() {
             ctx.clearRect(0, 0, overlay.width, overlay.height);
             if (!showVsaLines || vsaLinesToDraw.length === 0 || currentCandleData.length === 0) return;
 
             const timeScale = chart.timeScale();
-            
-            // Determinar la coordenada X correspondiente a 4 velas antes de la última vela
-            const targetIndex = Math.max(0, currentCandleData.length - 1 - 4);
-            const targetCandleTime = currentCandleData[targetIndex].time;
-            let endX = timeScale.timeToCoordinate(targetCandleTime);
+            const lastCandle = currentCandleData[currentCandleData.length - 1];
+            const lastCandleX = timeScale.timeToCoordinate(lastCandle.time);
 
-            // Fallback si no está visible
-            if (endX === null) {
-                endX = overlay.width - 120;
+            if (lastCandleX === null) return;
+
+            // Calcular ancho entre velas para proyectar un desplazamiento equivalente a 4 velas a la derecha
+            let candleSpacing = 10;
+            if (currentCandleData.length >= 2) {
+                const prevCandleX = timeScale.timeToCoordinate(currentCandleData[currentCandleData.length - 2].time);
+                if (prevCandleX !== null) candleSpacing = Math.abs(lastCandleX - prevCandleX);
             }
+
+            // Extremo de la línea horizontal (4 velas más allá del precio)
+            const lineEndX = lastCandleX + (candleSpacing * 4);
 
             let renderList = [];
 
@@ -404,25 +408,22 @@
                         if (coordX !== null) startX = Math.max(0, coordX);
                     }
 
-                    // Asegurar que startX no sea mayor que endX
-                    if (startX < endX) {
-                        renderList.push({
-                            price: item.price,
-                            title: item.title,
-                            color: item.color,
-                            startX: startX,
-                            endX: endX,
-                            y: y,
-                            labelY: y
-                        });
-                    }
+                    renderList.push({
+                        price: item.price,
+                        title: item.title,
+                        color: item.color,
+                        startX: startX,
+                        endX: lineEndX,
+                        y: y,
+                        labelY: y
+                    });
                 }
             });
 
-            // Ordenar verticalmente
+            // Ordenar por eje Y
             renderList.sort((a, b) => a.y - b.y);
 
-            // Desplazar etiquetas solapadas
+            // Evitar solapamientos verticales en etiquetas ajustando coordenadas Y
             const minSpace = 16;
             for (let i = 1; i < renderList.length; i++) {
                 if (renderList[i].labelY - renderList[i-1].labelY < minSpace) {
@@ -430,9 +431,9 @@
                 }
             }
 
-            // Dibujar las líneas y etiquetas
+            // Dibujar
             renderList.forEach(item => {
-                // 1. Línea que finaliza 4 velas antes del precio
+                // 1. Línea horizontal despejada hacia la derecha
                 ctx.strokeStyle = item.color;
                 ctx.lineWidth = 1.5;
                 ctx.beginPath();
@@ -440,13 +441,13 @@
                 ctx.lineTo(item.endX, item.y);
                 ctx.stroke();
 
-                // 2. Etiqueta al final de la línea
+                // 2. Etiqueta flotante posicionada A LA DERECHA de la línea
                 ctx.font = "bold 10px sans-serif";
                 const textWidth = ctx.measureText(item.title).width;
                 const rectPadding = 5;
                 const rectWidth = textWidth + rectPadding * 2;
                 const rectHeight = 15;
-                const rectX = item.endX - rectWidth;
+                const rectX = item.endX + 6; // Posicionada justo al finalizar la línea
                 const rectY = item.labelY - rectHeight / 2;
 
                 ctx.fillStyle = item.color;
