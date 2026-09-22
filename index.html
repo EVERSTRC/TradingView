@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Menú Principal</title>
+  <title>Menú Principal - TradingView Hub</title>
   <style>
     * {
       box-sizing: border-box;
@@ -13,7 +13,8 @@
     }
 
     body {
-      background-color: #f4f6f9;
+      background-color: #0e1118;
+      color: #ffffff;
       display: flex;
       justify-content: center;
       align-items: center;
@@ -22,34 +23,44 @@
     }
 
     .menu-container {
-      background: #ffffff;
+      background: #181c27;
+      border: 1px solid #2a2e39;
       padding: 30px;
       border-radius: 12px;
-      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
       width: 100%;
-      max-width: 400px;
+      max-width: 420px;
       text-align: center;
     }
 
     h1 {
-      font-size: 1.5rem;
-      color: #333;
-      margin-bottom: 20px;
+      font-size: 1.6rem;
+      color: #f0f3fa;
+      margin-bottom: 8px;
+    }
+
+    p.subtitle {
+      font-size: 0.9rem;
+      color: #787b86;
+      margin-bottom: 24px;
     }
 
     .nav-links {
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 14px;
     }
 
     .btn {
-      display: block;
-      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 14px 20px;
       background-color: #2962ff;
       color: #ffffff;
       text-decoration: none;
       font-weight: 600;
+      font-size: 1rem;
       border-radius: 8px;
       transition: background-color 0.2s ease, transform 0.1s ease;
     }
@@ -67,11 +78,13 @@
 <body>
 
   <div class="menu-container">
-    <h1>Menú Navegación</h1>
+    <h1>Panel de Control</h1>
+    <p class="subtitle">Selecciona una herramienta para ingresar</p>
+
     <nav class="nav-links">
-      <a href="index.html" class="btn">Módulo Principal (Index)</a>
-      <a href="crt.html" class="btn">CRT</a>
-      <a href="rsva.html" class="btn">RSVA</a>
+      <a href="ballenas.html" class="btn">Módulo Ballenas (S/R VSA)</a>
+      <a href="crt.html" class="btn">Módulo CRT</a>
+      <a href="rsva.html" class="btn">Módulo RSVA</a>
     </nav>
   </div>
 
