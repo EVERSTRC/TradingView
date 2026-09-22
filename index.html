@@ -282,9 +282,11 @@
         chart.timeScale().subscribeVisibleLogicalRangeChange(() => drawOverlay());
 
         function analyzeVSAData(candles, period, factor) {
-            if (!candles || candles.length < period) return { events: [], lastState: null };
+            if (!candles || candles.length < period) return { events: [], lastSupport: null, lastResistance: null, lastState: null };
 
             let events = [];
+            let lastSupport = null;
+            let lastResistance = null;
             let lastState = null;
 
             for (let i = period; i < candles.length; i++) {
@@ -309,14 +311,14 @@
                 const isBuy = isWhale && (deltaNet > 0 || mInf > (range * 0.35));
                 const isSell = isWhale && (deltaNet < 0 || mSup > (range * 0.35));
 
-                if (isBuy || isSell) {
-                    events.push({
-                        index: i,
-                        time: candle.time,
-                        type: isBuy ? 'BUY' : 'SELL',
-                        price: isBuy ? candle.low : candle.high,
-                        vol: effVol
-                    });
+                if (isBuy) {
+                    const ev = { index: i, time: candle.time, type: 'BUY', price: candle.low, vol: effVol };
+                    events.push(ev);
+                    lastSupport = ev;
+                } else if (isSell) {
+                    const ev = { index: i, time: candle.time, type: 'SELL', price: candle.high, vol: effVol };
+                    events.push(ev);
+                    lastResistance = ev;
                 }
 
                 if (i === candles.length - 1) {
@@ -331,7 +333,7 @@
                 }
             }
 
-            return { events, lastState };
+            return { events, lastSupport, lastResistance, lastState };
         }
 
         function formatVol(val) {
@@ -345,7 +347,7 @@
             const tfs = ['15m', '1h', '4h', '1d', '1w', '1m'];
             for (const tf of tfs) {
                 try {
-                    const res = await fetch(`https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=${tf}&limit=150`);
+                    const res = await fetch(`https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=${tf}&limit=200`);
                     const data = await res.json();
                     const candles = data.map(d => ({
                         time: Math.floor(d[0] / 1000),
@@ -401,17 +403,15 @@
                     drawableItems.push({
                         ...item,
                         y: y,
-                        labelY: y, // Y inicial de la etiqueta
+                        labelY: y,
                         startX: startX,
                         endX: lastCandleX
                     });
                 }
             });
 
-            // Ordenar de arriba hacia abajo según posición Y
             drawableItems.sort((a, b) => a.y - b.y);
 
-            // Ajustar posición vertical labelY para evitar colisión/solapamiento de etiquetas
             const minPadding = 16;
             for (let i = 1; i < drawableItems.length; i++) {
                 let prev = drawableItems[i - 1];
@@ -421,9 +421,7 @@
                 }
             }
 
-            // Dibujar cada elemento (Línea exacta en su precio Y + Etiqueta en labelY)
             drawableItems.forEach(item => {
-                // Dibujar Línea Horizontal Exacta
                 ctx.strokeStyle = item.color;
                 ctx.lineWidth = item.lineWidth || 1.5;
                 ctx.beginPath();
@@ -439,7 +437,6 @@
                 ctx.stroke();
                 ctx.setLineDash([]);
 
-                // Dibujar Etiqueta en posición desolapada (labelY)
                 ctx.font = "bold 10px -apple-system, BlinkMacSystemFont, Roboto, sans-serif";
                 const textMetrics = ctx.measureText(item.title);
                 const padX = 5;
@@ -482,38 +479,59 @@
             if (showVsaLines) {
                 const levels = [];
 
-                // 1. Nivel del gráfico actual (Sop/Res Chart)
-                if (currentAnalysis.events.length > 0) {
-                    const lastChartEv = currentAnalysis.events[currentAnalysis.events.length - 1];
+                // 1. Niveles del gráfico activo (Tanto Soporte como Resistencia si existen)
+                if (currentAnalysis.lastSupport) {
                     levels.push({
-                        price: lastChartEv.price,
-                        title: `${lastChartEv.type === 'BUY' ? 'Sop' : 'Res'} Chart`,
-                        color: lastChartEv.type === 'BUY' ? '#00b0ff' : '#ff5252',
+                        price: currentAnalysis.lastSupport.price,
+                        title: 'Sop Chart',
+                        color: '#00b0ff',
                         style: 'solid',
                         lineWidth: 1.5,
-                        startTime: lastChartEv.time
+                        startTime: currentAnalysis.lastSupport.time
+                    });
+                }
+                if (currentAnalysis.lastResistance) {
+                    levels.push({
+                        price: currentAnalysis.lastResistance.price,
+                        title: 'Res Chart',
+                        color: '#ff5252',
+                        style: 'solid',
+                        lineWidth: 1.5,
+                        startTime: currentAnalysis.lastResistance.time
                     });
                 }
 
-                // 2. Niveles Multi-Timeframe (15m, 1h, 4h, 1d)
+                // 2. Niveles Multi-Timeframe (Muestra tanto Soporte como Resistencia de cada TF)
                 const mtfLevels = [
                     { tf: '15m', label: '15m', colorS: '#00b0ff', colorR: '#ff5252', style: 'dashed', lineWidth: 1.2 },
                     { tf: '1h', label: '1H', colorS: '#2962ff', colorR: '#d32f2f', style: 'solid', lineWidth: 1.5 },
-                    { tf: '4h', label: '4H', colorS: '#a142f4', colorR: '#a142f4', style: 'solid', lineWidth: 1.8 },
-                    { tf: '1d', label: '1D', colorS: '#e6a100', colorR: '#e6a100', style: 'solid', lineWidth: 2.5 }
+                    { tf: '4h', label: '4H', colorS: '#a142f4', colorR: '#e040fb', style: 'solid', lineWidth: 1.8 },
+                    { tf: '1d', label: '1D', colorS: '#e6a100', colorR: '#ff9100', style: 'solid', lineWidth: 2.5 }
                 ];
 
                 mtfLevels.forEach(m => {
-                    if (mtfVsaCache[m.tf] && mtfVsaCache[m.tf].events.length > 0) {
-                        const lastEv = mtfVsaCache[m.tf].events[mtfVsaCache[m.tf].events.length - 1];
-                        levels.push({
-                            price: lastEv.price,
-                            title: `${lastEv.type === 'BUY' ? 'Sop' : 'Res'} ${m.label}`,
-                            color: lastEv.type === 'BUY' ? m.colorS : m.colorR,
-                            style: m.style,
-                            lineWidth: m.lineWidth,
-                            startTime: lastEv.time
-                        });
+                    const cache = mtfVsaCache[m.tf];
+                    if (cache) {
+                        if (cache.lastSupport) {
+                            levels.push({
+                                price: cache.lastSupport.price,
+                                title: `Sop ${m.label}`,
+                                color: m.colorS,
+                                style: m.style,
+                                lineWidth: m.lineWidth,
+                                startTime: cache.lastSupport.time
+                            });
+                        }
+                        if (cache.lastResistance) {
+                            levels.push({
+                                price: cache.lastResistance.price,
+                                title: `Res ${m.label}`,
+                                color: m.colorR,
+                                style: m.style,
+                                lineWidth: m.lineWidth,
+                                startTime: cache.lastResistance.time
+                            });
+                        }
                     }
                 });
 
