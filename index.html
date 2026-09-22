@@ -347,7 +347,8 @@
             const tfs = ['15m', '1h', '4h', '1d', '1w', '1m'];
             for (const tf of tfs) {
                 try {
-                    const res = await fetch(`https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=${tf}&limit=200`);
+                    // Límite ampliado a 1000 velas para máxima precisión e igualar a TradingView
+                    const res = await fetch(`https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=${tf}&limit=1000`);
                     const data = await res.json();
                     const candles = data.map(d => ({
                         time: Math.floor(d[0] / 1000),
@@ -479,7 +480,6 @@
             if (showVsaLines) {
                 const levels = [];
 
-                // 1. Niveles del gráfico activo (Tanto Soporte como Resistencia si existen)
                 if (currentAnalysis.lastSupport) {
                     levels.push({
                         price: currentAnalysis.lastSupport.price,
@@ -501,7 +501,6 @@
                     });
                 }
 
-                // 2. Niveles Multi-Timeframe (Muestra tanto Soporte como Resistencia de cada TF)
                 const mtfLevels = [
                     { tf: '15m', label: '15m', colorS: '#00b0ff', colorR: '#ff5252', style: 'dashed', lineWidth: 1.2 },
                     { tf: '1h', label: '1H', colorS: '#2962ff', colorR: '#d32f2f', style: 'solid', lineWidth: 1.5 },
@@ -550,7 +549,8 @@
             if (ws) ws.close();
 
             try {
-                const res = await fetch(`https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=${interval}&limit=200`);
+                // Descarga 1000 velas para sincronizar los promedios con TradingView
+                const res = await fetch(`https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=${interval}&limit=1000`);
                 const data = await res.json();
                 
                 currentCandleData = data.map(d => ({
