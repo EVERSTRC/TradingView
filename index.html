@@ -75,16 +75,31 @@
             width: 100%; 
         }
 
+        #chart-wrapper {
+            flex: 1;
+            height: 100%;
+            position: relative;
+        }
+
         #chart { 
-            flex: 1; 
+            width: 100%; 
             height: 100%; 
-            position: relative; 
+        }
+
+        #labels-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 5;
         }
 
         #dashboard { 
             position: absolute;
             top: 12px;
-            right: 100px; /* Desplazado a la izquierda para dejar libre el eje de precios */
+            right: 80px;
             z-index: 10;
             display: flex; 
             flex-direction: column; 
@@ -92,7 +107,7 @@
         }
 
         .vsa-table-container {
-            background-color: #000000;
+            background-color: rgba(0, 0, 0, 0.85);
             border: 1px solid #2962ff;
             border-radius: 4px;
             padding: 4px;
@@ -103,7 +118,7 @@
             border-collapse: collapse; 
             font-size: 11px; 
             color: #d1d4dc;
-            min-width: 270px;
+            min-width: 280px;
         }
 
         .vsa-table th { 
@@ -167,7 +182,10 @@
     </div>
 
     <div id="main-container">
-        <div id="chart"></div>
+        <div id="chart-wrapper">
+            <div id="chart"></div>
+            <canvas id="labels-overlay"></canvas>
+        </div>
 
         <div id="dashboard">
             <div id="panel-vsa-mtf" class="vsa-table-container">
@@ -218,12 +236,16 @@
 
         let currentCandleData = [];
         let mtfVsaCache = {};
+        let activeLines = [];
         let priceLinesList = [];
         let ws = null;
 
         const statusEl = document.getElementById("status");
         const timeframeSelect = document.getElementById("timeframe");
+        const chartWrapper = document.getElementById("chart-wrapper");
         const chartContainer = document.getElementById("chart");
+        const overlay = document.getElementById("labels-overlay");
+        const ctx = overlay.getContext("2d");
 
         const btnVsa = document.getElementById("btn-vsa");
         const btnSignals = document.getElementById("btn-signals");
@@ -245,18 +267,29 @@
             upColor: '#089981', downColor: '#f23645', borderVisible: false, wickUpColor: '#089981', wickDownColor: '#f23645'
         });
 
+        function resizeCanvas() {
+            overlay.width = chartContainer.clientWidth;
+            overlay.height = chartContainer.clientHeight;
+            drawCustomLabels();
+        }
+
         const resizeObserver = new ResizeObserver(entries => {
             if (!entries || entries.length === 0) return;
             const { width, height } = entries[0].contentRect;
             chart.applyOptions({ width, height });
+            resizeCanvas();
         });
         resizeObserver.observe(chartContainer);
+
+        chart.timeScale().subscribeVisibleLogicalRangeChange(() => drawCustomLabels());
 
         function clearPriceLines() {
             priceLinesList.forEach(line => {
                 try { candlestickSeries.removePriceLine(line); } catch(e){}
             });
             priceLinesList = [];
+            activeLines = [];
+            drawCustomLabels();
         }
 
         function analyzeVSAData(candles, period, factor) {
@@ -293,14 +326,18 @@
                         time: candle.time,
                         type: isBuy ? 'BUY' : 'SELL',
                         price: isBuy ? candle.low : candle.high,
-                        vol: effVol
+                        vol: effVol,
+                        pctBuy: ((volBuy / effVol) * 100).toFixed(1),
+                        pctSell: ((volSell / effVol) * 100).toFixed(1)
                     });
                 }
 
                 if (i === candles.length - 1) {
+                    // Si el último cierre no es evento, tomar datos del último evento VSA registrado
+                    const lastEvent = events.length > 0 ? events[events.length - 1] : null;
                     lastState = {
-                        isBuy,
-                        isSell,
+                        isBuy: isBuy || (lastEvent ? lastEvent.type === 'BUY' : false),
+                        isSell: isSell || (lastEvent ? lastEvent.type === 'SELL' : false),
                         volume: effVol,
                         pctBuy: ((volBuy / effVol) * 100).toFixed(1),
                         pctSell: ((volSell / effVol) * 100).toFixed(1)
@@ -345,12 +382,45 @@
 
             let badge = `<span class="badge-neu">NEUTRAL</span>`;
             if (state.isBuy) badge = `<span class="badge-buy">BUY</span>`;
-            if (state.isSell) badge = `<span class="badge-sell">SELL</span>`;
+            else if (state.isSell) badge = `<span class="badge-sell">SELL</span>`;
 
             row.cells[1].innerHTML = badge;
             row.cells[2].innerText = formatVol(state.volume);
             row.cells[3].innerText = `${state.pctBuy}%`;
             row.cells[4].innerText = `${state.pctSell}%`;
+        }
+
+        function drawCustomLabels() {
+            ctx.clearRect(0, 0, overlay.width, overlay.height);
+            if (!showVsaLines || activeLines.length === 0) return;
+
+            const rightMargin = 85; // Espacio libre del eje de precio
+            const x = overlay.width - rightMargin - 90;
+
+            activeLines.forEach(item => {
+                const y = candlestickSeries.priceToCoordinate(item.price);
+                if (y !== null && y >= 0 && y <= overlay.height) {
+                    ctx.font = "bold 10px sans-serif";
+                    const textWidth = ctx.measureText(item.title).width;
+                    const padding = 8;
+                    const rectWidth = textWidth + padding;
+                    const rectHeight = 16;
+                    const rectX = x - rectWidth / 2;
+                    const rectY = y - rectHeight / 2;
+
+                    // Fondo redondeado estilo TradingView
+                    ctx.fillStyle = item.color;
+                    ctx.beginPath();
+                    ctx.roundRect(rectX, rectY, rectWidth, rectHeight, 4);
+                    ctx.fill();
+
+                    // Texto centrado
+                    ctx.fillStyle = "#ffffff";
+                    ctx.textAlign = "center";
+                    ctx.textBaseline = "middle";
+                    ctx.fillText(item.title, x, y);
+                }
+            });
         }
 
         function renderVSAChartElements() {
@@ -360,7 +430,6 @@
 
             const currentAnalysis = analyzeVSAData(currentCandleData, periodoVol, factorVol);
             
-            // 1. SEÑALES BUY / SELL CON ARROW EN CANDLESTICK
             if (showVsaSignals) {
                 const markers = currentAnalysis.events.map(e => ({
                     time: e.time,
@@ -374,11 +443,9 @@
                 candlestickSeries.setMarkers([]);
             }
 
-            // 2. CREAR LÍNEAS DE PRECIO CON ETIQUETAS VISIBLES EN EL EJE DERECHO
             if (showVsaLines) {
                 const levelsToDraw = [];
 
-                // Recolectar niveles MTF (1D, 4H, 1H)
                 const mtfLevels = [
                     { tf: '1d', label: '1D', colorS: '#ffd700', colorR: '#e65100' },
                     { tf: '4h', label: '4H', colorS: '#aa00ff', colorR: '#ff6d00' },
@@ -396,7 +463,6 @@
                     }
                 });
 
-                // Añadir últimos eventos del timeframe actual evitando superposiciones muy cercanas (<0.1%)
                 currentAnalysis.events.slice(-4).forEach(ev => {
                     const title = `${ev.type === 'BUY' ? 'Sop' : 'Res'} 6bar15m`;
                     const color = ev.type === 'BUY' ? '#00b0ff' : '#ff5252';
@@ -407,7 +473,8 @@
                     }
                 });
 
-                // Crear PriceLines en Lightweight Charts
+                activeLines = levelsToDraw;
+
                 levelsToDraw.forEach(item => {
                     const pLine = candlestickSeries.createPriceLine({
                         price: item.price,
@@ -415,10 +482,12 @@
                         lineWidth: 2,
                         lineStyle: LightweightCharts.LineStyle.Solid,
                         axisLabelVisible: true,
-                        title: item.title
+                        title: ''
                     });
                     priceLinesList.push(pLine);
                 });
+
+                drawCustomLabels();
             }
         }
 
