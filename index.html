@@ -236,13 +236,11 @@
 
         let currentCandleData = [];
         let mtfVsaCache = {};
-        let activeLines = [];
-        let priceLinesList = [];
+        let vsaLinesToDraw = [];
         let ws = null;
 
         const statusEl = document.getElementById("status");
         const timeframeSelect = document.getElementById("timeframe");
-        const chartWrapper = document.getElementById("chart-wrapper");
         const chartContainer = document.getElementById("chart");
         const overlay = document.getElementById("labels-overlay");
         const ctx = overlay.getContext("2d");
@@ -270,7 +268,7 @@
         function resizeCanvas() {
             overlay.width = chartContainer.clientWidth;
             overlay.height = chartContainer.clientHeight;
-            drawCustomLabels();
+            drawOverlay();
         }
 
         const resizeObserver = new ResizeObserver(entries => {
@@ -281,16 +279,7 @@
         });
         resizeObserver.observe(chartContainer);
 
-        chart.timeScale().subscribeVisibleLogicalRangeChange(() => drawCustomLabels());
-
-        function clearPriceLines() {
-            priceLinesList.forEach(line => {
-                try { candlestickSeries.removePriceLine(line); } catch(e){}
-            });
-            priceLinesList = [];
-            activeLines = [];
-            drawCustomLabels();
-        }
+        chart.timeScale().subscribeVisibleLogicalRangeChange(() => drawOverlay());
 
         function analyzeVSAData(candles, period, factor) {
             if (!candles || candles.length < period) return { events: [], lastState: null };
@@ -326,18 +315,15 @@
                         time: candle.time,
                         type: isBuy ? 'BUY' : 'SELL',
                         price: isBuy ? candle.low : candle.high,
-                        vol: effVol,
-                        pctBuy: ((volBuy / effVol) * 100).toFixed(1),
-                        pctSell: ((volSell / effVol) * 100).toFixed(1)
+                        vol: effVol
                     });
                 }
 
                 if (i === candles.length - 1) {
-                    // Si el último cierre no es evento, tomar datos del último evento VSA registrado
                     const lastEvent = events.length > 0 ? events[events.length - 1] : null;
                     lastState = {
-                        isBuy: isBuy || (lastEvent ? lastEvent.type === 'BUY' : false),
-                        isSell: isSell || (lastEvent ? lastEvent.type === 'SELL' : false),
+                        isBuy: lastEvent ? lastEvent.type === 'BUY' : false,
+                        isSell: lastEvent ? lastEvent.type === 'SELL' : false,
                         volume: effVol,
                         pctBuy: ((volBuy / effVol) * 100).toFixed(1),
                         pctSell: ((volSell / effVol) * 100).toFixed(1)
@@ -390,46 +376,87 @@
             row.cells[4].innerText = `${state.pctSell}%`;
         }
 
-        function drawCustomLabels() {
+        // RENDERIZADO COMPLETO EN CANVAS DE LÍNEAS HASTA EL BORDES Y ETIQUETAS FLOTANTES
+        function drawOverlay() {
             ctx.clearRect(0, 0, overlay.width, overlay.height);
-            if (!showVsaLines || activeLines.length === 0) return;
+            if (!showVsaLines || vsaLinesToDraw.length === 0) return;
 
-            const rightMargin = 85; // Espacio libre del eje de precio
-            const x = overlay.width - rightMargin - 90;
+            const timeScale = chart.timeScale();
+            const rightEdgeX = overlay.width - 65; // Límite donde empieza el eje de precio derecho
 
-            activeLines.forEach(item => {
+            // Agrupar elementos por Y para resolver superposiciones de etiquetas pegadas
+            let renderList = [];
+
+            vsaLinesToDraw.forEach(item => {
                 const y = candlestickSeries.priceToCoordinate(item.price);
                 if (y !== null && y >= 0 && y <= overlay.height) {
-                    ctx.font = "bold 10px sans-serif";
-                    const textWidth = ctx.measureText(item.title).width;
-                    const padding = 8;
-                    const rectWidth = textWidth + padding;
-                    const rectHeight = 16;
-                    const rectX = x - rectWidth / 2;
-                    const rectY = y - rectHeight / 2;
+                    let startX = 0;
+                    if (item.startTime) {
+                        const coordX = timeScale.timeToCoordinate(item.startTime);
+                        if (coordX !== null) startX = Math.max(0, coordX);
+                    }
 
-                    // Fondo redondeado estilo TradingView
-                    ctx.fillStyle = item.color;
-                    ctx.beginPath();
-                    ctx.roundRect(rectX, rectY, rectWidth, rectHeight, 4);
-                    ctx.fill();
-
-                    // Texto centrado
-                    ctx.fillStyle = "#ffffff";
-                    ctx.textAlign = "center";
-                    ctx.textBaseline = "middle";
-                    ctx.fillText(item.title, x, y);
+                    renderList.push({
+                        price: item.price,
+                        title: item.title,
+                        color: item.color,
+                        startX: startX,
+                        y: y,
+                        labelY: y
+                    });
                 }
+            });
+
+            // Ordenar por coordenada Y
+            renderList.sort((a, b) => a.y - b.y);
+
+            // Ajuste anti-solapamiento vertical de etiquetas cercanas
+            const minSpace = 16;
+            for (let i = 1; i < renderList.length; i++) {
+                if (renderList[i].labelY - renderList[i-1].labelY < minSpace) {
+                    renderList[i].labelY = renderList[i-1].labelY + minSpace;
+                }
+            }
+
+            // Dibujar Líneas + Etiquetas estilo TradingView
+            renderList.forEach(item => {
+                // 1. Línea horizontal desde la vela de origen hacia la derecha
+                ctx.strokeStyle = item.color;
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.moveTo(item.startX, item.y);
+                ctx.lineTo(rightEdgeX, item.y);
+                ctx.stroke();
+
+                // 2. Etiqueta Flotante
+                ctx.font = "bold 10px sans-serif";
+                const textWidth = ctx.measureText(item.title).width;
+                const rectPadding = 6;
+                const rectWidth = textWidth + rectPadding * 2;
+                const rectHeight = 16;
+                const rectX = rightEdgeX - rectWidth - 5;
+                const rectY = item.labelY - rectHeight / 2;
+
+                // Fondo redondeado de la etiqueta
+                ctx.fillStyle = item.color;
+                ctx.beginPath();
+                ctx.roundRect(rectX, rectY, rectWidth, rectHeight, 3);
+                ctx.fill();
+
+                // Texto
+                ctx.fillStyle = "#ffffff";
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.fillText(item.title, rectX + rectWidth / 2, item.labelY);
             });
         }
 
         function renderVSAChartElements() {
-            clearPriceLines();
-
             if (currentCandleData.length < periodoVol) return;
 
             const currentAnalysis = analyzeVSAData(currentCandleData, periodoVol, factorVol);
             
+            // 1. MARCADORES DE SEÑALES BUY / SELL EN VELAS
             if (showVsaSignals) {
                 const markers = currentAnalysis.events.map(e => ({
                     time: e.time,
@@ -443,8 +470,9 @@
                 candlestickSeries.setMarkers([]);
             }
 
+            // 2. RECOPILAR LÍNEAS S/R MTF + LOCALES
             if (showVsaLines) {
-                const levelsToDraw = [];
+                const levels = [];
 
                 const mtfLevels = [
                     { tf: '1d', label: '1D', colorS: '#ffd700', colorR: '#e65100' },
@@ -455,40 +483,32 @@
                 mtfLevels.forEach(m => {
                     if (mtfVsaCache[m.tf] && mtfVsaCache[m.tf].events.length > 0) {
                         const lastEv = mtfVsaCache[m.tf].events[mtfVsaCache[m.tf].events.length - 1];
-                        levelsToDraw.push({
+                        levels.push({
                             price: lastEv.price,
                             title: `${lastEv.type === 'BUY' ? 'Sop' : 'Res'} ${m.label}`,
-                            color: lastEv.type === 'BUY' ? m.colorS : m.colorR
+                            color: lastEv.type === 'BUY' ? m.colorS : m.colorR,
+                            startTime: lastEv.time
                         });
                     }
                 });
 
-                currentAnalysis.events.slice(-4).forEach(ev => {
+                // Últimos 3 eventos locales del marco de tiempo activo
+                currentAnalysis.events.slice(-3).forEach(ev => {
                     const title = `${ev.type === 'BUY' ? 'Sop' : 'Res'} 6bar15m`;
                     const color = ev.type === 'BUY' ? '#00b0ff' : '#ff5252';
 
-                    const isDuplicate = levelsToDraw.some(l => Math.abs(l.price - ev.price) / ev.price < 0.001);
+                    const isDuplicate = levels.some(l => Math.abs(l.price - ev.price) / ev.price < 0.0008);
                     if (!isDuplicate) {
-                        levelsToDraw.push({ price: ev.price, title, color });
+                        levels.push({ price: ev.price, title, color, startTime: ev.time });
                     }
                 });
 
-                activeLines = levelsToDraw;
-
-                levelsToDraw.forEach(item => {
-                    const pLine = candlestickSeries.createPriceLine({
-                        price: item.price,
-                        color: item.color,
-                        lineWidth: 2,
-                        lineStyle: LightweightCharts.LineStyle.Solid,
-                        axisLabelVisible: true,
-                        title: ''
-                    });
-                    priceLinesList.push(pLine);
-                });
-
-                drawCustomLabels();
+                vsaLinesToDraw = levels;
+            } else {
+                vsaLinesToDraw = [];
             }
+
+            drawOverlay();
         }
 
         async function fetchKlines(interval = "15m") {
