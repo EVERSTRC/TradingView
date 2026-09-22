@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bitcoin Trading Terminal - S/R VSA Ballenas</title>
+    <title>Bitcoin Trading Terminal - S/R VSA Ballenas + Supertrend</title>
     <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -158,6 +158,24 @@
         }
         .config-row { display: flex; justify-content: space-between; align-items: center; }
         .config-input { width: 40px; background: #2a2e39; border: 1px solid #363c4e; color: #fff; text-align: right; font-size: 11px; border-radius: 2px; }
+        
+        .dash-module {
+            background-color: rgba(19, 23, 34, 0.9);
+            border: 1px solid #2a2e39;
+            padding: 6px 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .dash-module h4 {
+            font-size: 10px;
+            color: #787b86;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .dash-val { font-weight: bold; }
     </style>
 </head>
 <body>
@@ -178,6 +196,7 @@
         <div class="controls-right">
             <button id="btn-vsa" class="btn-toggle">S/R Ballenas VSA</button>
             <button id="btn-signals" class="btn-toggle">Señales BUY/SELL</button>
+            <button id="btn-supertrend" class="btn-toggle">Supertrend</button>
             <button id="btn-panel" class="btn-toggle">Dashboard MTF</button>
         </div>
     </div>
@@ -212,6 +231,18 @@
                 </table>
             </div>
 
+            <div id="dash-module-supertrend" class="dash-module">
+                <h4>Supertrend</h4>
+                <div class="config-row">
+                    <span>Señal:</span>
+                    <span id="dash-st-signal" class="dash-val">--</span>
+                </div>
+                <div class="config-row">
+                    <span>Precio:</span>
+                    <span id="dash-st-price" class="dash-val">--</span>
+                </div>
+            </div>
+
             <div class="config-box">
                 <div class="config-row">
                     <span style="color:#787b86; font-weight:bold;">CONFIGURACIÓN VSA</span>
@@ -232,6 +263,7 @@
     document.addEventListener("DOMContentLoaded", function () {
         let showVsaLines = true;
         let showVsaSignals = true;
+        let showSupertrend = true;
 
         let periodoVol = 20;
         let factorVol = 1.8;
@@ -249,10 +281,15 @@
 
         const btnVsa = document.getElementById("btn-vsa");
         const btnSignals = document.getElementById("btn-signals");
+        const btnSupertrend = document.getElementById("btn-supertrend");
         const btnPanel = document.getElementById("btn-panel");
 
         const inputPeriod = document.getElementById("input-period");
         const inputFactor = document.getElementById("input-factor");
+
+        const dashStSignal = document.getElementById("dash-st-signal");
+        const dashStPrice = document.getElementById("dash-st-price");
+        const modSupertrend = document.getElementById("dash-module-supertrend");
 
         const chart = LightweightCharts.createChart(chartContainer, {
             width: chartContainer.clientWidth,
@@ -265,6 +302,12 @@
 
         const candlestickSeries = chart.addCandlestickSeries({
             upColor: '#089981', downColor: '#f23645', borderVisible: false, wickUpColor: '#089981', wickDownColor: '#f23645'
+        });
+
+        const supertrendSeries = chart.addLineSeries({
+            lineWidth: 2,
+            priceLineVisible: false,
+            lastValueVisible: false
         });
 
         function resizeCanvas() {
@@ -282,6 +325,65 @@
         resizeObserver.observe(chartContainer);
 
         chart.timeScale().subscribeVisibleLogicalRangeChange(() => drawOverlay());
+
+        // --- CÁLCULO DE SUPERTREND (ATR 10, Mult 3.0) ---
+        function calculateSupertrend(candles, period = 10, multiplier = 3.0) {
+            if (!candles || candles.length < period) return [];
+
+            let stLine = [];
+            let trs = [];
+
+            for (let i = 0; i < candles.length; i++) {
+                if (i === 0) {
+                    trs.push(candles[i].high - candles[i].low);
+                } else {
+                    const tr = Math.max(
+                        candles[i].high - candles[i].low,
+                        Math.abs(candles[i].high - candles[i - 1].close),
+                        Math.abs(candles[i].low - candles[i - 1].close)
+                    );
+                    trs.push(tr);
+                }
+            }
+
+            let upperBand = 0, lowerBand = 0, supertrend = 0, dir = 1;
+
+            for (let i = 0; i < candles.length; i++) {
+                if (i < period - 1) {
+                    stLine.push({ time: candles[i].time, value: NaN, dir: 1 });
+                    continue;
+                }
+
+                let sumTR = 0;
+                for (let j = i - period + 1; j <= i; j++) sumTR += trs[j];
+                const atr = sumTR / period;
+
+                const hl2 = (candles[i].high + candles[i].low) / 2;
+                let basicUpper = hl2 + (multiplier * atr);
+                let basicLower = hl2 - (multiplier * atr);
+
+                const prevUpper = i > period - 1 ? upperBand : basicUpper;
+                const prevLower = i > period - 1 ? lowerBand : basicLower;
+                const prevClose = i > 0 ? candles[i - 1].close : candles[i].close;
+
+                lowerBand = (basicLower > prevLower || prevClose < prevLower) ? basicLower : prevLower;
+                upperBand = (basicUpper < prevUpper || prevClose > prevUpper) ? basicUpper : prevUpper;
+
+                const prevST = i > period - 1 ? supertrend : lowerBand;
+                const prevDir = i > period - 1 ? dir : 1;
+
+                if (prevST === prevUpper) {
+                    dir = candles[i].close > upperBand ? 1 : -1;
+                } else {
+                    dir = candles[i].close < lowerBand ? -1 : 1;
+                }
+
+                supertrend = dir === 1 ? lowerBand : upperBand;
+                stLine.push({ time: candles[i].time, value: supertrend, dir: dir });
+            }
+
+            return stLine;
+        }
 
         function analyzeVSAData(candles, period, factor, isMTF = false) {
             if (!candles || candles.length < period + 1) return { events: [], lastSupport: null, lastResistance: null, lastState: null };
@@ -475,7 +577,7 @@
                     time: e.time,
                     position: e.type === 'BUY' ? 'belowBar' : 'aboveBar',
                     color: e.type === 'BUY' ? '#00e676' : '#ff1744',
-                    shape: 'circle', // Cambiado de flechas a círculos
+                    shape: 'circle',
                     text: e.type
                 }));
                 candlestickSeries.setMarkers(markers);
@@ -546,6 +648,28 @@
                 vsaLinesToDraw = [];
             }
 
+            // Renderizado y actualización de Supertrend
+            if (showSupertrend) {
+                const stData = calculateSupertrend(currentCandleData);
+                if (stData.length > 0) {
+                    const formattedSt = stData.filter(d => !isNaN(d.value)).map(d => ({
+                        time: d.time,
+                        value: d.value,
+                        color: d.dir === 1 ? '#00e676' : '#ff1744'
+                    }));
+                    supertrendSeries.setData(formattedSt);
+
+                    const lastSt = stData[stData.length - 1];
+                    if (lastSt && !isNaN(lastSt.value)) {
+                        dashStSignal.innerText = lastSt.dir === 1 ? "BULLISH (COMPRA)" : "BEARISH (VENTA)";
+                        dashStSignal.style.color = lastSt.dir === 1 ? "#00e676" : "#ff1744";
+                        dashStPrice.innerText = lastSt.value.toFixed(2);
+                    }
+                }
+            } else {
+                supertrendSeries.setData([]);
+            }
+
             drawOverlay();
         }
 
@@ -612,6 +736,13 @@
         btnSignals.addEventListener("click", () => {
             showVsaSignals = !showVsaSignals;
             btnSignals.className = showVsaSignals ? "btn-toggle" : "btn-toggle inactive";
+            renderVSAChartElements();
+        });
+
+        btnSupertrend.addEventListener("click", () => {
+            showSupertrend = !showSupertrend;
+            btnSupertrend.className = showSupertrend ? "btn-toggle" : "btn-toggle inactive";
+            modSupertrend.style.display = showSupertrend ? "flex" : "none";
             renderVSAChartElements();
         });
 
