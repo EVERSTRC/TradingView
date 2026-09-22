@@ -366,6 +366,7 @@
         let lastNotifiedSignalTime = null;
         let lastNotifiedSignalType = null;
         let audioCtx = null; 
+        let calculatedMarkers = [];
 
         function initAudioContext() {
             if (!audioCtx) {
@@ -615,7 +616,6 @@
             ? chart.addSeries(LightweightCharts.CandlestickSeries, { upColor: '#089981', downColor: '#f23645', borderVisible: false, wickUpColor: '#089981', wickDownColor: '#f23645' })
             : chart.addCandlestickSeries({ upColor: '#089981', downColor: '#f23645', borderVisible: false, wickUpColor: '#089981', wickDownColor: '#f23645' });
 
-        // LÍNEA DE TENDENCIA DIAGONAL CLÁSICA
         const trendLineSeries = chart.addSeries
             ? chart.addSeries(LightweightCharts.LineSeries, { color: '#2962ff', lineWidth: 3, lineStyle: LightweightCharts.LineStyle.Solid })
             : chart.addLineSeries({ color: '#2962ff', lineWidth: 3, lineStyle: LightweightCharts.LineStyle.Solid });
@@ -729,7 +729,7 @@
             if (!events || events.length === 0 || !currentCandleData || currentCandleData.length === 0) return;
 
             if (!showNewsOnChart) {
-                processIndicators(false);
+                candlestickSeries.setMarkers(calculatedMarkers);
                 return;
             }
 
@@ -757,11 +757,8 @@
                 }
             });
 
-            if (newsMarkers.length > 0) {
-                const currentMarkers = candlestickSeries.markers ? candlestickSeries.markers() : [];
-                const combined = [...currentMarkers, ...newsMarkers].sort((a, b) => a.time - b.time);
-                candlestickSeries.setMarkers(combined);
-            }
+            const combined = [...calculatedMarkers, ...newsMarkers].sort((a, b) => a.time - b.time);
+            candlestickSeries.setMarkers(combined);
         }
 
         function checkNewsAlerts() {
@@ -1223,7 +1220,6 @@
             return { pivotHigh: lastPivotHigh, pivotLow: lastPivotLow };
         }
 
-        // CÁLCULO DE LÍNEA DE TENDENCIA DIAGONAL (REGRESIÓN LINEAL / PIVOTES)
         function calculateLinearTrendLine(candles, lookback = 100) {
             if (!candles || candles.length < 20) return [];
 
@@ -1437,7 +1433,6 @@
                 }
             }
 
-            // DIBUJO DE LÍNEA DE TENDENCIA DIAGONAL CLÁSICA
             if (showTrendline) {
                 const trendPoints = calculateLinearTrendLine(currentCandleData, 120);
                 trendLineSeries.setData(trendPoints);
@@ -1447,11 +1442,12 @@
 
             await processMultiTfPivots();
 
-            allMarkers.sort((a, b) => a.time - b.time);
-            candlestickSeries.setMarkers(allMarkers);
+            calculatedMarkers = allMarkers.sort((a, b) => a.time - b.time);
             
             if (showNewsOnChart && cachedEconomicEvents.length > 0) {
                 drawNewsOnChart(cachedEconomicEvents);
+            } else {
+                candlestickSeries.setMarkers(calculatedMarkers);
             }
 
             updateRealtimeAnalysis(currentPrice);
@@ -1507,7 +1503,7 @@
                 candlestickSeries.update(updatedCandle);
                 updateRealtimeAnalysis(updatedCandle.close);
 
-                if (k.x && currentCandleData.length > 0) {
+                if (currentCandleData.length > 0) {
                     const lastIdx = currentCandleData.length - 1;
                     if (currentCandleData[lastIdx].time === updatedCandle.time) {
                         currentCandleData[lastIdx] = updatedCandle;
@@ -1515,7 +1511,10 @@
                         currentCandleData.push(updatedCandle);
                     }
                     if (currentCandleData.length > 500) currentCandleData.shift();
-                    await processIndicators(false);
+                    
+                    if (k.x) {
+                        await processIndicators(false);
+                    }
                 }
 
                 if (statusEl.style.display !== "none") {
