@@ -166,6 +166,7 @@
         <div class="controls-left">
             <span>TF:</span>
             <select id="timeframe" class="select-tf">
+                <option value="5m">5 Minutos</option>
                 <option value="15m" selected>15 Minutos</option>
                 <option value="1h">1 Hora</option>
                 <option value="4h">4 Horas</option>
@@ -200,6 +201,7 @@
                         </tr>
                     </thead>
                     <tbody>
+                        <tr id="row-5m"><td>5 Minutos</td><td style="text-align: center;"><span class="badge-neu">NEUTRAL</span></td><td>--</td><td class="txt-green">--</td><td class="txt-red">--</td></tr>
                         <tr id="row-15m"><td>15 Minutos</td><td style="text-align: center;"><span class="badge-neu">NEUTRAL</span></td><td>--</td><td class="txt-green">--</td><td class="txt-red">--</td></tr>
                         <tr id="row-1h"><td>1 Hora</td><td style="text-align: center;"><span class="badge-neu">NEUTRAL</span></td><td>--</td><td class="txt-green">--</td><td class="txt-red">--</td></tr>
                         <tr id="row-4h"><td>4 Horas</td><td style="text-align: center;"><span class="badge-neu">NEUTRAL</span></td><td>--</td><td class="txt-green">--</td><td class="txt-red">--</td></tr>
@@ -346,7 +348,7 @@
         }
 
         async function loadMTFData() {
-            const tfs = ['15m', '1h', '4h', '1d', '1w', '1m'];
+            const tfs = ['5m', '15m', '1h', '4h', '1d', '1w', '1m'];
             const currentTF = timeframeSelect.value;
 
             for (const tf of tfs) {
@@ -448,7 +450,6 @@
                 const rectW = textMetrics.width + (padX * 2);
                 const rectH = 15;
                 
-                // Offset ajustado a 18px a la derecha para separación limpia respecto a las velas
                 const rectX = item.endX + 18; 
                 const rectY = item.labelY - (rectH / 2);
 
@@ -507,6 +508,7 @@
                 }
 
                 const mtfLevels = [
+                    { tf: '5m', label: '5m', colorS: '#00e5ff', colorR: '#ff4081', style: 'dashed', lineWidth: 1.0 },
                     { tf: '15m', label: '15m', colorS: '#00b0ff', colorR: '#ff5252', style: 'dashed', lineWidth: 1.2 },
                     { tf: '1h', label: '1H', colorS: '#2962ff', colorR: '#d32f2f', style: 'solid', lineWidth: 1.5 },
                     { tf: '4h', label: '4H', colorS: '#a142f4', colorR: '#e040fb', style: 'solid', lineWidth: 1.8 },
