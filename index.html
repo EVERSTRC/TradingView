@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bitcoin Trading Terminal - Integrated SMC & VSA Whales MTF</title>
+    <title>Terminal S/R VSA Ballenas MTF + Dashboard</title>
     <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -11,8 +11,6 @@
         html, body { 
             width: 100vw; 
             height: 100vh; 
-            max-width: 100vw; 
-            max-height: 100vh; 
             overflow: hidden; 
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
             background-color: #131722; 
@@ -25,32 +23,29 @@
             display: flex; 
             align-items: center; 
             justify-content: space-between; 
-            padding: 4px 10px; 
+            padding: 6px 14px; 
             background-color: #1e222d; 
             border-bottom: 1px solid #2a2e39; 
             flex-shrink: 0; 
-            min-height: 42px;
-            width: 100%;
-            overflow-x: auto;
+            height: 46px;
         }
 
-        .controls-group { display: flex; align-items: center; gap: 6px; flex-wrap: nowrap; }
-        label { font-size: 11px; color: #787b86; }
+        .controls-group { display: flex; align-items: center; gap: 8px; }
+        label { font-size: 12px; color: #787b86; font-weight: 500; }
         select, button { 
             background-color: #2a2e39; 
             color: #d1d4dc; 
             border: 1px solid #363c4e; 
-            padding: 3px 6px; 
+            padding: 4px 8px; 
             border-radius: 4px; 
-            font-size: 11px; 
+            font-size: 12px; 
             cursor: pointer; 
             transition: all 0.2s; 
-            white-space: nowrap;
         }
         select:hover, button:hover { background-color: #363c4e; }
-        button.active { background-color: #2962ff; color: #ffffff; border-color: #2962ff; }
+        button.active { background-color: #0052cc; color: #ffffff; border-color: #0052cc; }
         button.inactive { opacity: 0.5; }
-        #status { font-size: 11px; color: #2962ff; font-weight: bold; }
+        #status { font-size: 12px; color: #00e676; font-weight: bold; }
 
         #main-container { 
             display: flex; 
@@ -58,133 +53,95 @@
             position: relative; 
             overflow: hidden; 
             width: 100%; 
-            height: calc(100vh - 42px); 
         }
 
         #chart { 
             flex: 1; 
             height: 100%; 
-            width: 100%; 
-            min-width: 0; 
-            min-height: 0; 
             position: relative; 
         }
 
         #dashboard { 
-            width: 270px; 
-            min-width: 270px;
-            max-width: 270px;
+            width: 310px; 
             height: 100%;
             background-color: #1e222d; 
             border-left: 1px solid #2a2e39; 
-            padding: 6px; 
+            padding: 10px; 
             display: flex; 
             flex-direction: column; 
-            gap: 5px; 
+            gap: 10px; 
             overflow-y: auto; 
-            overflow-x: hidden;
             flex-shrink: 0; 
         }
 
-        #dashboard::-webkit-scrollbar { width: 4px; }
-        #dashboard::-webkit-scrollbar-track { background: #131722; }
-        #dashboard::-webkit-scrollbar-thumb { background: #363c4e; border-radius: 2px; }
-
         .dash-module { 
             background-color: #131722; 
-            border-radius: 4px; 
-            padding: 6px 8px; 
+            border-radius: 6px; 
+            padding: 10px; 
             border: 1px solid #2a2e39; 
             display: flex; 
             flex-direction: column; 
-            gap: 3px; 
-            flex-shrink: 0;
-            width: 100%;
-            box-sizing: border-box;
+            gap: 6px; 
         }
         .dash-module h4 { 
-            font-size: 10px; 
+            font-size: 11px; 
             color: #787b86; 
             text-transform: uppercase; 
             letter-spacing: 0.5px; 
-            margin-bottom: 2px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            border-bottom: 1px solid #2a2e39;
+            padding-bottom: 4px;
+            margin-bottom: 4px;
         }
+        
         .dash-row { 
             display: flex; 
             justify-content: space-between; 
-            font-size: 10px; 
+            font-size: 11px; 
             align-items: center; 
-            gap: 4px;
-            width: 100%;
-        }
-        .dash-row > span:first-child {
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            color: #9db2c6;
-        }
-        .dash-val { 
-            font-weight: bold; 
-            white-space: nowrap;
-            text-align: right;
         }
 
-        .vsa-table { width: 100%; border-collapse: collapse; font-size: 9px; margin-top: 2px; }
-        .vsa-table th { text-align: left; color: #787b86; padding: 2px 0; font-weight: normal; border-bottom: 1px solid #2a2e39; }
-        .vsa-table td { padding: 2px 0; text-align: right; }
-        .vsa-table td:first-child { text-align: left; }
+        .vsa-table { width: 100%; border-collapse: collapse; font-size: 10px; margin-top: 2px; }
+        .vsa-table th { text-align: left; color: #787b86; padding: 4px 2px; font-weight: 600; border-bottom: 1px solid #2a2e39; }
+        .vsa-table td { padding: 5px 2px; text-align: right; }
+        .vsa-table td:first-child { text-align: left; font-weight: 500; }
         
-        #timer-progress-container { width: 100%; height: 3px; background-color: #2a2e39; border-radius: 2px; overflow: hidden; margin-top: 2px; }
-        #timer-progress { height: 100%; width: 0%; background-color: #2962ff; transition: width 1s linear; }
-        
-        .vsa-badge { padding: 1px 3px; border-radius: 2px; font-size: 8px; font-weight: bold; text-transform: uppercase; display: inline-block; text-align: center; }
+        .vsa-badge { padding: 2px 4px; border-radius: 3px; font-size: 9px; font-weight: bold; text-transform: uppercase; display: inline-block; text-align: center; }
         .vsa-buy { background-color: rgba(0, 230, 118, 0.2); color: #00e676; border: 1px solid #00e676; }
         .vsa-sell { background-color: rgba(255, 23, 68, 0.2); color: #ff1744; border: 1px solid #ff1744; }
         .vsa-neutral { background-color: rgba(120, 123, 134, 0.2); color: #787b86; border: 1px solid #787b86; }
         .txt-buy { color: #00e676; font-weight: bold; }
         .txt-sell { color: #ff1744; font-weight: bold; }
-        
-        .trend-bar-bg { width: 100%; height: 5px; background-color: #2a2e39; border-radius: 3px; overflow: hidden; margin: 2px 0; position: relative; }
-        .trend-bar-fill { height: 100%; width: 50%; background-color: #787b86; transition: all 0.5s ease; }
-        
-        .session-badge { padding: 1px 4px; border-radius: 3px; font-size: 8px; font-weight: bold; text-transform: uppercase; }
-        .session-active { background-color: rgba(0, 230, 118, 0.2); color: #00e676; border: 1px solid #00e676; }
-        .session-closed { background-color: rgba(120, 123, 134, 0.1); color: #5d606b; border: 1px solid #2a2e39; }
 
-        .news-item { display: flex; justify-content: space-between; align-items: center; font-size: 9px; padding: 2px 0; border-bottom: 1px solid #2a2e39; }
-        .news-title { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 4px; }
-        .news-impact { padding: 1px 3px; border-radius: 2px; font-weight: bold; font-size: 7px; background-color: rgba(255, 23, 68, 0.2); color: #ff1744; border: 1px solid #ff1744; margin-right: 4px; }
-        .news-warning { background-color: rgba(255, 23, 68, 0.15); border: 1px solid #ff1744; color: #ff1744; font-size: 9px; padding: 3px; text-align: center; font-weight: bold; border-radius: 3px; margin-bottom: 4px; display: none; }
+        .param-input {
+            width: 50px;
+            background: #2a2e39;
+            border: 1px solid #363c4e;
+            color: #fff;
+            font-size: 11px;
+            padding: 2px 4px;
+            border-radius: 3px;
+            text-align: right;
+        }
     </style>
 </head>
 <body>
 
     <div id="top-bar">
         <div class="controls-group">
-            <label for="timeframe">TF:</label>
+            <label for="timeframe">Timeframe Chart:</label>
             <select id="timeframe">
-                <option value="1m">1 Min</option>
-                <option value="3m">3 Min</option>
-                <option value="5m">5 Min</option>
-                <option value="15m" selected>15 Min</option>
-                <option value="30m">30 Min</option>
-                <option value="1h">1 Hour</option>
-                <option value="4h">4 Hours</option>
-                <option value="1d">1 Day</option>
+                <option value="15m" selected>15m</option>
+                <option value="1h">1H</option>
+                <option value="4h">4H</option>
+                <option value="1d">1D</option>
             </select>
-            <div id="status">Conectando...</div>
+            <div id="status">Conectando WebSocket...</div>
         </div>
 
         <div class="controls-group">
-            <button id="toggle-supertrend" class="active">Supertrend</button>
-            <button id="toggle-vsa" class="active">S/R Ballenas VSA</button>
-            <button id="toggle-ob" class="active">Order Blocks</button>
-            <button id="toggle-liquidity" class="active">Liquidez</button>
-            <button id="toggle-pivots" class="active">Pivots</button>
-            <button id="toggle-news" class="active">Noticias USD</button>
+            <button id="toggle-vsa" class="active">Niveles VSA Ballenas</button>
+            <button id="toggle-signals" class="active">Señales Buy/Sell</button>
+            <button id="toggle-panel" class="active">Panel MTF</button>
         </div>
     </div>
 
@@ -192,89 +149,53 @@
         <div id="chart"></div>
 
         <div id="dashboard">
+            <!-- Módulo Parámetros -->
             <div class="dash-module">
-                <h4>Vela Actual</h4>
+                <h4>Parámetros VSA</h4>
                 <div class="dash-row">
-                    <span>Cierre en:</span>
-                    <span id="timer-display" class="dash-val">00:00</span>
+                    <span>Período Promedio Vol:</span>
+                    <input type="number" id="param-period" class="param-input" value="20" min="1">
                 </div>
-                <div id="timer-progress-container">
-                    <div id="timer-progress"></div>
+                <div class="dash-row">
+                    <span>Mult. Volumen Ballena:</span>
+                    <input type="number" id="param-factor" class="param-input" value="1.8" step="0.1" min="1.1">
                 </div>
             </div>
 
-            <div id="dash-module-news" class="dash-module" style="border: 1px solid #ff1744;">
-                <h4>Macro Eventos USD (CR)</h4>
-                <div id="news-alert-banner" class="news-warning">⚠️ NOTICIA EN BREVE</div>
-                <div id="news-list-container">
-                    <div style="font-size: 9px; color: #787b86;">Cargando eventos...</div>
-                </div>
-            </div>
-
-            <div id="dash-module-sessions" class="dash-module" style="border: 1px solid #363c4e;">
-                <h4>Sesión de Mercado (CR)</h4>
-                <div class="dash-row" style="margin-bottom: 2px;">
-                    <span>Estado:</span>
-                    <span id="dash-active-session-text" class="dash-val" style="color: #00e676;">--</span>
-                </div>
-                <div class="dash-row">
-                    <span>Asian (Tokio):</span>
-                    <span id="sess-badge-tokyo" class="session-badge session-closed">CERRADO</span>
-                </div>
-                <div class="dash-row">
-                    <span>London (Londres):</span>
-                    <span id="sess-badge-london" class="session-badge session-closed">CERRADO</span>
-                </div>
-                <div class="dash-row">
-                    <span>New York (EE.UU.):</span>
-                    <span id="sess-badge-ny" class="session-badge session-closed">CERRADO</span>
-                </div>
-            </div>
-
-            <div id="dash-module-vsa" class="dash-module" style="border: 1px solid #2962ff;">
-                <h4>S/R VSA Ballenas MTF & Vol %</h4>
+            <!-- Módulo Tabla MTF -->
+            <div id="panel-mtf-container" class="dash-module">
+                <h4>Dashboard % Vol MTF</h4>
                 <table class="vsa-table">
                     <thead>
                         <tr>
-                            <th>TF</th>
+                            <th>Timeframe</th>
                             <th>Señal</th>
-                            <th>Vol</th>
-                            <th>% C</th>
-                            <th>% V</th>
+                            <th>Volumen</th>
+                            <th>% Compra</th>
+                            <th>% Venta</th>
                         </tr>
                     </thead>
                     <tbody id="vsa-mtf-tbody">
-                        <tr id="vsa-row-15m"><td>15M</td><td><span class="vsa-badge vsa-neutral">--</span></td><td>--</td><td class="txt-buy">--</td><td class="txt-sell">--</td></tr>
-                        <tr id="vsa-row-1h"><td>1H</td><td><span class="vsa-badge vsa-neutral">--</span></td><td>--</td><td class="txt-buy">--</td><td class="txt-sell">--</td></tr>
-                        <tr id="vsa-row-4h"><td>4H</td><td><span class="vsa-badge vsa-neutral">--</span></td><td>--</td><td class="txt-buy">--</td><td class="txt-sell">--</td></tr>
-                        <tr id="vsa-row-1d"><td>1D</td><td><span class="vsa-badge vsa-neutral">--</span></td><td>--</td><td class="txt-buy">--</td><td class="txt-sell">--</td></tr>
-                        <tr id="vsa-row-1w"><td>1W</td><td><span class="vsa-badge vsa-neutral">--</span></td><td>--</td><td class="txt-buy">--</td><td class="txt-sell">--</td></tr>
-                        <tr id="vsa-row-1m"><td>1M</td><td><span class="vsa-badge vsa-neutral">--</span></td><td>--</td><td class="txt-buy">--</td><td class="txt-sell">--</td></tr>
+                        <tr id="vsa-row-15m"><td>15 Minutos</td><td><span class="vsa-badge vsa-neutral">--</span></td><td>--</td><td class="txt-buy">--</td><td class="txt-sell">--</td></tr>
+                        <tr id="vsa-row-1h"><td>1 Hora</td><td><span class="vsa-badge vsa-neutral">--</span></td><td>--</td><td class="txt-buy">--</td><td class="txt-sell">--</td></tr>
+                        <tr id="vsa-row-4h"><td>4 Horas</td><td><span class="vsa-badge vsa-neutral">--</span></td><td>--</td><td class="txt-buy">--</td><td class="txt-sell">--</td></tr>
+                        <tr id="vsa-row-1d"><td>1 Diario</td><td><span class="vsa-badge vsa-neutral">--</span></td><td>--</td><td class="txt-buy">--</td><td class="txt-sell">--</td></tr>
+                        <tr id="vsa-row-1w"><td>1 Semana</td><td><span class="vsa-badge vsa-neutral">--</span></td><td>--</td><td class="txt-buy">--</td><td class="txt-sell">--</td></tr>
+                        <tr id="vsa-row-1m"><td>1 Mes</td><td><span class="vsa-badge vsa-neutral">--</span></td><td>--</td><td class="txt-buy">--</td><td class="txt-sell">--</td></tr>
                     </tbody>
                 </table>
             </div>
 
-            <div id="dash-module-ob" class="dash-module" style="border: 1px solid #26a69a;">
-                <h4>Order Blocks (SMC)</h4>
+            <!-- Módulo Métricas del Gráfico -->
+            <div class="dash-module">
+                <h4>VSA Estado Chart Local</h4>
                 <div class="dash-row">
-                    <span>OB Res (Venta):</span>
-                    <span id="dash-ob-bearish" class="dash-val" style="color: #ff1744;">--</span>
+                    <span>Estado Ballena:</span>
+                    <span id="local-whale-status" class="vsa-badge vsa-neutral">NO DETECTADO</span>
                 </div>
                 <div class="dash-row">
-                    <span>OB Sop (Compra):</span>
-                    <span id="dash-ob-bullish" class="dash-val" style="color: #00e676;">--</span>
-                </div>
-            </div>
-
-            <div id="dash-module-supertrend" class="dash-module">
-                <h4>Supertrend</h4>
-                <div class="dash-row">
-                    <span>Señal:</span>
-                    <span id="dash-st-signal" class="dash-val">--</span>
-                </div>
-                <div class="dash-row">
-                    <span>Precio:</span>
-                    <span id="dash-st-price" class="dash-val">--</span>
+                    <span>Delta Volumen:</span>
+                    <span id="local-delta-vol" style="font-weight: bold;">--</span>
                 </div>
             </div>
         </div>
@@ -282,32 +203,39 @@
 
     <script>
     document.addEventListener("DOMContentLoaded", function () {
-        const TELEGRAM_CONFIG = { enabled: true, username: "ERC1670" };
+        // Variables de Configuración y Estado
+        let showVsa = true;
+        let showSignals = true;
+        let showPanel = true;
 
-        let showVsa = true, showOb = true, showSupertrend = true, showLiquidity = true, showPivots = true, showNews = true;
+        let periodoVol = 20;
+        let factorVol = 1.8;
+
         let activePriceLines = [];
+        let activeMarkers = [];
         let currentCandleData = [];
         let vsaDataMTF = {};
+        let ws = null;
 
         const statusEl = document.getElementById("status");
         const timeframeSelect = document.getElementById("timeframe");
         const chartContainer = document.getElementById("chart");
 
         const btnVsa = document.getElementById("toggle-vsa");
-        const btnOb = document.getElementById("toggle-ob");
-        const btnSupertrend = document.getElementById("toggle-supertrend");
-        const btnLiquidity = document.getElementById("toggle-liquidity");
-        const btnPivots = document.getElementById("toggle-pivots");
-        const btnNews = document.getElementById("toggle-news");
+        const btnSignals = document.getElementById("toggle-signals");
+        const btnPanel = document.getElementById("toggle-panel");
 
-        // Inicialización de Gráfico
+        const inputPeriod = document.getElementById("param-period");
+        const inputFactor = document.getElementById("param-factor");
+
+        // Inicialización del Gráfico con Lightweight Charts
         const chart = LightweightCharts.createChart(chartContainer, {
             width: chartContainer.clientWidth,
             height: chartContainer.clientHeight,
             layout: { background: { type: 'solid', color: '#131722' }, textColor: '#d1d4dc' },
-            grid: { vertLines: { color: 'rgba(42, 46, 57, 0.5)' }, horzLines: { color: 'rgba(42, 46, 57, 0.5)' } },
-            timeScale: { borderColor: 'rgba(197, 203, 206, 0.8)', timeVisible: true, secondsVisible: true },
-            rightPriceScale: { autoScale: true, alignLabels: true, borderVisible: true }
+            grid: { vertLines: { color: 'rgba(42, 46, 57, 0.4)' }, horzLines: { color: 'rgba(42, 46, 57, 0.4)' } },
+            timeScale: { borderColor: 'rgba(197, 203, 206, 0.8)', timeVisible: true, secondsVisible: false },
+            rightPriceScale: { autoScale: true, borderVisible: true }
         });
 
         const candlestickSeries = chart.addCandlestickSeries({
@@ -329,11 +257,12 @@
         }
 
         // ==========================================
-        // CÁLCULO ALGORÍTMICO VSA BALLENAS
+        // LÓGICA VSA (TRADUCCIÓN EXACTA DE PINE SCRIPT)
         // ==========================================
         function calculateVSA(candles, period = 20, factor = 1.8) {
             if (!candles || candles.length < period) return null;
 
+            // SMA del Volumen
             let sumVol = 0;
             for (let i = candles.length - period; i < candles.length; i++) {
                 sumVol += candles[i].volume;
@@ -342,9 +271,10 @@
             const last = candles[candles.length - 1];
 
             const range = last.high - last.low;
-            const effVol = last.volume === 0 ? 1.0 : last.volume;
+            const effVol = (last.volume === 0 || isNaN(last.volume)) ? 1.0 : last.volume;
             const isWhale = effVol > (avgVol * factor);
 
+            // Algoritmo Delta Compra/Venta
             const volBuy = range === 0 ? effVol / 2 : effVol * ((last.close - last.low) / range);
             const volSell = effVol - volBuy;
             const deltaNet = volBuy - volSell;
@@ -361,26 +291,29 @@
             return {
                 isBuy,
                 isSell,
+                isWhale,
                 volume: effVol,
                 pctBuy,
                 pctSell,
+                deltaNet,
                 support: isBuy ? last.low : null,
                 resistance: isSell ? last.high : null
             };
         }
 
         function formatVolume(val) {
-            if (!val) return "-";
+            if (!val || isNaN(val)) return "-";
             if (val >= 1000000) return (val / 1000000).toFixed(2) + "M";
             if (val >= 1000) return (val / 1000).toFixed(2) + "K";
             return val.toFixed(2);
         }
 
+        // Obtención de datos MTF
         async function fetchMTFVsaData() {
             const tfs = ['15m', '1h', '4h', '1d', '1w', '1m'];
             for (const tf of tfs) {
                 try {
-                    const res = await fetch(`https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=${tf}&limit=30`);
+                    const res = await fetch(`https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=${tf}&limit=35`);
                     const data = await res.json();
                     const candles = data.map(d => ({
                         open: parseFloat(d[1]),
@@ -389,20 +322,20 @@
                         close: parseFloat(d[4]),
                         volume: parseFloat(d[5])
                     }));
-                    vsaDataMTF[tf] = calculateVSA(candles);
+                    vsaDataMTF[tf] = calculateVSA(candles, periodoVol, factorVol);
                     updateVSADashboardRow(tf, vsaDataMTF[tf]);
                 } catch(e) {
-                    console.error("Error cargando VSA MTF", tf, e);
+                    console.error("Error obteniendo MTF VSA:", tf, e);
                 }
             }
-            if (showVsa) drawVSALinesOnChart();
+            evaluateChartSignalsAndLines();
         }
 
         function updateVSADashboardRow(tf, vsa) {
             const row = document.getElementById(`vsa-row-${tf}`);
             if (!row || !vsa) return;
 
-            let badge = `<span class="vsa-badge vsa-neutral">NEU</span>`;
+            let badge = `<span class="vsa-badge vsa-neutral">NEUTRAL</span>`;
             if (vsa.isBuy) badge = `<span class="vsa-badge vsa-buy">BUY</span>`;
             if (vsa.isSell) badge = `<span class="vsa-badge vsa-sell">SELL</span>`;
 
@@ -412,50 +345,103 @@
             row.cells[4].innerText = `${vsa.pctSell}%`;
         }
 
-        function drawVSALinesOnChart() {
+        function evaluateChartSignalsAndLines() {
             clearActiveLines();
-            if (!showVsa) return;
+            activeMarkers = [];
 
-            const tfs = ['15m', '1h', '4h', '1d'];
-            const colors = { '15m': '#00b0ff', '1h': '#0288d1', '4h': '#aa00ff', '1d': '#ffd700' };
+            if (currentCandleData.length < periodoVol) return;
 
-            tfs.forEach(tf => {
-                const vsa = vsaDataMTF[tf];
-                if (vsa) {
-                    if (vsa.support) {
-                        const line = candlestickSeries.createPriceLine({
-                            price: vsa.support,
-                            color: colors[tf] || '#00e676',
-                            lineWidth: 2,
-                            lineStyle: LightweightCharts.LineStyle.Dashed,
-                            axisLabelVisible: true,
-                            title: `Sop VSA ${tf.toUpperCase()}`
-                        });
-                        activePriceLines.push(line);
-                    }
-                    if (vsa.resistance) {
-                        const line = candlestickSeries.createPriceLine({
-                            price: vsa.resistance,
-                            color: colors[tf] || '#ff1744',
-                            lineWidth: 2,
-                            lineStyle: LightweightCharts.LineStyle.Dashed,
-                            axisLabelVisible: true,
-                            title: `Res VSA ${tf.toUpperCase()}`
-                        });
-                        activePriceLines.push(line);
+            const localVsa = calculateVSA(currentCandleData, periodoVol, factorVol);
+            
+            // Actualizar módulo visual
+            const whaleStatusEl = document.getElementById("local-whale-status");
+            const deltaVolEl = document.getElementById("local-delta-vol");
+
+            if (localVsa) {
+                if (localVsa.isWhale) {
+                    whaleStatusEl.className = localVsa.isBuy ? "vsa-badge vsa-buy" : "vsa-badge vsa-sell";
+                    whaleStatusEl.innerText = localVsa.isBuy ? "BALLENA COMPRA" : "BALLENA VENTA";
+                } else {
+                    whaleStatusEl.className = "vsa-badge vsa-neutral";
+                    whaleStatusEl.innerText = "VOL NORMAL";
+                }
+                deltaVolEl.innerText = formatVolume(localVsa.deltaNet);
+                deltaVolEl.style.color = localVsa.deltaNet >= 0 ? "#00e676" : "#ff1744";
+            }
+
+            // Dibujar Marcadores (BUY/SELL)
+            if (showSignals) {
+                for (let i = periodoVol; i < currentCandleData.length; i++) {
+                    const slice = currentCandleData.slice(0, i + 1);
+                    const vsaVal = calculateVSA(slice, periodoVol, factorVol);
+                    if (vsaVal) {
+                        if (vsaVal.isBuy) {
+                            activeMarkers.push({
+                                time: currentCandleData[i].time,
+                                position: 'belowBar',
+                                color: '#00e676',
+                                shape: 'arrowUp',
+                                text: 'BUY VSA'
+                            });
+                        } else if (vsaVal.isSell) {
+                            activeMarkers.push({
+                                time: currentCandleData[i].time,
+                                position: 'aboveBar',
+                                color: '#ff1744',
+                                shape: 'arrowDown',
+                                text: 'SELL VSA'
+                            });
+                        }
                     }
                 }
-            });
+                candlestickSeries.setMarkers(activeMarkers);
+            } else {
+                candlestickSeries.setMarkers([]);
+            }
+
+            // Dibujar Líneas Proyectadas S/R MTF
+            if (showVsa) {
+                const configS/R = [
+                    { tf: '15m', label: '15m', colSop: '#00b0ff', colRes: '#ff5252' },
+                    { tf: '1h',  label: '1H',  colSop: '#0288d1', colRes: '#d32f2f' },
+                    { tf: '4h',  label: '4H',  colSop: '#aa00ff', colRes: '#ff6d00' },
+                    { tf: '1d',  label: '1D',  colSop: '#ffd700', colRes: '#e65100' },
+                    { tf: '1w',  label: '1W',  colSop: '#00ffff', colRes: '#ff007f' },
+                    { tf: '1m',  label: '1M',  colSop: '#ffffff', colRes: '#7c4dff' }
+                ];
+
+                configS/R.forEach(cfg => {
+                    const v = vsaDataMTF[cfg.tf];
+                    if (v) {
+                        if (v.support) {
+                            activePriceLines.push(candlestickSeries.createPriceLine({
+                                price: v.support, color: cfg.colSop, lineWidth: 2,
+                                lineStyle: LightweightCharts.LineStyle.Dashed, title: `Sop ${cfg.label}`
+                            }));
+                        }
+                        if (v.resistance) {
+                            activePriceLines.push(candlestickSeries.createPriceLine({
+                                price: v.resistance, color: cfg.colRes, lineWidth: 2,
+                                lineStyle: LightweightCharts.LineStyle.Dashed, title: `Res ${cfg.label}`
+                            }));
+                        }
+                    }
+                });
+            }
         }
 
-        // Carga Principal de Datos
+        // Conexión API / WebSocket Binance
         async function fetchKlines(symbol = "BTCUSDT", interval = "15m") {
-            statusEl.innerText = "Cargando datos...";
+            statusEl.innerText = "Cargando Histórico...";
+            statusEl.style.color = "#787b86";
+
+            if (ws) ws.close();
+
             try {
                 const res = await fetch(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=200`);
                 const data = await res.json();
                 
-                const formattedData = data.map(d => ({
+                currentCandleData = data.map(d => ({
                     time: Math.floor(d[0] / 1000),
                     open: parseFloat(d[1]),
                     high: parseFloat(d[2]),
@@ -464,12 +450,9 @@
                     volume: parseFloat(d[5])
                 }));
 
-                currentCandleData = formattedData;
-                candlestickSeries.setData(formattedData);
-                statusEl.innerText = "Conectado ✅";
-                statusEl.style.color = "#00e676";
-
-                fetchMTFVsaData();
+                candlestickSeries.setData(currentCandleData);
+                await fetchMTFVsaData();
+                connectWebSocket(symbol, interval);
             } catch (err) {
                 console.error(err);
                 statusEl.innerText = "Error API Binance";
@@ -477,18 +460,80 @@
             }
         }
 
-        // Manejadores de Interfaz
+        function connectWebSocket(symbol = "BTCUSDT", interval = "15m") {
+            const streamName = `${symbol.toLowerCase()}@kline_${interval}`;
+            ws = new WebSocket(`wss://stream.binance.com:9443/ws/${streamName}`);
+
+            ws.onopen = () => {
+                statusEl.innerText = "En Vivo (WS Conectado) ✅";
+                statusEl.style.color = "#00e676";
+            };
+
+            ws.onmessage = (event) => {
+                const message = JSON.parse(event.data);
+                const k = message.k;
+
+                const candle = {
+                    time: Math.floor(k.t / 1000),
+                    open: parseFloat(k.o),
+                    high: parseFloat(k.h),
+                    low: parseFloat(k.l),
+                    close: parseFloat(k.c),
+                    volume: parseFloat(k.v)
+                };
+
+                candlestickSeries.update(candle);
+
+                const lastIdx = currentCandleData.length - 1;
+                if (lastIdx >= 0 && currentCandleData[lastIdx].time === candle.time) {
+                    currentCandleData[lastIdx] = candle;
+                } else {
+                    currentCandleData.push(candle);
+                }
+
+                evaluateChartSignalsAndLines();
+            };
+
+            ws.onerror = () => {
+                statusEl.innerText = "Error WebSocket";
+                statusEl.style.color = "#ff1744";
+            };
+        }
+
+        // Control de Interfaz
         btnVsa.addEventListener("click", () => {
             showVsa = !showVsa;
             btnVsa.className = showVsa ? "active" : "inactive";
-            drawVSALinesOnChart();
+            evaluateChartSignalsAndLines();
+        });
+
+        btnSignals.addEventListener("click", () => {
+            showSignals = !showSignals;
+            btnSignals.className = showSignals ? "active" : "inactive";
+            evaluateChartSignalsAndLines();
+        });
+
+        btnPanel.addEventListener("click", () => {
+            showPanel = !showPanel;
+            btnPanel.className = showPanel ? "active" : "inactive";
+            document.getElementById("panel-mtf-container").style.display = showPanel ? "flex" : "none";
         });
 
         timeframeSelect.addEventListener("change", (e) => {
             fetchKlines("BTCUSDT", e.target.value);
         });
 
-        // Inicializar Sistema
+        inputPeriod.addEventListener("change", (e) => {
+            periodoVol = parseInt(e.target.value) || 20;
+            fetchMTFVsaData();
+        });
+
+        inputFactor.addEventListener("change", (e) => {
+            factorVol = parseFloat(e.target.value) || 1.8;
+            fetchMTFVsaData();
+        });
+
+        // Inicialización
         fetchKlines();
     });
     </script>
