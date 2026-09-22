@@ -19,7 +19,6 @@
             flex-direction: column; 
         }
 
-        /* --- NAVBAR SUPERIOR ORIGINAL --- */
         #top-bar { 
             display: flex; 
             align-items: center; 
@@ -59,7 +58,6 @@
             gap: 4px;
         }
 
-        /* Botones estilo TradingView / GitHub App Original */
         .btn-toggle {
             background-color: #2962ff;
             color: #ffffff;
@@ -74,7 +72,6 @@
         .btn-toggle:hover { background-color: #1e53e5; }
         .btn-toggle.inactive { background-color: #2a2e39; color: #787b86; }
 
-        /* --- CONTENEDOR PRINCIPAL --- */
         #main-container { 
             display: flex; 
             flex: 1; 
@@ -89,7 +86,6 @@
             position: relative; 
         }
 
-        /* --- DASHBOARD FLOTANTE ORIGINAL --- */
         #dashboard { 
             position: absolute;
             top: 10px;
@@ -99,7 +95,7 @@
             display: flex; 
             flex-direction: column; 
             gap: 8px; 
-            pointer-events: none; /* Dejamos click a través si se desea */
+            pointer-events: none;
         }
 
         .dash-module { 
@@ -123,61 +119,24 @@
             margin-bottom: 2px;
         }
 
-        /* TABLA DE VOLUMEN MTF IDENTICA A LA CAPTURA */
         .vsa-table { width: 100%; border-collapse: collapse; font-size: 11px; }
         .vsa-table th { text-align: left; color: #787b86; padding: 4px 2px; font-weight: 500; font-size: 10px; }
         .vsa-table td { padding: 4px 2px; text-align: right; font-size: 11px; }
         .vsa-table td:first-child { text-align: left; font-weight: 600; color: #d1d4dc; }
         
-        .badge-neu {
-            background-color: #2a2e39;
-            color: #787b86;
-            padding: 1px 4px;
-            border-radius: 3px;
-            font-size: 9px;
-            font-weight: bold;
-        }
-        .badge-buy {
-            background-color: rgba(0, 230, 118, 0.2);
-            color: #00e676;
-            padding: 1px 4px;
-            border-radius: 3px;
-            font-size: 9px;
-            font-weight: bold;
-        }
-        .badge-sell {
-            background-color: rgba(255, 23, 68, 0.2);
-            color: #ff1744;
-            padding: 1px 4px;
-            border-radius: 3px;
-            font-size: 9px;
-            font-weight: bold;
-        }
+        .badge-neu { background-color: #2a2e39; color: #787b86; padding: 1px 4px; border-radius: 3px; font-size: 9px; font-weight: bold; }
+        .badge-buy { background-color: rgba(0, 230, 118, 0.2); color: #00e676; padding: 1px 4px; border-radius: 3px; font-size: 9px; font-weight: bold; }
+        .badge-sell { background-color: rgba(255, 23, 68, 0.2); color: #ff1744; padding: 1px 4px; border-radius: 3px; font-size: 9px; font-weight: bold; }
 
         .txt-green { color: #00e676; font-weight: bold; }
         .txt-red { color: #ff1744; font-weight: bold; }
 
-        .param-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-size: 11px;
-        }
-        .param-input {
-            width: 45px;
-            background: #2a2e39;
-            border: 1px solid #363c4e;
-            color: #fff;
-            font-size: 11px;
-            padding: 2px 4px;
-            border-radius: 3px;
-            text-align: right;
-        }
+        .param-row { display: flex; justify-content: space-between; align-items: center; font-size: 11px; }
+        .param-input { width: 45px; background: #2a2e39; border: 1px solid #363c4e; color: #fff; font-size: 11px; padding: 2px 4px; border-radius: 3px; text-align: right; }
     </style>
 </head>
 <body>
 
-    <!-- BARRA SUPERIOR ESTRUCTURAL -->
     <div id="top-bar">
         <div class="controls-left">
             <span>TF:</span>
@@ -197,12 +156,10 @@
         </div>
     </div>
 
-    <!-- CONTENEDOR GRAFICO Y DASHBOARD -->
     <div id="main-container">
         <div id="chart"></div>
 
         <div id="dashboard">
-            <!-- PANEL VSA MTF EXACTO A LA CAPTURA -->
             <div id="panel-vsa-mtf" class="dash-module">
                 <h4>S/R VSA BALLENAS MTF & VOL %</h4>
                 <table class="vsa-table">
@@ -226,7 +183,6 @@
                 </table>
             </div>
 
-            <!-- PARÁMETROS VSA AJUSTABLES -->
             <div class="dash-module">
                 <h4>CONFIGURACIÓN VSA</h4>
                 <div class="param-row">
@@ -266,14 +222,13 @@
         const inputPeriod = document.getElementById("input-period");
         const inputFactor = document.getElementById("input-factor");
 
-        // Inicializar Lightweight Charts
         const chart = LightweightCharts.createChart(chartContainer, {
             width: chartContainer.clientWidth,
             height: chartContainer.clientHeight,
             layout: { background: { type: 'solid', color: '#131722' }, textColor: '#d1d4dc' },
             grid: { vertLines: { color: 'rgba(42, 46, 57, 0.3)' }, horzLines: { color: 'rgba(42, 46, 57, 0.3)' } },
             timeScale: { borderColor: '#2a2e39', timeVisible: true, secondsVisible: false },
-            rightPriceScale: { borderColor: '#2a2e39' }
+            rightPriceScale: { borderColor: '#2a2e39', autoScale: true }
         });
 
         const candlestickSeries = chart.addCandlestickSeries({
@@ -294,40 +249,58 @@
             activePriceLines = [];
         }
 
-        // --- CÁLCULO PINE SCRIPT VSA BALLENAS ---
+        // --- ALGORITMO VSA REVISADO CON PERSISTENCIA DE ULTIMO NIVEL (PINE SCRIPT VALUENWHEN) ---
         function calculateVSA(candles, period, factor) {
             if (!candles || candles.length < period) return null;
 
-            let sumVol = 0;
-            for (let i = candles.length - period; i < candles.length; i++) {
-                sumVol += candles[i].volume;
+            let lastSop = null;
+            let lastRes = null;
+            let lastIsBuy = false;
+            let lastIsSell = false;
+            let lastVol = 0, lastPctBuy = 0, lastPctSell = 0;
+
+            for (let i = period; i < candles.length; i++) {
+                let sumVol = 0;
+                for (let j = i - period; j < i; j++) {
+                    sumVol += candles[j].volume;
+                }
+                const avgVol = sumVol / period;
+                const candle = candles[i];
+
+                const range = candle.high - candle.low;
+                const effVol = (candle.volume === 0 || isNaN(candle.volume)) ? 1.0 : candle.volume;
+                const isWhale = effVol > (avgVol * factor);
+
+                const volBuy = range === 0 ? effVol / 2 : effVol * ((candle.close - candle.low) / range);
+                const volSell = effVol - volBuy;
+                const deltaNet = volBuy - volSell;
+
+                const mInf = Math.min(candle.open, candle.close) - candle.low;
+                const mSup = candle.high - Math.max(candle.open, candle.close);
+
+                const isBuy = isWhale && (deltaNet > 0 || mInf > (range * 0.35));
+                const isSell = isWhale && (deltaNet < 0 || mSup > (range * 0.35));
+
+                if (isBuy) lastSop = candle.low;
+                if (isSell) lastRes = candle.high;
+
+                if (i === candles.length - 1) {
+                    lastIsBuy = isBuy;
+                    lastIsSell = isSell;
+                    lastVol = effVol;
+                    lastPctBuy = ((volBuy / effVol) * 100).toFixed(1);
+                    lastPctSell = ((volSell / effVol) * 100).toFixed(1);
+                }
             }
-            const avgVol = sumVol / period;
-            const last = candles[candles.length - 1];
-
-            const range = last.high - last.low;
-            const effVol = (last.volume === 0 || isNaN(last.volume)) ? 1.0 : last.volume;
-            const isWhale = effVol > (avgVol * factor);
-
-            const volBuy = range === 0 ? effVol / 2 : effVol * ((last.close - last.low) / range);
-            const volSell = effVol - volBuy;
-            const deltaNet = volBuy - volSell;
-
-            const mInf = Math.min(last.open, last.close) - last.low;
-            const mSup = last.high - Math.max(last.open, last.close);
-
-            const isBuy = isWhale && (deltaNet > 0 || mInf > (range * 0.35));
-            const isSell = isWhale && (deltaNet < 0 || mSup > (range * 0.35));
 
             return {
-                isBuy,
-                isSell,
-                isWhale,
-                volume: effVol,
-                pctBuy: ((volBuy / effVol) * 100).toFixed(1),
-                pctSell: ((volSell / effVol) * 100).toFixed(1),
-                support: isBuy ? last.low : null,
-                resistance: isSell ? last.high : null
+                isBuy: lastIsBuy,
+                isSell: lastIsSell,
+                volume: lastVol,
+                pctBuy: lastPctBuy,
+                pctSell: lastPctSell,
+                support: lastSop,
+                resistance: lastRes
             };
         }
 
@@ -338,12 +311,11 @@
             return val.toFixed(2);
         }
 
-        // Carga de datos MTF para Dashboard
         async function loadMTFData() {
             const mapTf = { '15m': '15m', '1h': '1h', '4h': '4h', '1d': '1d', '1w': '1w', '1m': '1m' };
             for (const tf in mapTf) {
                 try {
-                    const res = await fetch(`https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=${tf}&limit=30`);
+                    const res = await fetch(`https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=${tf}&limit=100`);
                     const data = await res.json();
                     const candles = data.map(d => ({
                         open: parseFloat(d[1]), high: parseFloat(d[2]), low: parseFloat(d[3]), close: parseFloat(d[4]), volume: parseFloat(d[5])
@@ -393,7 +365,7 @@
                 candlestickSeries.setMarkers([]);
             }
 
-            // Niveles de Soporte/Resistencia MTF
+            // Dibujar líneas horizontales visibles en la escala de precios
             if (showVsaLines) {
                 const levels = [
                     { tf: '15m', label: '15m', cS: '#00b0ff', cR: '#ff5252' },
@@ -407,14 +379,16 @@
                 levels.forEach(l => {
                     const data = mtfVsaCache[l.tf];
                     if (data) {
-                        if (data.support) {
+                        if (data.support !== null) {
                             activePriceLines.push(candlestickSeries.createPriceLine({
-                                price: data.support, color: l.cS, lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed, title: `Sop ${l.label}`
+                                price: data.support, color: l.cS, lineWidth: 2,
+                                lineStyle: LightweightCharts.LineStyle.Solid, axisLabelVisible: true, title: `Sop ${l.label}`
                             }));
                         }
-                        if (data.resistance) {
+                        if (data.resistance !== null) {
                             activePriceLines.push(candlestickSeries.createPriceLine({
-                                price: data.resistance, color: l.cR, lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed, title: `Res ${l.label}`
+                                price: data.resistance, color: l.cR, lineWidth: 2,
+                                lineStyle: LightweightCharts.LineStyle.Solid, axisLabelVisible: true, title: `Res ${l.label}`
                             }));
                         }
                     }
@@ -422,7 +396,6 @@
             }
         }
 
-        // Carga de gráfico principal
         async function fetchKlines(interval = "15m") {
             statusEl.innerText = "Cargando...";
             statusEl.style.color = "#ffd700";
@@ -477,7 +450,6 @@
             };
         }
 
-        // Eventos
         btnVsa.addEventListener("click", () => {
             showVsaLines = !showVsaLines;
             btnVsa.className = showVsaLines ? "btn-toggle" : "btn-toggle inactive";
