@@ -81,11 +81,10 @@
             position: relative; 
         }
 
-        /* --- DASHBOARD IGUAL A LA CAPTURA DE TRADINGVIEW --- */
         #dashboard { 
             position: absolute;
             top: 12px;
-            right: 12px;
+            right: 100px; /* Desplazado a la izquierda para dejar libre el eje de precios */
             z-index: 10;
             display: flex; 
             flex-direction: column; 
@@ -104,7 +103,7 @@
             border-collapse: collapse; 
             font-size: 11px; 
             color: #d1d4dc;
-            min-width: 280px;
+            min-width: 270px;
         }
 
         .vsa-table th { 
@@ -219,7 +218,7 @@
 
         let currentCandleData = [];
         let mtfVsaCache = {};
-        let raySeriesList = [];
+        let priceLinesList = [];
         let ws = null;
 
         const statusEl = document.getElementById("status");
@@ -239,7 +238,7 @@
             layout: { background: { type: 'solid', color: '#000000' }, textColor: '#d1d4dc' },
             grid: { vertLines: { color: '#161923' }, horzLines: { color: '#161923' } },
             timeScale: { borderColor: '#2a2e39', timeVisible: true, secondsVisible: false },
-            rightPriceScale: { borderColor: '#2a2e39' }
+            rightPriceScale: { borderColor: '#2a2e39', autoScale: true }
         });
 
         const candlestickSeries = chart.addCandlestickSeries({
@@ -253,14 +252,13 @@
         });
         resizeObserver.observe(chartContainer);
 
-        function clearRayLines() {
-            raySeriesList.forEach(s => {
-                try { chart.removeSeries(s); } catch(e){}
+        function clearPriceLines() {
+            priceLinesList.forEach(line => {
+                try { candlestickSeries.removePriceLine(line); } catch(e){}
             });
-            raySeriesList = [];
+            priceLinesList = [];
         }
 
-        // --- ALGORITMO VSA EXPERTO CON REGISTRO DE RAYOS HISTÓRICOS ---
         function analyzeVSAData(candles, period, factor) {
             if (!candles || candles.length < period) return { events: [], lastState: null };
 
@@ -356,13 +354,13 @@
         }
 
         function renderVSAChartElements() {
-            clearRayLines();
+            clearPriceLines();
 
             if (currentCandleData.length < periodoVol) return;
 
             const currentAnalysis = analyzeVSAData(currentCandleData, periodoVol, factorVol);
             
-            // 1. DIBUJAR SEÑALES (BUY / SELL ARROWS)
+            // 1. SEÑALES BUY / SELL CON ARROW EN CANDLESTICK
             if (showVsaSignals) {
                 const markers = currentAnalysis.events.map(e => ({
                     time: e.time,
@@ -376,54 +374,50 @@
                 candlestickSeries.setMarkers([]);
             }
 
-            // 2. DIBUJAR RAYOS DE SOPORTE Y RESISTENCIA COMO EN TRADINGVIEW
+            // 2. CREAR LÍNEAS DE PRECIO CON ETIQUETAS VISIBLES EN EL EJE DERECHO
             if (showVsaLines) {
-                const lastTime = currentCandleData[currentCandleData.length - 1].time;
+                const levelsToDraw = [];
 
-                // Trazar los rayos del marco de tiempo actual
-                currentAnalysis.events.slice(-6).forEach(ev => {
-                    const lineSeries = chart.addLineSeries({
-                        color: ev.type === 'BUY' ? '#00b0ff' : '#ff5252',
-                        lineWidth: 2,
-                        priceLineVisible: false,
-                        lastValueVisible: true,
-                        title: `${ev.type === 'BUY' ? 'Sop' : 'Res'} ${ev.price.toFixed(0)}`
-                    });
-
-                    lineSeries.setData([
-                        { time: ev.time, value: ev.price },
-                        { time: lastTime, value: ev.price }
-                    ]);
-
-                    raySeriesList.push(lineSeries);
-                });
-
-                // Trazar S/R MTF Clave (4H, 1D)
+                // Recolectar niveles MTF (1D, 4H, 1H)
                 const mtfLevels = [
-                    { tf: '4h', label: '4H', color: '#aa00ff' },
-                    { tf: '1d', label: '1D', color: '#ffd700' }
+                    { tf: '1d', label: '1D', colorS: '#ffd700', colorR: '#e65100' },
+                    { tf: '4h', label: '4H', colorS: '#aa00ff', colorR: '#ff6d00' },
+                    { tf: '1h', label: '1H', colorS: '#0288d1', colorR: '#d32f2f' }
                 ];
 
                 mtfLevels.forEach(m => {
                     if (mtfVsaCache[m.tf] && mtfVsaCache[m.tf].events.length > 0) {
-                        const lastMtfEvent = mtfVsaCache[m.tf].events[mtfVsaCache[m.tf].events.length - 1];
-                        if (lastMtfEvent.time <= lastTime) {
-                            const lineSeries = chart.addLineSeries({
-                                color: m.color,
-                                lineWidth: 2,
-                                priceLineVisible: false,
-                                lastValueVisible: true,
-                                title: `${lastMtfEvent.type === 'BUY' ? 'Sop' : 'Res'} ${m.label}`
-                            });
-
-                            lineSeries.setData([
-                                { time: lastMtfEvent.time, value: lastMtfEvent.price },
-                                { time: lastTime, value: lastMtfEvent.price }
-                            ]);
-
-                            raySeriesList.push(lineSeries);
-                        }
+                        const lastEv = mtfVsaCache[m.tf].events[mtfVsaCache[m.tf].events.length - 1];
+                        levelsToDraw.push({
+                            price: lastEv.price,
+                            title: `${lastEv.type === 'BUY' ? 'Sop' : 'Res'} ${m.label}`,
+                            color: lastEv.type === 'BUY' ? m.colorS : m.colorR
+                        });
                     }
+                });
+
+                // Añadir últimos eventos del timeframe actual evitando superposiciones muy cercanas (<0.1%)
+                currentAnalysis.events.slice(-4).forEach(ev => {
+                    const title = `${ev.type === 'BUY' ? 'Sop' : 'Res'} 6bar15m`;
+                    const color = ev.type === 'BUY' ? '#00b0ff' : '#ff5252';
+
+                    const isDuplicate = levelsToDraw.some(l => Math.abs(l.price - ev.price) / ev.price < 0.001);
+                    if (!isDuplicate) {
+                        levelsToDraw.push({ price: ev.price, title, color });
+                    }
+                });
+
+                // Crear PriceLines en Lightweight Charts
+                levelsToDraw.forEach(item => {
+                    const pLine = candlestickSeries.createPriceLine({
+                        price: item.price,
+                        color: item.color,
+                        lineWidth: 2,
+                        lineStyle: LightweightCharts.LineStyle.Solid,
+                        axisLabelVisible: true,
+                        title: item.title
+                    });
+                    priceLinesList.push(pLine);
                 });
             }
         }
