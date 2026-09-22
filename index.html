@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bitcoin Trading Terminal - S/R VSA Ballenas + Supertrend exacto</title>
+    <title>Bitcoin Trading Terminal - S/R VSA Ballenas & Supertrend</title>
     <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -238,7 +238,7 @@
                     <span id="dash-st-signal" class="dash-val">--</span>
                 </div>
                 <div class="config-row">
-                    <span>Precio Señal:</span>
+                    <span>Precio:</span>
                     <span id="dash-st-price" class="dash-val">--</span>
                 </div>
             </div>
@@ -326,46 +326,37 @@
 
         chart.timeScale().subscribeVisibleLogicalRangeChange(() => drawOverlay());
 
-        // --- CÁLCULO EXACTO DE SUPERTREND (LÓGICA DEL CÓDIGO ARCHIVO BASE) ---
-        function getSupertrendMarkers(candles, atrPeriods = 10, multiplier = 3.0) {
-            if (!candles || candles.length < atrPeriods + 1) return { stLine: [], lastSignal: null };
-
+        // --- CÁLCULO DE SUPERTREND DEL CÓDIGO DE REFERENCIA PROPORCIONADO ---
+        function getSupertrendMarkers(candles, atrPeriods = 14, multiplier = 2.0) {
+            if (!candles || candles.length < atrPeriods + 1) return { stMarkers: [], lastSignal: null, stValues: [] };
+            
             const len = candles.length;
             const tr = new Float64Array(len);
             tr[0] = candles[0].high - candles[0].low;
 
             for (let i = 1; i < len; i++) {
-                const hL = candles[i].high - candles[i].low;
-                const hC = Math.abs(candles[i].high - candles[i - 1].close);
-                const lC = Math.abs(candles[i].low - candles[i - 1].close);
-                tr[i] = Math.max(hL, hC, lC);
+                tr[i] = Math.max(
+                    candles[i].high - candles[i].low,
+                    Math.abs(candles[i].high - candles[i - 1].close),
+                    Math.abs(candles[i].low - candles[i - 1].close)
+                );
             }
 
             const atr = new Float64Array(len);
             let sumTR = 0;
             for (let i = 0; i < atrPeriods; i++) sumTR += tr[i];
             atr[atrPeriods - 1] = sumTR / atrPeriods;
+            for (let i = atrPeriods; i < len; i++) atr[i] = (atr[i - 1] * (atrPeriods - 1) + tr[i]) / atrPeriods;
 
-            for (let i = atrPeriods; i < len; i++) {
-                atr[i] = (atr[i - 1] * (atrPeriods - 1) + tr[i]) / atrPeriods;
-            }
-
-            const up = new Float64Array(len);
-            const dn = new Float64Array(len);
-            const trend = new Int32Array(len);
+            const up = new Float64Array(len), dn = new Float64Array(len), trend = new Int32Array(len);
             let currentTrend = 1;
+            const stValues = [];
 
             for (let i = 0; i < len; i++) {
                 const src = (candles[i].high + candles[i].low) / 2;
-                let basicUp = src - (multiplier * atr[i]);
-                let basicDn = src + (multiplier * atr[i]);
+                let basicUp = src - (multiplier * atr[i]), basicDn = src + (multiplier * atr[i]);
 
-                if (i === 0) {
-                    up[i] = basicUp;
-                    dn[i] = basicDn;
-                    trend[i] = 1;
-                    continue;
-                }
+                if (i === 0) { up[i] = basicUp; dn[i] = basicDn; trend[i] = 1; continue; }
 
                 up[i] = candles[i - 1].close > up[i - 1] ? Math.max(basicUp, up[i - 1]) : basicUp;
                 dn[i] = candles[i - 1].close < dn[i - 1] ? Math.min(basicDn, dn[i - 1]) : basicDn;
@@ -375,25 +366,23 @@
                 else currentTrend = trend[i - 1];
 
                 trend[i] = currentTrend;
+                stValues.push({ time: candles[i].time, value: currentTrend === 1 ? up[i] : dn[i], color: currentTrend === 1 ? '#00e676' : '#ff1744' });
             }
 
-            let stLine = [];
+            const stMarkers = [];
             let lastSignal = null;
 
-            for (let i = atrPeriods; i < len; i++) {
-                const val = trend[i] === 1 ? up[i] : dn[i];
-                stLine.push({ time: candles[i].time, value: val, color: trend[i] === 1 ? '#00e676' : '#ff1744' });
-
-                if (i > atrPeriods && trend[i] !== trend[i - 1]) {
-                    lastSignal = {
-                        type: trend[i] === 1 ? 'BUY' : 'SELL',
-                        price: candles[i].close,
-                        time: candles[i].time
-                    };
+            for (let i = 1; i < len; i++) {
+                if (trend[i] === 1 && trend[i - 1] === -1) {
+                    stMarkers.push({ time: candles[i].time, position: 'belowBar', color: '#00e676', shape: 'arrowUp', text: 'ST BUY' });
+                    lastSignal = { type: 'BUY', price: candles[i].close, time: candles[i].time };
+                } else if (trend[i] === -1 && trend[i - 1] === 1) {
+                    stMarkers.push({ time: candles[i].time, position: 'aboveBar', color: '#ff1744', shape: 'arrowDown', text: 'ST SELL' });
+                    lastSignal = { type: 'SELL', price: candles[i].close, time: candles[i].time };
                 }
             }
 
-            return { stLine, lastSignal };
+            return { stMarkers, lastSignal, stValues };
         }
 
         function analyzeVSAData(candles, period, factor, isMTF = false) {
@@ -659,19 +648,18 @@
                 vsaLinesToDraw = [];
             }
 
-            // Aplicar el motor Supertrend traído de 'Para FireBase'
+            // Aplicación dinámica del Supertrend enviado por el usuario
             if (showSupertrend) {
-                const { stLine, lastSignal } = getSupertrendMarkers(currentCandleData, 10, 3.0);
-                supertrendSeries.setData(stLine);
+                const { stValues, lastSignal } = getSupertrendMarkers(currentCandleData, 14, 2.0);
+                supertrendSeries.setData(stValues);
 
                 if (lastSignal) {
                     dashStSignal.innerText = lastSignal.type === "BUY" ? "BUY (ALCISTA)" : "SELL (BAJISTA)";
                     dashStSignal.style.color = lastSignal.type === "BUY" ? "#00e676" : "#ff1744";
                     dashStPrice.innerText = `$${lastSignal.price.toFixed(2)}`;
-                } else if (stLine.length > 0) {
-                    const lastSt = stLine[stLine.length - 1];
-                    const isBuy = lastSt.color === "#00e676";
-                    dashStSignal.innerText = isBuy ? "BUY (ALCISTA)" : "SELL (BAJISTA)";
+                } else if (stValues.length > 0) {
+                    const lastSt = stValues[stValues.length - 1];
+                    dashStSignal.innerText = lastSt.color === "#00e676" ? "BUY (ALCISTA)" : "SELL (BAJISTA)";
                     dashStSignal.style.color = lastSt.color;
                     dashStPrice.innerText = `$${lastSt.value.toFixed(2)}`;
                 }
