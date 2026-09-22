@@ -5,9 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bitcoin Trading Hub - Menú Principal</title>
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
+        * { 
+            box-sizing: border-box; 
+            margin: 0; 
+            padding: 0; 
+        }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             background-color: #131722;
             color: #d1d4dc;
             min-height: 100vh;
@@ -22,9 +26,10 @@
             margin-bottom: 40px;
         }
         .header h1 {
-            font-size: 28px;
+            font-size: 32px;
             color: #ffffff;
             margin-bottom: 8px;
+            letter-spacing: -0.5px;
         }
         .header p {
             color: #787b86;
@@ -65,20 +70,24 @@
             margin-bottom: 8px;
         }
         .card-desc {
-            font-size: 12px;
+            font-size: 13px;
             color: #787b86;
             line-height: 1.5;
-            margin-bottom: 20px;
+            margin-bottom: 24px;
         }
         .btn-launch {
             background-color: #2962ff;
             color: #ffffff;
-            padding: 8px 16px;
+            padding: 10px 16px;
             border-radius: 4px;
-            font-size: 12px;
-            font-weight: bold;
+            font-size: 13px;
+            font-weight: 600;
             text-align: center;
             align-self: flex-start;
+            transition: background-color 0.2s ease;
+        }
+        .card:hover .btn-launch {
+            background-color: #1e53e5;
         }
     </style>
 </head>
@@ -90,40 +99,40 @@
     </div>
 
     <div class="grid-container">
-        <!-- Tarjeta 1 -->
+        <!-- Tarjeta 1: Terminal Principal -->
         <a href="index.html" class="card">
             <div>
                 <div class="card-icon">⚡</div>
                 <div class="card-title">Terminal Principal</div>
                 <div class="card-desc">
-                    Gráfico en vivo con Supertrend, Liquidez SMC, Pivots Multi-TF, Order Blocks y eventos macro USD.
+                    Gráfico en vivo con Supertrend, Liquidez SMC, Pivots Multi-TF, Order Blocks y eventos macroeconómicos USD.
                 </div>
             </div>
             <div class="btn-launch">Abrir Terminal 1 &rarr;</div>
         </a>
 
-        <!-- Tarjeta 2 -->
+        <!-- Tarjeta 2: Estrategia / Módulo 2 -->
         <a href="2.html" class="card">
             <div>
                 <div class="card-icon">🎯</div>
-                <div class="card-title">Modulo Muestra 2</div>
+                <div class="card-title">Módulo de Análisis 2</div>
                 <div class="card-desc">
-                    Herramientas secundarias de análisis, escáner o métricas avanzadas de mercado.
+                    Herramientas secundarias de análisis, escáneres de mercado o métricas avanzadas.
                 </div>
             </div>
-            <div class="btn-launch">Abrir Terminal 2 &rarr;</div>
+            <div class="btn-launch">Abrir Módulo 2 &rarr;</div>
         </a>
 
-        <!-- Tarjeta 3 -->
+        <!-- Tarjeta 3: Herramientas / Módulo 3 -->
         <a href="3.html" class="card">
             <div>
                 <div class="card-icon">📈</div>
-                <div class="card-title">Modulo Muestra 3</div>
+                <div class="card-title">Módulo de Análisis 3</div>
                 <div class="card-desc">
-                    Sistemas complementarios, gestión de operaciones o registros históricos.
+                    Sistemas complementarios, gestión de riesgo o registro de operaciones.
                 </div>
             </div>
-            <div class="btn-launch">Abrir Terminal 3 &rarr;</div>
+            <div class="btn-launch">Abrir Módulo 3 &rarr;</div>
         </a>
     </div>
 
