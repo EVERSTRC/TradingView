@@ -281,21 +281,24 @@
 
         chart.timeScale().subscribeVisibleLogicalRangeChange(() => drawOverlay());
 
-        function analyzeVSAData(candles, period, factor) {
-            if (!candles || candles.length < period) return { events: [], lastSupport: null, lastResistance: null, lastState: null };
+        function analyzeVSAData(candles, period, factor, isMTF = false) {
+            if (!candles || candles.length < period + 1) return { events: [], lastSupport: null, lastResistance: null, lastState: null };
+
+            // Si es MTF, ignorar la vela en vivo no cerrada para replicar TradingView exactamente
+            const targetCandles = isMTF ? candles.slice(0, -1) : candles;
 
             let events = [];
             let lastSupport = null;
             let lastResistance = null;
             let lastState = null;
 
-            for (let i = period; i < candles.length; i++) {
+            for (let i = period; i < targetCandles.length; i++) {
                 let sumVol = 0;
                 for (let j = i - period; j < i; j++) {
-                    sumVol += candles[j].volume;
+                    sumVol += targetCandles[j].volume;
                 }
                 const avgVol = sumVol / period;
-                const candle = candles[i];
+                const candle = targetCandles[i];
 
                 const range = candle.high - candle.low;
                 const effVol = (candle.volume === 0 || isNaN(candle.volume)) ? 1.0 : candle.volume;
@@ -321,7 +324,7 @@
                     lastResistance = ev;
                 }
 
-                if (i === candles.length - 1) {
+                if (i === targetCandles.length - 1) {
                     const lastEvent = events.length > 0 ? events[events.length - 1] : null;
                     lastState = {
                         isBuy: lastEvent ? lastEvent.type === 'BUY' : false,
@@ -345,9 +348,10 @@
 
         async function loadMTFData() {
             const tfs = ['15m', '1h', '4h', '1d', '1w', '1m'];
+            const currentTF = timeframeSelect.value;
+
             for (const tf of tfs) {
                 try {
-                    // Límite ampliado a 1000 velas para máxima precisión e igualar a TradingView
                     const res = await fetch(`https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=${tf}&limit=1000`);
                     const data = await res.json();
                     const candles = data.map(d => ({
@@ -355,7 +359,8 @@
                         open: parseFloat(d[1]), high: parseFloat(d[2]), low: parseFloat(d[3]), close: parseFloat(d[4]), volume: parseFloat(d[5])
                     }));
 
-                    const analysis = analyzeVSAData(candles, periodoVol, factorVol);
+                    const isMTF = (tf !== currentTF);
+                    const analysis = analyzeVSAData(candles, periodoVol, factorVol, isMTF);
                     mtfVsaCache[tf] = analysis;
                     updateDashboardRow(tf, analysis.lastState);
                 } catch(e) {
@@ -462,7 +467,7 @@
         function renderVSAChartElements() {
             if (currentCandleData.length < periodoVol) return;
 
-            const currentAnalysis = analyzeVSAData(currentCandleData, periodoVol, factorVol);
+            const currentAnalysis = analyzeVSAData(currentCandleData, periodoVol, factorVol, false);
             
             if (showVsaSignals) {
                 const markers = currentAnalysis.events.map(e => ({
@@ -549,7 +554,6 @@
             if (ws) ws.close();
 
             try {
-                // Descarga 1000 velas para sincronizar los promedios con TradingView
                 const res = await fetch(`https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=${interval}&limit=1000`);
                 const data = await res.json();
                 
