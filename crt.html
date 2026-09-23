@@ -1,25 +1,139 @@
-<script>
-    window.addEventListener('load', function () {
-        const chartDom = document.getElementById("chart-container");
-        const selectHTF = document.getElementById("tf-htf");
-        const selectLTF = document.getElementById("tf-ltf");
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRL :) Automated Trading Decision System</title>
+    <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background-color: #0d1117; color: #c9d1d9; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; height: 100vh; display: flex; flex-direction: column; }
         
+        #toolbar {
+            height: 50px; background-color: #161b22; border-bottom: 1px solid #30363d;
+            display: flex; align-items: center; justify-content: space-between; padding: 0 20px;
+        }
+        .title { font-weight: 800; font-size: 16px; color: #fff; display: flex; align-items: center; gap: 8px; }
+        .controls { display: flex; gap: 10px; align-items: center; }
+        select { background: #21262d; color: #fff; border: 1px solid #30363d; padding: 6px 12px; border-radius: 6px; outline: none; }
+
+        .status-badge {
+            background-color: rgba(0, 230, 118, 0.15);
+            color: #00e676;
+            border: 1px solid #00e676;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+
+        #workspace { flex: 1; display: flex; position: relative; overflow: hidden; }
+
+        /* PANEL IZQUIERDO: HTF */
+        #htf-draw-panel {
+            width: 220px; background-color: #161b22; border-right: 2px solid #30363d;
+            display: flex; flex-direction: column; align-items: center; padding: 15px 10px; position: relative; z-index: 5;
+        }
+        .panel-title { font-size: 12px; font-weight: 700; color: #8b949e; text-transform: uppercase; margin-bottom: 10px; }
+        #htf-svg { width: 100%; height: 100%; overflow: visible; }
+
+        /* PANEL DERECHO: GRÁFICO LTF */
+        #chart-container { flex: 1; height: 100%; position: relative; }
+
+        /* BANNER AUTOMÁTICO DE DECISIÓN */
+        #auto-decision-box {
+            position: absolute; top: 15px; left: 235px; z-index: 10;
+            background: rgba(22, 27, 34, 0.95); border: 2px solid #30363d;
+            border-radius: 8px; padding: 12px 18px; min-width: 320px;
+            backdrop-filter: blur(8px); box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+        }
+        .dec-title { font-size: 11px; text-transform: uppercase; color: #8b949e; font-weight: 700; letter-spacing: 0.5px; }
+        .dec-action { font-size: 16px; font-weight: 800; margin: 4px 0; }
+        .dec-reason { font-size: 12px; color: #c9d1d9; }
+        
+        .state-buy { color: #00e676; border-color: #00e676 !important; }
+        .state-sell { color: #ff5252; border-color: #ff5252 !important; }
+        .state-wait { color: #ffb300; border-color: #ffb300 !important; }
+        .state-no-trade { color: #8b949e; border-color: #8b949e !important; }
+    </style>
+</head>
+<body>
+
+    <div id="toolbar">
+        <div class="title">
+            <span>CRL :) Automatic Signal System</span>
+        </div>
+        <div class="controls">
+            <div id="status" class="status-badge">Conectando...</div>
+            <select id="tf-htf">
+                <option value="1h" selected>HTF: 1 Hora</option>
+                <option value="4h">HTF: 4 Horas</option>
+            </select>
+            <select id="tf-ltf">
+                <option value="1m">LTF: 1 Minuto</option>
+                <option value="5m" selected>LTF: 5 Minutos</option>
+            </select>
+        </div>
+    </div>
+
+    <div id="workspace">
+        <!-- VELA HTF DIBUJADA -->
+        <div id="htf-draw-panel">
+            <div class="panel-title" id="htf-name-label">1 HOUR - HTF</div>
+            <svg id="htf-svg" viewBox="0 0 160 400">
+                <line id="htf-wick" x1="80" y1="40" x2="80" y2="360" stroke="#2962ff" stroke-width="3" />
+                <rect id="htf-body" x="40" y="100" width="80" height="180" fill="#2962ff" stroke="#2962ff" stroke-width="2" rx="3" />
+
+                <line x1="10" y1="40" x2="150" y2="40" stroke="#ff5252" stroke-width="1.5" stroke-dasharray="4,4" />
+                <text x="15" y="32" fill="#ff5252" font-size="11" font-weight="bold">BSL (High)</text>
+                <text id="txt-bsl" x="145" y="32" fill="#ff5252" font-size="10" text-anchor="end">0.00</text>
+
+                <line x1="10" y1="200" x2="150" y2="200" stroke="#ffb300" stroke-width="1.5" stroke-dasharray="2,2" />
+                <text x="15" y="192" fill="#ffb300" font-size="11" font-weight="bold">50% (EQ)</text>
+                <text id="txt-eq" x="145" y="192" fill="#ffb300" font-size="10" text-anchor="end">0.00</text>
+
+                <line x1="10" y1="360" x2="150" y2="360" stroke="#00e676" stroke-width="1.5" stroke-dasharray="4,4" />
+                <text x="15" y="352" fill="#00e676" font-size="11" font-weight="bold">SSL (Low)</text>
+                <text id="txt-ssl" x="145" y="352" fill="#00e676" font-size="10" text-anchor="end">0.00</text>
+            </svg>
+        </div>
+
+        <!-- INDICADOR AUTOMÁTICO DE DECISIÓN -->
+        <div id="auto-decision-box" class="state-wait">
+            <div class="dec-title">ANALIZADOR AUTOMÁTICO CRL</div>
+            <div id="dec-action" class="dec-action">ANALIZANDO MERCADO...</div>
+            <div id="dec-reason" class="dec-reason">Evaluando posición respecto a niveles HTF.</div>
+        </div>
+
+        <!-- GRÁFICO LTF -->
+        <div id="chart-container"></div>
+    </div>
+
+    <script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const statusEl = document.getElementById("status");
+        const selectHTF = document.getElementById("tf-htf");
+        selectHTF.value = "1h"; // Valor por defecto
+        const selectLTF = document.getElementById("tf-ltf");
+        selectLTF.value = "5m"; // Valor por defecto
+        const chartDom = document.getElementById("chart-container");
+
         const boxDecision = document.getElementById("auto-decision-box");
         const txtAction = document.getElementById("dec-action");
         const txtReason = document.getElementById("dec-reason");
 
-        if (typeof LightweightCharts === 'undefined') {
-            txtAction.innerText = "⚠️ ERROR DE LIBRERÍA";
-            txtReason.innerText = "No se pudo cargar LightweightCharts CDN.";
-            return;
-        }
+        let currentCandleData = [];
+        let activePriceLines = [];
+        let currentHigh = 0, currentLow = 0, currentEQ = 0;
+        let ws = null;
 
         const chart = LightweightCharts.createChart(chartDom, {
             width: chartDom.clientWidth,
             height: chartDom.clientHeight,
             layout: { background: { type: 'solid', color: '#0d1117' }, textColor: '#c9d1d9' },
             grid: { vertLines: { color: '#21262d' }, horzLines: { color: '#21262d' } },
-            timeScale: { borderColor: '#30363d', timeVisible: true }
+            timeScale: { borderColor: '#30363d', timeVisible: true, rightOffset: 5 },
+            rightPriceScale: { borderColor: '#30363d', autoScale: true }
         });
 
         const series = chart.addCandlestickSeries({
@@ -28,94 +142,81 @@
             wickUpColor: '#26a69a', wickDownColor: '#ef5350'
         });
 
-        let activePriceLines = [];
-        let currentHigh = 0, currentLow = 0, currentEQ = 0;
-        let wsLTF = null, wsHTF = null;
-        let ltfHistoryMap = new Map();
+        const resizeObserver = new ResizeObserver(entries => {
+            if (!entries || entries.length === 0) return;
+            const { width, height } = entries[0].contentRect;
+            chart.applyOptions({ width, height });
+        });
+        resizeObserver.observe(chartDom);
 
-        function connectHTFWebSocket() {
-            if (wsHTF) {
-                wsHTF.close();
+        // Fetch de velas históricas con fallback de endpoints
+        async function fetchKlinesHistory(interval, limit = 500) {
+            const endpoints = [
+                `https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=${interval}&limit=${limit}`,
+                `https://api1.binance.com/api/v3/klines?symbol=BTCUSDT&interval=${interval}&limit=${limit}`,
+                `https://api3.binance.com/api/v3/klines?symbol=BTCUSDT&interval=${interval}&limit=${limit}`
+            ];
+
+            for (let url of endpoints) {
+                try {
+                    const res = await fetch(url);
+                    if (res.ok) {
+                        const data = await res.json();
+                        return data.map(d => ({
+                            time: Math.floor(d[0] / 1000),
+                            open: parseFloat(d[1]), high: parseFloat(d[2]),
+                            low: parseFloat(d[3]), close: parseFloat(d[4])
+                        }));
+                    }
+                } catch (e) {
+                    console.warn(`Error en ${url}, intentando endpoint de respaldo...`);
+                }
             }
+            return [];
+        }
+
+        // Cargar y actualizar la vela previa HTF
+        async function loadHTFData() {
             const htfVal = selectHTF.value;
             document.getElementById('htf-name-label').innerText = `${htfVal.toUpperCase()} - HTF CANDLE`;
 
-            wsHTF = new WebSocket(`wss://stream.binance.com:9443/ws/btcusdt@kline_${htfVal}`);
-            wsHTF.onmessage = (event) => {
-                const msg = JSON.parse(event.data);
-                if (msg.e === 'kline') {
-                    const k = msg.k;
-                    currentHigh = parseFloat(k.h);
-                    currentLow = parseFloat(k.l);
-                    currentEQ = currentLow + (currentHigh - currentLow) * 0.5;
+            const htfData = await fetchKlinesHistory(htfVal, 5);
+            if (htfData.length < 2) return;
 
-                    document.getElementById('txt-bsl').innerText = `$${currentHigh.toFixed(1)}`;
-                    document.getElementById('txt-eq').innerText = `$${currentEQ.toFixed(1)}`;
-                    document.getElementById('txt-ssl').innerText = `$${currentLow.toFixed(1)}`;
+            const candle = htfData[htfData.length - 2];
+            currentHigh = candle.high;
+            currentLow = candle.low;
+            currentEQ = currentLow + (currentHigh - currentLow) * 0.5;
 
-                    activePriceLines.forEach(line => series.removePriceLine(line));
-                    activePriceLines = [];
+            document.getElementById('txt-bsl').innerText = `$${currentHigh.toFixed(1)}`;
+            document.getElementById('txt-eq').innerText = `$${currentEQ.toFixed(1)}`;
+            document.getElementById('txt-ssl').innerText = `$${currentLow.toFixed(1)}`;
 
-                    activePriceLines.push(series.createPriceLine({ price: currentHigh, color: '#ff5252', lineWidth: 2, lineStyle: 2, title: 'BSL' }));
-                    activePriceLines.push(series.createPriceLine({ price: currentEQ, color: '#ffb300', lineWidth: 1, lineStyle: 0, title: '50% EQ' }));
-                    activePriceLines.push(series.createPriceLine({ price: currentLow, color: '#00e676', lineWidth: 2, lineStyle: 2, title: 'SSL' }));
-                }
-            };
+            activePriceLines.forEach(line => series.removePriceLine(line));
+            activePriceLines = [];
+
+            activePriceLines.push(series.createPriceLine({ price: currentHigh, color: '#ff5252', lineWidth: 2, lineStyle: 2, title: 'BSL' }));
+            activePriceLines.push(series.createPriceLine({ price: currentEQ, color: '#ffb300', lineWidth: 1, lineStyle: 0, title: '50% EQ' }));
+            activePriceLines.push(series.createPriceLine({ price: currentLow, color: '#00e676', lineWidth: 2, lineStyle: 2, title: 'SSL' }));
         }
 
-        function connectLTFWebSocket() {
-            if (wsLTF) {
-                wsLTF.close();
-            }
-            ltfHistoryMap.clear();
-            series.setData([]);
+        // Evaluar reglas de trading automático
+        function evaluateAutomatedTrade() {
+            if (currentCandleData.length < 2 || !currentHigh || !currentLow) return;
 
-            const ltfVal = selectLTF.value;
-            txtAction.innerText = "⏳ RECIBIENDO VELAS...";
-            txtReason.innerText = "Construyendo historial continuo vía WebSocket directo sin CORS.";
-
-            wsLTF = new WebSocket(`wss://stream.binance.com:9443/ws/btcusdt@kline_${ltfVal}`);
-            wsLTF.onmessage = (event) => {
-                const msg = JSON.parse(event.data);
-                if (msg.e === 'kline') {
-                    const k = msg.k;
-                    const candle = {
-                        time: Math.floor(k.t / 1000),
-                        open: parseFloat(k.o),
-                        high: parseFloat(k.h),
-                        low: parseFloat(k.l),
-                        close: parseFloat(k.c)
-                    };
-
-                    ltfHistoryMap.set(candle.time, candle);
-                    const sortedCandles = Array.from(ltfHistoryMap.values()).sort((a, b) => a.time - b.time);
-                    
-                    series.setData(sortedCandles);
-                    evaluateAutomatedTrade(candle);
-                }
-            };
-
-            wsLTF.onerror = () => {
-                boxDecision.className = "state-no-trade";
-                txtAction.innerText = "⚠️ ERROR DE CONEXIÓN";
-                txtReason.innerText = "No se pudo conectar con el WebSocket de Binance.";
-            };
-        }
-
-        function evaluateAutomatedTrade(lastBar) {
-            if (!currentHigh || !currentLow) return;
+            const lastBar = currentCandleData[currentCandleData.length - 1];
             const markers = [];
 
             if (lastBar.low < currentLow && lastBar.close > currentLow) {
                 boxDecision.className = "state-buy";
                 txtAction.innerText = "🚀 ENTRAR EN COMPRA (LONG)";
-                txtReason.innerText = `Barrido de SSL detectado. Stop Loss: $${lastBar.low.toFixed(1)} | Objetivo TP: $${currentEQ.toFixed(1)}`;
+                txtReason.innerText = `Barrido de SSL detectado. Stop Loss: $${lastBar.low.toFixed(1)} | TP: $${currentEQ.toFixed(1)}`;
                 markers.push({ time: lastBar.time, position: 'belowBar', color: '#00e676', shape: 'arrowUp', text: 'COMPRA (SSL Sweep)' });
             }
             else if (lastBar.high > currentHigh && lastBar.close < currentHigh) {
                 boxDecision.className = "state-sell";
                 txtAction.innerText = "🐻 ENTRAR EN VENTA (SHORT)";
-                txtReason.innerText = `Barrido de BSL detectado. Stop Loss: $${lastBar.high.toFixed(1)} | Objetivo TP: $${currentEQ.toFixed(1)}`;
+                txtReason.innerText = `Barrido de BSL detectado. Stop Loss: $${lastBar.high.toFixed(1)} | TP: $${currentEQ.toFixed(1)}`;
                 markers.push({ time: lastBar.time, position: 'aboveBar', color: '#ff5252', shape: 'arrowDown', text: 'VENTA (BSL Sweep)' });
             }
             else if (lastBar.close > currentHigh || lastBar.close < currentLow) {
@@ -132,15 +233,74 @@
             series.setMarkers(markers);
         }
 
-        function startStreams() {
-            connectHTFWebSocket();
-            connectLTFWebSocket();
+        // Cargar historial LTF y abrir la conexión WebSocket
+        async function loadLTFData() {
+            statusEl.innerText = "Cargando...";
+            statusEl.style.color = "#ffd700";
+
+            if (ws) ws.close();
+
+            const ltfVal = selectLTF.value;
+            currentCandleData = await fetchKlinesHistory(ltfVal, 500);
+
+            if (currentCandleData.length > 0) {
+                series.setData(currentCandleData);
+                evaluateAutomatedTrade();
+            }
+
+            connectWebSocket(ltfVal);
         }
 
-        selectHTF.addEventListener('change', startStreams);
-        selectLTF.addEventListener('change', startStreams);
-        window.addEventListener('resize', () => chart.applyOptions({ width: chartDom.clientWidth, height: chartDom.clientHeight }));
+        function connectWebSocket(interval) {
+            ws = new WebSocket(`wss://stream.binance.com:9443/ws/btcusdt@kline_${interval}`);
 
-        startStreams();
+            ws.onopen = () => {
+                statusEl.innerText = "Conectado ✓";
+                statusEl.style.color = "#00e676";
+            };
+
+            ws.onerror = () => {
+                statusEl.innerText = "Error WS";
+                statusEl.style.color = "#ff1744";
+            };
+
+            ws.onmessage = (event) => {
+                const msg = JSON.parse(event.data);
+                const k = msg.k;
+
+                const candle = {
+                    time: Math.floor(k.t / 1000),
+                    open: parseFloat(k.o), high: parseFloat(k.h),
+                    low: parseFloat(k.l), close: parseFloat(k.c)
+                };
+
+                series.update(candle);
+
+                const lastIdx = currentCandleData.length - 1;
+                if (lastIdx >= 0 && currentCandleData[lastIdx].time === candle.time) {
+                    currentCandleData[lastIdx] = candle;
+                } else {
+                    currentCandleData.push(candle);
+                }
+
+                evaluateAutomatedTrade();
+            };
+        }
+
+        async function initApp() {
+            await loadHTFData();
+            await loadLTFData();
+        }
+
+        selectHTF.addEventListener("change", async () => {
+            await loadHTFData();
+            evaluateAutomatedTrade();
+        });
+
+        selectLTF.addEventListener("change", loadLTFData);
+
+        initApp();
     });
-</script>
+    </script>
+</body>
+</html>
