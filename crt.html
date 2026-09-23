@@ -72,6 +72,7 @@
             <select id="tf-ltf">
                 <option value="1m">LTF: 1 Minuto</option>
                 <option value="5m" selected>LTF: 5 Minutos</option>
+                <option value="15m">LTF: 15 Minutos</option>
             </select>
         </div>
     </div>
@@ -113,9 +114,9 @@
     document.addEventListener("DOMContentLoaded", function () {
         const statusEl = document.getElementById("status");
         const selectHTF = document.getElementById("tf-htf");
-        selectHTF.value = "1h"; // Valor por defecto
+        selectHTF.value = "1h"; 
         const selectLTF = document.getElementById("tf-ltf");
-        selectLTF.value = "5m"; // Valor por defecto
+        selectLTF.value = "5m"; 
         const chartDom = document.getElementById("chart-container");
 
         const boxDecision = document.getElementById("auto-decision-box");
