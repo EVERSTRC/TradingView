@@ -31,100 +31,74 @@
         let activePriceLines = [];
         let currentHigh = 0, currentLow = 0, currentEQ = 0;
         let wsLTF = null, wsHTF = null;
+        let ltfHistoryMap = new Map();
 
-        // Carga de historial previo vía API REST
-        async function fetchKlinesHistory(symbol, interval, limit = 200) {
-            const endpoints = [
-                `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`,
-                `https://api1.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`,
-                `https://api3.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`
-            ];
-
-            for (let url of endpoints) {
-                try {
-                    let res = await fetch(url);
-                    if (res.ok) {
-                        let data = await res.json();
-                        return data.map(d => ({
-                            time: Math.floor(d[0] / 1000),
-                            open: parseFloat(d[1]),
-                            high: parseFloat(d[2]),
-                            low: parseFloat(d[3]),
-                            close: parseFloat(d[4])
-                        }));
-                    }
-                } catch (e) {
-                    console.warn(`Falló la carga desde ${url}, intentando alternativo...`);
-                }
+        function connectHTFWebSocket() {
+            if (wsHTF) {
+                wsHTF.close();
             }
-            return [];
-        }
-
-        // Conectar nivel HTF con WebSocket y actualización de líneas
-        async function initHTF() {
-            if (wsHTF) wsHTF.close();
             const htfVal = selectHTF.value;
             document.getElementById('htf-name-label').innerText = `${htfVal.toUpperCase()} - HTF CANDLE`;
-
-            // Obtener última vela cerrada para los niveles HTF
-            const history = await fetchKlinesHistory('BTCUSDT', htfVal, 5);
-            if (history.length >= 2) {
-                const prevCandle = history[history.length - 2];
-                updateHTFUI(prevCandle.high, prevCandle.low);
-            }
 
             wsHTF = new WebSocket(`wss://stream.binance.com:9443/ws/btcusdt@kline_${htfVal}`);
             wsHTF.onmessage = (event) => {
                 const msg = JSON.parse(event.data);
-                const k = msg.k;
-                updateHTFUI(parseFloat(k.h), parseFloat(k.l));
+                if (msg.e === 'kline') {
+                    const k = msg.k;
+                    currentHigh = parseFloat(k.h);
+                    currentLow = parseFloat(k.l);
+                    currentEQ = currentLow + (currentHigh - currentLow) * 0.5;
+
+                    document.getElementById('txt-bsl').innerText = `$${currentHigh.toFixed(1)}`;
+                    document.getElementById('txt-eq').innerText = `$${currentEQ.toFixed(1)}`;
+                    document.getElementById('txt-ssl').innerText = `$${currentLow.toFixed(1)}`;
+
+                    activePriceLines.forEach(line => series.removePriceLine(line));
+                    activePriceLines = [];
+
+                    activePriceLines.push(series.createPriceLine({ price: currentHigh, color: '#ff5252', lineWidth: 2, lineStyle: 2, title: 'BSL' }));
+                    activePriceLines.push(series.createPriceLine({ price: currentEQ, color: '#ffb300', lineWidth: 1, lineStyle: 0, title: '50% EQ' }));
+                    activePriceLines.push(series.createPriceLine({ price: currentLow, color: '#00e676', lineWidth: 2, lineStyle: 2, title: 'SSL' }));
+                }
             };
         }
 
-        function updateHTFUI(high, low) {
-            currentHigh = high;
-            currentLow = low;
-            currentEQ = currentLow + (currentHigh - currentLow) * 0.5;
-
-            document.getElementById('txt-bsl').innerText = `$${currentHigh.toFixed(1)}`;
-            document.getElementById('txt-eq').innerText = `$${currentEQ.toFixed(1)}`;
-            document.getElementById('txt-ssl').innerText = `$${currentLow.toFixed(1)}`;
-
-            activePriceLines.forEach(line => series.removePriceLine(line));
-            activePriceLines = [];
-
-            activePriceLines.push(series.createPriceLine({ price: currentHigh, color: '#ff5252', lineWidth: 2, lineStyle: 2, title: 'BSL' }));
-            activePriceLines.push(series.createPriceLine({ price: currentEQ, color: '#ffb300', lineWidth: 1, lineStyle: 0, title: '50% EQ' }));
-            activePriceLines.push(series.createPriceLine({ price: currentLow, color: '#00e676', lineWidth: 2, lineStyle: 2, title: 'SSL' }));
-        }
-
-        // Cargar historial LTF y conectar WebSocket para actualizaciones en vivo
-        async function initLTF() {
-            if (wsLTF) wsLTF.close();
-            const ltfVal = selectLTF.value;
-
-            // 1. Cargar las 200 velas pasadas en el gráfico
-            const history = await fetchKlinesHistory('BTCUSDT', ltfVal, 200);
-            if (history.length > 0) {
-                series.setData(history);
-                chart.timeScale().fitContent();
+        function connectLTFWebSocket() {
+            if (wsLTF) {
+                wsLTF.close();
             }
+            ltfHistoryMap.clear();
+            series.setData([]);
 
-            // 2. Transmitir velas en tiempo real
+            const ltfVal = selectLTF.value;
+            txtAction.innerText = "⏳ RECIBIENDO VELAS...";
+            txtReason.innerText = "Construyendo historial continuo vía WebSocket directo sin CORS.";
+
             wsLTF = new WebSocket(`wss://stream.binance.com:9443/ws/btcusdt@kline_${ltfVal}`);
             wsLTF.onmessage = (event) => {
                 const msg = JSON.parse(event.data);
-                const k = msg.k;
-                const candle = {
-                    time: Math.floor(k.t / 1000),
-                    open: parseFloat(k.o),
-                    high: parseFloat(k.h),
-                    low: parseFloat(k.l),
-                    close: parseFloat(k.c)
-                };
+                if (msg.e === 'kline') {
+                    const k = msg.k;
+                    const candle = {
+                        time: Math.floor(k.t / 1000),
+                        open: parseFloat(k.o),
+                        high: parseFloat(k.h),
+                        low: parseFloat(k.l),
+                        close: parseFloat(k.c)
+                    };
 
-                series.update(candle);
-                evaluateAutomatedTrade(candle);
+                    ltfHistoryMap.set(candle.time, candle);
+                    const sortedCandles = Array.from(ltfHistoryMap.values()).sort((a, b) => a.time - b.time);
+                    
+                    series.setData(sortedCandles);
+                    evaluateAutomatedTrade(candle);
+                }
+            };
+
+            wsLTF.onerror = () => {
+                boxDecision.className = "state-no-trade";
+                txtAction.innerText = "⚠️ ERROR DE CONEXIÓN";
+                txtReason.innerText = "No se pudo conectar con el WebSocket de Binance.";
             };
         }
 
@@ -158,15 +132,15 @@
             series.setMarkers(markers);
         }
 
-        async function startApp() {
-            await initHTF();
-            await initLTF();
+        function startStreams() {
+            connectHTFWebSocket();
+            connectLTFWebSocket();
         }
 
-        selectHTF.addEventListener('change', startApp);
-        selectLTF.addEventListener('change', startApp);
+        selectHTF.addEventListener('change', startStreams);
+        selectLTF.addEventListener('change', startStreams);
         window.addEventListener('resize', () => chart.applyOptions({ width: chartDom.clientWidth, height: chartDom.clientHeight }));
 
-        startApp();
+        startStreams();
     });
 </script>
